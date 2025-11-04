@@ -9,7 +9,11 @@ Smart Shield Trust Route is an intelligent delivery routing system that optimize
 ## ✨ Key Features
 
 - **AI Route Optimization Engine** - Combines graph algorithms + ML to plan efficient delivery sequences
-- **Safety Layer Integration** - Real-time crime data, lighting conditions, and patrol routes
+- **Interactive Animated Map** - Snapchat-style location tracking with real-time route visualization
+- **Safety Overlay** - Color-coded route segments based on safety scores with heatmap visualization
+- **Crime Data Integration** - Tamil Nadu 2022 crime statistics for route safety scoring
+- **Traffic-Aware Routing** - Real-time traffic data from Google Maps for accurate ETAs
+- **Weather Integration** - Real-time weather conditions affecting route safety and duration
 - **Multi-Delivery Handling** - Dynamic route updates for multiple stops
 - **Smart Feedback System** - Rider ratings improve safety scoring over time
 - **Company Dashboard** - Visualize delivery performance, safety heatmaps, and fuel metrics
@@ -55,9 +59,10 @@ Smart Shield Trust Route is an intelligent delivery routing system that optimize
 - **Leaflet** - Interactive maps
 
 ### APIs & Services
-- **Google Maps API** - Geocoding, directions
-- **OpenStreetMap** - Map data
-- **SafeGraph** - Safety/POI data
+- **Google Maps API** - Geocoding, traffic-aware directions, route geometry
+- **OpenWeatherMap API** - Real-time weather data and hazard scoring
+- **OpenStreetMap / Nominatim** - Map data and geocoding
+- **Tamil Nadu Crime Data** - District-wise crime statistics (OpenCity.in)
 
 ## 📁 Project Structure
 
@@ -74,7 +79,9 @@ Smart_shield/
 │   │   │   ├── safety_scorer.py
 │   │   │   └── route_optimizer.py
 │   │   ├── services/
-│   │   │   ├── maps.py          # Maps API integration
+│   │   │   ├── maps.py          # Maps API integration (traffic-aware)
+│   │   │   ├── crime_data.py    # Tamil Nadu crime data service
+│   │   │   ├── weather.py       # Weather API integration
 │   │   │   └── database.py      # Database operations
 │   │   ├── schemas/             # Pydantic models
 │   │   │   ├── delivery.py
@@ -83,6 +90,11 @@ Smart_shield/
 │   ├── database/
 │   │   ├── models.py
 │   │   └── database.py
+│   ├── data/
+│   │   └── crime/               # Place Tamil Nadu crime CSV files here
+│   ├── scripts/
+│   │   ├── setup_crime_data.py  # Helper script for crime data setup
+│   │   └── README.md
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
@@ -122,22 +134,44 @@ cd backend
 pip install -r requirements.txt
 ```
 
-3. Set up environment variables:
+3. Set up crime data (optional but recommended):
 ```bash
-cp .env.example .env
-# Edit .env with your API keys and database credentials
+# Run the setup script to create data directory and sample CSV
+python scripts/setup_crime_data.py
+
+# Or manually download Tamil Nadu crime data:
+# Visit: https://www.data.opencity.in/dataset/tamil-nadu-crime-data-2022
+# Download CSV files and place in backend/data/crime/
 ```
 
-4. Initialize database:
+4. Set up environment variables:
+```bash
+# Create .env file from example
+# On Windows PowerShell:
+Copy-Item backend\.env.example backend\.env
+
+# On Linux/Mac:
+cp backend/.env.example backend/.env
+
+# Edit .env with your API keys:
+# - GOOGLE_MAPS_API_KEY (required for traffic-aware routing)
+# - WEATHER_API_KEY (optional, has fallback to mock data)
+```
+
+5. Initialize database:
 ```bash
 # Run database migrations
 python -m api.services.database init_db
 ```
 
-5. Start the FastAPI server:
+6. Start the FastAPI server:
 ```bash
+cd backend
 uvicorn api.main:app --reload
 ```
+
+The server will start at `http://localhost:8000`
+API documentation available at `http://localhost:8000/docs`
 
 ### Frontend Setup
 
@@ -181,13 +215,48 @@ npm start
 
 ## 🔐 Environment Variables
 
+Create a `.env` file in the `backend/` directory with the following variables:
+
 ```env
-DATABASE_URL=postgresql://user:password@localhost/smartshield
-GOOGLE_MAPS_API_KEY=your_key_here
-MAPBOX_TOKEN=your_token_here
-JWT_SECRET_KEY=your_secret_key
+# Database (SQLite default, PostgreSQL for production)
+DATABASE_URL=sqlite:///./smartshield.db
+
+# Google Maps API (REQUIRED for traffic-aware routing)
+# Get from: https://console.cloud.google.com/google/maps-apis
+GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+
+# Weather API (OPTIONAL - has fallback to mock data)
+# Get from: https://openweathermap.org/api
+WEATHER_API_KEY=your_weather_api_key_here
+
+# Optional APIs
+MAPBOX_TOKEN=your_mapbox_token_here
+SAFEGRAPH_API_KEY=your_safegraph_api_key_here
+
+# Security
+SECRET_KEY=change-me-in-production
+JWT_SECRET_KEY=change-me-in-production
 ENVIRONMENT=development
 ```
+
+### Getting API Keys
+
+1. **Google Maps API Key** (Required for traffic-aware routing):
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select existing
+   - Enable "Maps JavaScript API" and "Directions API"
+   - Create credentials → API Key
+   - Copy the key to `GOOGLE_MAPS_API_KEY`
+
+2. **Weather API Key** (Optional):
+   - Sign up at [OpenWeatherMap](https://openweathermap.org/api)
+   - Get your free API key
+   - Copy to `WEATHER_API_KEY`
+
+3. **Crime Data** (No API key needed):
+   - Download from [OpenCity.in](https://www.data.opencity.in/dataset/tamil-nadu-crime-data-2022)
+   - Place CSV files in `backend/data/crime/`
+   - Or use the built-in default data for development
 
 ## 🤝 Contributing
 
@@ -201,11 +270,39 @@ ENVIRONMENT=development
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
+## 📊 Data Sources
+
+### Crime Data
+- **Tamil Nadu Crime Data 2022** - [OpenCity.in Dataset](https://www.data.opencity.in/dataset/tamil-nadu-crime-data-2022)
+  - District-wise crime statistics
+  - Includes murders, sexual harassment, road accidents, suicides
+  - Public Domain license
+  - Used for route safety scoring
+
+### Traffic Data
+- **Google Maps Directions API** - Traffic-aware routing
+  - Real-time traffic conditions
+  - Multiple route alternatives
+  - Accurate ETAs based on current traffic
+
+### Weather Data
+- **OpenWeatherMap API** - Real-time weather conditions
+  - Precipitation, wind, visibility
+  - Weather hazard scoring
+  - Route duration adjustments
+
+### Research References
+- **Coimbatore Traffic Congestion Study** - [GIS-based Traffic Analysis](https://www.sphinxsai.com/2017/ch_vol10_no8/2/%28382-387%29V10N8CT.pdf)
+  - Traffic congestion evaluation methodology
+  - Route optimization strategies
+
 ## 🙏 Acknowledgments
 
-- Google Maps Platform
-- OpenStreetMap contributors
-- SafeGraph for safety data
+- Google Maps Platform for traffic-aware routing
+- OpenStreetMap / Nominatim for map data and geocoding
+- OpenCity.in for Tamil Nadu crime data
+- OpenWeatherMap for weather data
+- Coimbatore Institute of Technology for traffic research
 
 ## 📧 Contact
 

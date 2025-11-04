@@ -20,7 +20,9 @@ from config.config import settings
 from api.schemas.delivery import Coordinate, DeliveryStop
 from api.services.maps import MapsService
 from api.models.safety_scorer import SafetyScorer
+from api.services.weather import WeatherService
 from loguru import logger
+import asyncio
 
 
 class RouteOptimizer:
@@ -29,6 +31,7 @@ class RouteOptimizer:
     def __init__(self):
         self.maps_service = MapsService()
         self.safety_scorer = SafetyScorer()
+        self.weather_service = WeatherService()
     
     def optimize_route(
         self,
@@ -90,7 +93,8 @@ class RouteOptimizer:
             stops,
             sequence,
             optimize_for,
-            rider_info
+            rider_info,
+            departure_time
         )
         
         # Generate route ID
@@ -285,14 +289,20 @@ class RouteOptimizer:
         stops: List[DeliveryStop],
         sequence: List[int],
         objectives: List[str],
-        rider_info: Optional[Dict]
+        rider_info: Optional[Dict],
+        departure_time: Optional[datetime] = None
     ) -> Tuple[List[Dict], Dict]:
-        """Build route segments with statistics."""
+        """Build route segments with statistics using traffic-aware directions."""
         segments = []
         total_distance = 0
         total_duration = 0
         total_safety = 0
         total_fuel = 0
+        
+        # Get departure timestamp for traffic-aware routing
+        dep_timestamp = None
+        if departure_time:
+            dep_timestamp = int(departure_time.timestamp())
         
         # First segment: starting point to first stop
         current_point = starting_point
@@ -301,20 +311,94 @@ class RouteOptimizer:
             stop = stops[stop_idx]
             next_point = stop.coordinates
             
-            # Calculate distance
-            distance = self.maps_service.calculate_straight_distance(
-                current_point, next_point
+            # Get traffic-aware directions
+            directions = self.maps_service.get_directions(
+                origin=current_point,
+                destination=next_point,
+                mode="driving",
+                departure_time=dep_timestamp,
+                traffic_model="best_guess"
             )
             
-            # Estimate duration (30 km/h average)
-            duration = distance / 8.33
+            # Extract route geometry if available
+            route_coords = None
+            if directions and 'route_coordinates' in directions:
+                route_coords = directions['route_coordinates']
             
-            # Get safety score
+            # Get distance and duration from directions (traffic-aware)
+            if directions and directions.get('legs'):
+                leg = directions['legs'][0]
+                distance = leg['distance']['value']  # meters
+                # Use traffic duration if available, otherwise regular duration
+                if 'duration_in_traffic' in leg:
+                    duration = leg['duration_in_traffic']['value']  # seconds
+                else:
+                    duration = leg['duration']['value']  # seconds
+            else:
+                # Fallback to straight-line distance
+                distance = self.maps_service.calculate_straight_distance(
+                    current_point, next_point
+                )
+                duration = distance / 8.33  # Estimate
+            
+            # Get weather data for route points
+            weather_points = [current_point, next_point]
+            if route_coords:
+                # Sample weather at intermediate points
+                step = max(1, len(route_coords) // 5)
+                weather_points = [current_point] + [
+                    Coordinate(latitude=c['lat'], longitude=c['lng'])
+                    for c in route_coords[::step]
+                ] + [next_point]
+            
+            # Fetch weather data (async, but we'll run it synchronously for now)
+            weather_data_list = asyncio.run(
+                self.weather_service.get_route_weather(weather_points)
+            )
+            
+            # Average weather hazard for the segment
+            avg_weather_hazard = 0
+            if weather_data_list:
+                hazards = [w['weather'].get('hazard_score', 0) for w in weather_data_list]
+                avg_weather_hazard = sum(hazards) / len(hazards) if hazards else 0
+            
+            weather_data = {
+                'hazard_score': avg_weather_hazard,
+                'hazard_conditions': []
+            }
+            if weather_data_list:
+                # Aggregate conditions
+                all_conditions = []
+                for w in weather_data_list:
+                    all_conditions.extend(w['weather'].get('hazard_conditions', []))
+                weather_data['hazard_conditions'] = list(set(all_conditions))
+            
+            # Get safety score with weather data
             segment_coords = [current_point, next_point]
+            if route_coords:
+                # Use actual route coordinates for more accurate safety scoring
+                segment_coords = [
+                    Coordinate(latitude=c['lat'], longitude=c['lng'])
+                    for c in route_coords
+                ]
+            
+            # Determine time of day
+            time_of_day = "day"
+            if departure_time:
+                hour = departure_time.hour
+                if hour < 6 or hour >= 22:
+                    time_of_day = "night"
+                elif hour < 8 or hour >= 18:
+                    time_of_day = "evening"
+            
             safety_data = self.safety_scorer.score_route(
-                segment_coords, "day", rider_info
+                segment_coords, time_of_day, rider_info
             )
             safety_score = safety_data["route_safety_score"]
+            
+            # Apply weather penalty to duration
+            weather_penalty = self.weather_service.calculate_weather_penalty(weather_data)
+            duration = duration * weather_penalty
             
             # Calculate fuel consumption
             fuel = distance / 1000 * settings.FUEL_CONSUMPTION_PER_KM
@@ -325,7 +409,10 @@ class RouteOptimizer:
                 "distance_meters": distance,
                 "duration_seconds": duration,
                 "safety_score": safety_score,
-                "estimated_fuel_liters": fuel
+                "estimated_fuel_liters": fuel,
+                "route_coordinates": route_coords,
+                "weather_data": weather_data,
+                "has_traffic_data": directions and directions.get('has_traffic_data', False)
             })
             
             total_distance += distance

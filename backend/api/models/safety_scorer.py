@@ -11,16 +11,18 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from config.config import settings
 from api.schemas.delivery import Coordinate
+from api.services.crime_data import CrimeDataService
 from loguru import logger
 
 
 class SafetyScorer:
     """AI-powered safety scoring for routes."""
     
-    def __init__(self):
+    def __init__(self, crime_service: Optional[CrimeDataService] = None):
         self.model = None
         self.scaler = StandardScaler()
         self.weights = settings.SAFETY_WEIGHTS
+        self.crime_service = crime_service or CrimeDataService()
         self._initialize_model()
     
     def _initialize_model(self):
@@ -84,52 +86,73 @@ class SafetyScorer:
     def _get_location_features(
         self,
         coord: Coordinate,
-        time_of_day: str = "day"
+        time_of_day: str = "day",
+        weather_data: Optional[Dict] = None
     ) -> np.ndarray:
-        """Extract features for a location."""
-        # Simulate real-world feature extraction
-        # In production, this would fetch from external APIs (SafeGraph, etc.)
+        """Extract features for a location using real crime data."""
+        # Get real crime data from Tamil Nadu crime dataset
+        crime_score = self.crime_service.get_crime_score(coord)
+        crime_data = self.crime_service.get_crime_data_for_location(coord)
         
-        # Mock features - replace with actual API calls
-        np.random.seed(int(coord.latitude * 1000 + coord.longitude))
+        # Convert crime score to crime rate (0-10 scale)
+        crime_rate = crime_score / 10.0
         
-        # Crime rate (low for demo, higher in some areas)
-        crime_rate = np.random.rand() * 3
-        
-        # Lighting score (varies by location)
-        lighting_score = 60 + np.random.rand() * 30
-        
-        # Patrol density (varies by area)
-        patrol_density = 40 + np.random.rand() * 40
-        
-        # Traffic density
-        traffic_density = 30 + np.random.rand() * 50
-        
-        # Time of day adjustment
+        # Lighting score (varies by location and time)
         hour_map = {"day": 12, "evening": 18, "night": 22}
         hour = hour_map.get(time_of_day, 12)
+        
+        # Adjust lighting based on time of day
+        if hour < 6 or hour > 20:
+            lighting_score = 30 + np.random.rand() * 20  # Low at night
+        elif hour < 8 or hour > 18:
+            lighting_score = 50 + np.random.rand() * 30  # Medium at dawn/dusk
+        else:
+            lighting_score = 70 + np.random.rand() * 30  # High during day
+        
+        # Patrol density (higher in high-crime areas)
+        if crime_score > 50:
+            patrol_density = 60 + np.random.rand() * 30  # More patrols in high-crime areas
+        else:
+            patrol_density = 40 + np.random.rand() * 40
+        
+        # Traffic density (mock for now, could use real traffic data)
+        traffic_density = 30 + np.random.rand() * 50
+        
+        # Weather hazard impact (if provided)
+        weather_hazard = 0
+        if weather_data:
+            weather_hazard = weather_data.get("hazard_score", 0) / 10.0  # Scale to 0-10
         
         return np.array([
             crime_rate,
             lighting_score,
             patrol_density,
             traffic_density,
-            hour
+            hour,
+            weather_hazard
         ])
     
     def score_location(
         self,
         coord: Coordinate,
         time_of_day: str = "day",
-        rider_info: Optional[Dict] = None
+        rider_info: Optional[Dict] = None,
+        weather_data: Optional[Dict] = None
     ) -> Tuple[float, List[Dict]]:
         """Score a single location for safety.
         
         Returns:
             Tuple of (overall_score, factors_list)
         """
-        features = self._get_location_features(coord, time_of_day)
-        features_scaled = self.scaler.transform(features.reshape(1, -1))
+        features = self._get_location_features(coord, time_of_day, weather_data)
+        # Handle different feature sizes (with/without weather)
+        if features.shape[0] == 6:
+            # New format with weather
+            features_for_model = features[:5].reshape(1, -1)  # Use first 5 for model
+        else:
+            features_for_model = features.reshape(1, -1)
+        
+        features_scaled = self.scaler.transform(features_for_model)
         
         # Get model prediction
         base_score = self.model.predict(features_scaled)[0]
@@ -144,13 +167,17 @@ class SafetyScorer:
         
         base_score = np.clip(base_score, 0, 100)
         
+        # Get crime data for detailed description
+        crime_data = self.crime_service.get_crime_data_for_location(coord)
+        crime_score = self.crime_service.get_crime_score(coord)
+        
         # Create factors breakdown
         factors = [
             {
                 "factor": "crime",
-                "score": max(0, 100 - features[0] * 10),
+                "score": max(0, 100 - crime_score),
                 "weight": self.weights["crime"],
-                "description": f"Crime rate: {features[0]:.1f}"
+                "description": f"Crime risk: {crime_data.get('district', 'Unknown')} - {crime_data.get('total_crimes', 0)} incidents"
             },
             {
                 "factor": "lighting",
@@ -171,6 +198,18 @@ class SafetyScorer:
                 "description": f"Traffic conditions: {features[3]:.1f}/100"
             }
         ]
+        
+        # Add weather factor if available
+        if weather_data:
+            weather_hazard = weather_data.get("hazard_score", 0)
+            factors.append({
+                "factor": "weather",
+                "score": max(0, 100 - weather_hazard),
+                "weight": 0.15,  # Additional weight for weather
+                "description": f"Weather hazard: {', '.join(weather_data.get('hazard_conditions', []))}"
+            })
+            # Adjust base score based on weather
+            base_score -= weather_hazard * 0.2
         
         return base_score, factors
     
