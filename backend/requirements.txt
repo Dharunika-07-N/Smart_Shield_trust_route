@@ -1,0 +1,54 @@
+# Web Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-dotenv==1.0.0
+
+# Database
+sqlalchemy==2.0.23
+# psycopg2-binary==2.9.9  # Optional: For PostgreSQL. Comment out if having installation issues
+alembic==1.12.1
+# geoalchemy2==0.14.2  # Optional: For PostGIS. Comment out if having installation issues
+
+# Data Processing
+# pandas==2.1.3  # Optional: Heavy dependency. Uncomment if needed
+# numpy==1.26.2  # Optional: Heavy dependency. Uncomment if needed
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Machine Learning
+scikit-learn==1.3.2
+joblib==1.3.2
+# tensorflow==2.15.0  # Optional: Heavy dependency. Uncomment if needed for advanced ML
+
+# Graph Algorithms
+networkx==3.2.1
+# ortools==9.9.3963  # Optional: For advanced optimization. May require additional setup
+
+# Maps & Geospatial
+googlemaps==4.10.0
+geopy==2.4.1
+shapely==2.0.2
+folium==0.15.1
+
+# HTTP Requests
+httpx==0.25.2
+aiohttp==3.9.1
+
+# CORS
+fastapi-cors==0.0.6
+
+# Utilities
+python-dateutil==2.8.2
+pytz==2023.3
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.2
+
+# Logging
+loguru==0.7.2
+
