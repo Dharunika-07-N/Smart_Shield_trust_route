@@ -91,9 +91,22 @@ class MapsService:
         destination: Coordinate,
         waypoints: Optional[List[Coordinate]] = None,
         mode: str = "driving",
-        avoid: Optional[List[str]] = None
+        avoid: Optional[List[str]] = None,
+        departure_time: Optional[int] = None,
+        traffic_model: str = "best_guess"
     ) -> Optional[Dict]:
-        """Get directions between points."""
+        """
+        Get directions between points with traffic-aware routing.
+        
+        Args:
+            origin: Starting point
+            destination: End point
+            waypoints: Intermediate waypoints
+            mode: Transportation mode (driving, walking, bicycling)
+            avoid: Things to avoid (tolls, highways, ferries, indoor)
+            departure_time: Unix timestamp for traffic prediction (None = current time)
+            traffic_model: Traffic model (best_guess, optimistic, pessimistic)
+        """
         if not self.gmaps:
             logger.warning("Directions without API key - returning mock data")
             return self._mock_directions(origin, destination)
@@ -108,21 +121,74 @@ class MapsService:
                     f"{w.latitude},{w.longitude}" for w in waypoints
                 ]
             
-            directions = self.gmaps.directions(
-                origin=origin_str,
-                destination=dest_str,
-                waypoints=waypoints_list,
-                mode=mode,
-                avoid=avoid or [],
-                units="metric"
-            )
+            # Build directions request
+            directions_params = {
+                "origin": origin_str,
+                "destination": dest_str,
+                "mode": mode,
+                "avoid": avoid or [],
+                "units": "metric",
+                "alternatives": True  # Get multiple route options
+            }
+            
+            # Add traffic-aware parameters for driving mode
+            if mode == "driving" and departure_time:
+                directions_params["departure_time"] = departure_time
+                directions_params["traffic_model"] = traffic_model
+            
+            if waypoints_list:
+                directions_params["waypoints"] = waypoints_list
+            
+            directions = self.gmaps.directions(**directions_params)
             
             if directions:
-                return directions[0]
+                # Return the best route (first one) with traffic info
+                route = directions[0]
+                
+                # Extract route geometry (polyline)
+                if 'overview_polyline' in route:
+                    polyline_points = route['overview_polyline'].get('points', '')
+                    
+                    # Decode polyline to get coordinates (simplified - in production use polyline library)
+                    # For now, extract from legs
+                    route_coords = []
+                    for leg in route.get('legs', []):
+                        for step in leg.get('steps', []):
+                            start = step.get('start_location', {})
+                            route_coords.append({
+                                'lat': start.get('lat'),
+                                'lng': start.get('lng')
+                            })
+                            end = step.get('end_location', {})
+                            route_coords.append({
+                                'lat': end.get('lat'),
+                                'lng': end.get('lng')
+                            })
+                    
+                    route['route_coordinates'] = route_coords
+                    route['polyline'] = polyline_points
+                
+                # Add traffic duration if available
+                for leg in route.get('legs', []):
+                    if 'duration_in_traffic' in leg:
+                        route['has_traffic_data'] = True
+                        break
+                
+                return route
         except Exception as e:
             logger.error(f"Directions error: {e}")
         
         return None
+    
+    def decode_polyline(self, encoded: str) -> List[Dict]:
+        """Decode Google polyline string to list of coordinates."""
+        try:
+            import polyline
+            coords = polyline.decode(encoded)
+            return [{'lat': lat, 'lng': lon} for lat, lon in coords]
+        except ImportError:
+            logger.warning("polyline library not installed, using fallback")
+            return []
     
     def _mock_distance_matrix(
         self,
