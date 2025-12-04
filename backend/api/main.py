@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from config.config import settings
-from api.routes import delivery, safety, feedback
+from api.routes import delivery, safety, feedback, traffic
 import sys
 from pathlib import Path
 
@@ -30,19 +30,21 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS middleware
+# CORS middleware - Enhanced for frontend connection
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origins=settings.BACKEND_CORS_ORIGINS + ["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Include routers
 app.include_router(delivery.router, prefix=settings.API_V1_PREFIX, tags=["Delivery"])
 app.include_router(safety.router, prefix=settings.API_V1_PREFIX, tags=["Safety"])
 app.include_router(feedback.router, prefix=settings.API_V1_PREFIX, tags=["Feedback"])
+app.include_router(traffic.router, prefix=settings.API_V1_PREFIX, tags=["Traffic"])
 
 
 @app.on_event("startup")

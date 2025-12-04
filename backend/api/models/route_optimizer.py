@@ -20,6 +20,7 @@ from config.config import settings
 from api.schemas.delivery import Coordinate, DeliveryStop
 from api.services.maps import MapsService
 from api.models.safety_scorer import SafetyScorer
+from api.services.traffic import TrafficService
 from loguru import logger
 
 
@@ -29,6 +30,7 @@ class RouteOptimizer:
     def __init__(self):
         self.maps_service = MapsService()
         self.safety_scorer = SafetyScorer()
+        self.traffic_service = TrafficService()
     
     def optimize_route(
         self,
@@ -185,6 +187,20 @@ class RouteOptimizer:
                         safety_cost = safety_matrix[i][j] / 100.0
                         cost += safety_cost
                     
+                    # Traffic cost (considering current traffic conditions)
+                    if "traffic" in objectives or "time" in objectives:
+                        try:
+                            traffic_level, _, traffic_duration = self.traffic_service.get_traffic_level(
+                                points[i], points[j]
+                            )
+                            # Add traffic penalty to cost
+                            if traffic_level == 'high':
+                                cost += traffic_duration / 60.0 * 0.3  # 30% penalty for high traffic
+                            elif traffic_level == 'medium':
+                                cost += traffic_duration / 60.0 * 0.15  # 15% penalty
+                        except Exception as e:
+                            logger.warning(f"Could not get traffic data: {e}")
+                    
                     cost_matrix[i][j] = cost
         
         return cost_matrix
@@ -306,8 +322,15 @@ class RouteOptimizer:
                 current_point, next_point
             )
             
-            # Estimate duration (30 km/h average)
-            duration = distance / 8.33
+            # Get traffic-aware duration
+            traffic_level = "low"
+            try:
+                traffic_level, _, duration = self.traffic_service.get_traffic_level(
+                    current_point, next_point
+                )
+            except Exception:
+                # Fallback to average speed if traffic service fails
+                duration = distance / 8.33
             
             # Get safety score
             segment_coords = [current_point, next_point]
@@ -319,13 +342,23 @@ class RouteOptimizer:
             # Calculate fuel consumption
             fuel = distance / 1000 * settings.FUEL_CONSUMPTION_PER_KM
             
+            # Get traffic level for this segment
+            traffic_level = "low"
+            try:
+                traffic_level, _, _ = self.traffic_service.get_traffic_level(
+                    current_point, next_point
+                )
+            except Exception:
+                pass
+            
             segments.append({
                 "from_stop": f"START_{i}" if i == 0 else stops[sequence[i-1]].stop_id,
                 "to_stop": stop.stop_id,
                 "distance_meters": distance,
                 "duration_seconds": duration,
                 "safety_score": safety_score,
-                "estimated_fuel_liters": fuel
+                "estimated_fuel_liters": fuel,
+                "traffic_level": traffic_level
             })
             
             total_distance += distance

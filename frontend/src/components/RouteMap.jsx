@@ -4,7 +4,17 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
 const RouteMap = () => {
   const [selectedRoute, setSelectedRoute] = useState(null);
 
-  // Mock route data
+  // Get traffic color
+  const getTrafficColor = (traffic) => {
+    switch (traffic) {
+      case 'low': return '#22c55e';
+      case 'medium': return '#eab308';
+      case 'high': return '#ef4444';
+      default: return '#6b7280';
+    }
+  };
+
+  // Mock route data with traffic
   const routes = [
     {
       id: 1,
@@ -15,11 +25,11 @@ const RouteMap = () => {
       distance: '12.5 km',
       time: '28 min',
       coordinates: [
-        [40.7128, -74.0060],
-        [40.7210, -74.0120],
-        [40.7285, -74.0050],
-        [40.7320, -73.9950],
-        [40.7250, -73.9850],
+        { lat: 40.7128, lng: -74.0060, traffic: 'low', safety: 95 },
+        { lat: 40.7210, lng: -74.0120, traffic: 'medium', safety: 90 },
+        { lat: 40.7285, lng: -74.0050, traffic: 'high', safety: 85 },
+        { lat: 40.7320, lng: -73.9950, traffic: 'low', safety: 95 },
+        { lat: 40.7250, lng: -73.9850, traffic: 'medium', safety: 88 },
       ],
     },
     {
@@ -31,10 +41,10 @@ const RouteMap = () => {
       distance: '8.3 km',
       time: '22 min',
       coordinates: [
-        [40.7500, -73.9900],
-        [40.7550, -73.9850],
-        [40.7600, -73.9800],
-        [40.7650, -73.9750],
+        { lat: 40.7500, lng: -73.9900, traffic: 'low', safety: 88 },
+        { lat: 40.7550, lng: -73.9850, traffic: 'medium', safety: 85 },
+        { lat: 40.7600, lng: -73.9800, traffic: 'high', safety: 80 },
+        { lat: 40.7650, lng: -73.9750, traffic: 'low', safety: 87 },
       ],
     },
     {
@@ -46,12 +56,12 @@ const RouteMap = () => {
       distance: '15.2 km',
       time: '35 min',
       coordinates: [
-        [40.7100, -73.9950],
-        [40.7150, -73.9900],
-        [40.7200, -73.9850],
-        [40.7250, -73.9800],
-        [40.7300, -73.9750],
-        [40.7350, -73.9700],
+        { lat: 40.7100, lng: -73.9950, traffic: 'low', safety: 90 },
+        { lat: 40.7150, lng: -73.9900, traffic: 'medium', safety: 88 },
+        { lat: 40.7200, lng: -73.9850, traffic: 'low', safety: 92 },
+        { lat: 40.7250, lng: -73.9800, traffic: 'high', safety: 82 },
+        { lat: 40.7300, lng: -73.9750, traffic: 'medium', safety: 86 },
+        { lat: 40.7350, lng: -73.9700, traffic: 'low', safety: 89 },
       ],
     },
   ];
@@ -154,30 +164,69 @@ const RouteMap = () => {
               
               {selectedRoute ? (
                 <>
-                  {/* Display selected route */}
+                  {/* Display selected route with traffic-colored segments */}
                   {selectedRoute.coordinates.map((coord, index) => (
-                    <Marker key={index} position={coord}>
-                      <Popup>Stop {index + 1}</Popup>
+                    <Marker key={index} position={[coord.lat || coord[0], coord.lng || coord[1]]}>
+                      <Popup>
+                        Stop {index + 1}
+                        {coord.traffic && (
+                          <div className="mt-2">
+                            <div className="text-xs">Traffic: <span style={{ color: getTrafficColor(coord.traffic) }}>{coord.traffic}</span></div>
+                            {coord.safety && <div className="text-xs">Safety: {coord.safety}%</div>}
+                          </div>
+                        )}
+                      </Popup>
                     </Marker>
                   ))}
-                  <Polyline
-                    positions={selectedRoute.coordinates}
-                    pathOptions={{ color: 'blue', weight: 4 }}
-                  />
+                  {/* Create segments with traffic colors */}
+                  {selectedRoute.coordinates.map((coord, index) => {
+                    if (index === selectedRoute.coordinates.length - 1) return null;
+                    const start = selectedRoute.coordinates[index];
+                    const end = selectedRoute.coordinates[index + 1];
+                    const traffic = end.traffic || 'low';
+                    return (
+                      <Polyline
+                        key={index}
+                        positions={[
+                          [start.lat || start[0], start.lng || start[1]],
+                          [end.lat || end[0], end.lng || end[1]]
+                        ]}
+                        pathOptions={{
+                          color: getTrafficColor(traffic),
+                          weight: traffic === 'high' ? 8 : traffic === 'medium' ? 6 : 4,
+                          opacity: 0.8,
+                          dashArray: traffic === 'high' ? '10, 10' : null,
+                        }}
+                      />
+                    );
+                  })}
                 </>
               ) : (
                 <>
                   {/* Display all routes */}
                   {routes.map((route) => (
                     <React.Fragment key={route.id}>
-                      <Polyline
-                        positions={route.coordinates}
-                        pathOptions={{
-                          color: getSafetyColor(route.safety),
-                          weight: 2,
-                        }}
-                      />
-                      <Marker position={route.coordinates[0]}>
+                      {route.coordinates.map((coord, index) => {
+                        if (index === route.coordinates.length - 1) return null;
+                        const start = route.coordinates[index];
+                        const end = route.coordinates[index + 1];
+                        const traffic = end.traffic || 'low';
+                        return (
+                          <Polyline
+                            key={`${route.id}-${index}`}
+                            positions={[
+                              [start.lat || start[0], start.lng || start[1]],
+                              [end.lat || end[0], end.lng || end[1]]
+                            ]}
+                            pathOptions={{
+                              color: getTrafficColor(traffic),
+                              weight: 3,
+                              opacity: 0.6,
+                            }}
+                          />
+                        );
+                      })}
+                      <Marker position={[route.coordinates[0].lat || route.coordinates[0][0], route.coordinates[0].lng || route.coordinates[0][1]]}>
                         <Popup>{route.name}</Popup>
                       </Marker>
                     </React.Fragment>

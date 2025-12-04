@@ -93,6 +93,7 @@ class RouteSegment(BaseModel):
     duration_seconds: float = Field(..., ge=0, description="Duration in seconds")
     safety_score: float = Field(..., ge=0, le=100, description="Safety score (0-100)")
     estimated_fuel_liters: float = Field(..., ge=0, description="Estimated fuel consumption")
+    traffic_level: Optional[str] = Field("low", description="Traffic level: low, medium, high")
 
 
 class OptimizedRoute(BaseModel):

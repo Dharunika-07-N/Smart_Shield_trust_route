@@ -20,6 +20,11 @@ from .feedback import (
     FeedbackSubmissionResponse,
     FeedbackStats
 )
+from .traffic import (
+    TrafficSegmentResponse,
+    TrafficRouteResponse,
+    RouteSegmentTraffic
+)
 
 __all__ = [
     "DeliveryStop",
@@ -36,6 +41,9 @@ __all__ = [
     "SafetyHeatmapResponse",
     "SafetyFeedback",
     "FeedbackSubmissionResponse",
-    "FeedbackStats"
+    "FeedbackStats",
+    "TrafficSegmentResponse",
+    "TrafficRouteResponse",
+    "RouteSegmentTraffic"
 ]
 

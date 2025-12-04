@@ -6,6 +6,7 @@ import {
 import Analytics from './Analytics';
 import RouteMap from './RouteMap';
 import SafetyHeatmap from './SafetyHeatmap';
+import SnapMap from './SnapMap';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -74,6 +75,7 @@ const Dashboard = () => {
           <nav className="flex space-x-8">
             {[
               { id: 'overview', label: 'Overview' },
+              { id: 'snap-map', label: 'Live Map' },
               { id: 'analytics', label: 'Analytics' },
               { id: 'route-map', label: 'Route Map' },
               { id: 'safety-heatmap', label: 'Safety Heatmap' },
@@ -211,6 +213,7 @@ const Dashboard = () => {
           </div>
         )}
 
+        {activeTab === 'snap-map' && <SnapMap />}
         {activeTab === 'analytics' && <Analytics />}
         {activeTab === 'route-map' && <RouteMap />}
         {activeTab === 'safety-heatmap' && <SafetyHeatmap />}
