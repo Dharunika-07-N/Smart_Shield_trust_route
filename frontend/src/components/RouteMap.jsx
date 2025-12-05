@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 
@@ -18,6 +18,16 @@ const RouteMap = () => {
   const [safetyOverlay, setSafetyOverlay] = useState(null);
   const [showSafetyOverlay, setShowSafetyOverlay] = useState(true);
 
+
+  // Animated pulsing dot icon for current location (Snapchat-like)
+  const pulsingIcon = useMemo(() => {
+    const size = 20;
+    return L.divIcon({
+      className: 'pulsing-marker',
+      html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#3b82f6;box-shadow:0 0 0 0 rgba(59,130,246,0.7);animation:pulse 2s infinite"></div>`
+    });
+  }, []);
+
   // Get traffic color
   const getTrafficColor = (traffic) => {
     switch (traffic) {
@@ -28,7 +38,7 @@ const RouteMap = () => {
     }
   };
 
-  // Mock route data with traffic (used as example when no optimized routes)
+  // Mock route data with traffic
   const routes = [
     {
       id: 1,
@@ -80,20 +90,11 @@ const RouteMap = () => {
     },
   ];
 
-  // Animated pulsing dot icon for current location
-  const pulsingIcon = useMemo(() => {
-    const size = 20;
-    return L.divIcon({
-      className: 'pulsing-marker',
-      html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#3b82f6;box-shadow:0 0 0 0 rgba(59,130,246,0.7);animation:pulse 2s infinite"></div>`
-    });
-  }, []);
 
   useEffect(() => {
     const style = document.createElement('style');
     style.innerHTML = `
       @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(59,130,246,0.7)} 70%{box-shadow:0 0 0 15px rgba(59,130,246,0)} 100%{box-shadow:0 0 0 0 rgba(59,130,246,0)} }
-      .leaflet-container .pulsing-marker { transform: translate(-50%, -50%); }
     `;
     document.head.appendChild(style);
     return () => { document.head.removeChild(style); };
@@ -170,13 +171,13 @@ const RouteMap = () => {
       if (!safeJson.success) throw new Error(safeJson.detail || 'Safest route failed');
       setFastest(fastJson.data);
       setSafest(safeJson.data);
-      // Simple recommendation logic
+      // Simple recommendation logic: prefer safe if safety < 65 on fastest or time diff < 20%
       const fastestSecs = fastJson.data?.total_duration_seconds || 0;
       const safestSecs = safeJson.data?.total_duration_seconds || 0;
       const fastestSafety = fastJson.data?.average_safety_score || 0;
       const chooseSafe = fastestSafety < 65 || (safestSecs && fastestSecs && (safestSecs - fastestSecs) / fastestSecs < 0.2);
       setRecommended(chooseSafe ? 'safest' : 'fastest');
-
+      
       // Fetch safety overlay for recommended route
       await fetchSafetyOverlay(chooseSafe ? safeJson.data : fastJson.data);
     } catch (e) {
@@ -188,13 +189,15 @@ const RouteMap = () => {
 
   const fetchSafetyOverlay = async (routeData) => {
     if (!routeData || !routeData.segments || routeData.segments.length === 0) return;
-
+    
     try {
+      // Collect coordinates from route segments
       const coords = [];
       if (currentPos) {
         coords.push({ latitude: currentPos[0], longitude: currentPos[1] });
       }
-
+      
+      // Extract coordinates from segments
       routeData.segments.forEach(segment => {
         if (segment.route_coordinates && segment.route_coordinates.length > 0) {
           segment.route_coordinates.forEach(coord => {
@@ -202,13 +205,14 @@ const RouteMap = () => {
           });
         }
       });
-
+      
       if (destPos) {
         coords.push({ latitude: destPos[0], longitude: destPos[1] });
       }
-
+      
       if (coords.length < 2) return;
-
+      
+      // Call safety score API
       const response = await fetch(`${API_BASE}/api/v1/safety/score`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -219,7 +223,7 @@ const RouteMap = () => {
           include_factors: true
         })
       });
-
+      
       const safetyData = await response.json();
       if (safetyData.segment_scores) {
         setSafetyOverlay(safetyData);
@@ -237,6 +241,7 @@ const RouteMap = () => {
   };
 
   const getSafetyColorOpacity = (score) => {
+    // Higher opacity for lower safety scores (more visible danger zones)
     if (score >= 85) return 0.3;
     if (score >= 70) return 0.5;
     if (score >= 50) return 0.7;
@@ -246,16 +251,17 @@ const RouteMap = () => {
   // Convert route segments to polyline coordinates with safety coloring
   const getRoutePolylines = (routeData, segments) => {
     if (!routeData || !segments || segments.length === 0) return [];
-
+    
     const polylines = [];
     let currentPos_ = currentPos;
-
+    
     segments.forEach((segment, idx) => {
       const coords = [];
       if (currentPos_) {
         coords.push(currentPos_);
       }
-
+      
+      // Use route coordinates if available, otherwise use straight line
       if (segment.route_coordinates && segment.route_coordinates.length > 0) {
         segment.route_coordinates.forEach(coord => {
           coords.push([coord.lat, coord.lng]);
@@ -263,10 +269,10 @@ const RouteMap = () => {
       } else if (destPos) {
         coords.push(destPos);
       }
-
+      
       if (coords.length >= 2) {
         const safetyScore = segment.safety_score || 70;
-        const isRecommended = (recommended === 'fastest' && routeData === fastest) ||
+        const isRecommended = (recommended === 'fastest' && routeData === fastest) || 
                              (recommended === 'safest' && routeData === safest);
         polylines.push({
           positions: coords,
@@ -276,12 +282,13 @@ const RouteMap = () => {
           safetyScore: safetyScore
         });
       }
-
+      
+      // Update current position for next segment
       if (coords.length > 0) {
         currentPos_ = coords[coords.length - 1];
       }
     });
-
+    
     return polylines;
   };
 
@@ -347,7 +354,7 @@ const RouteMap = () => {
                 {loading ? 'Optimizing…' : 'Optimize Route'}
               </button>
               {error && <div className="text-sm text-red-600">{error}</div>}
-
+              
               {/* Safety overlay toggle */}
               {(fastest || safest) && (
                 <div className="mt-3 flex items-center space-x-2">
@@ -447,6 +454,35 @@ const RouteMap = () => {
                 </Marker>
               )}
 
+              {/* Display all routes */}
+              {routes.map((route) => (
+                <React.Fragment key={route.id}>
+                  {route.coordinates.map((coord, index) => {
+                    if (index === route.coordinates.length - 1) return null;
+                    const start = route.coordinates[index];
+                    const end = route.coordinates[index + 1];
+                    const traffic = end.traffic || 'low';
+                    return (
+                      <Polyline
+                        key={`${route.id}-${index}`}
+                        positions={[
+                          [start.lat || start[0], start.lng || start[1]],
+                          [end.lat || end[0], end.lng || end[1]]
+                        ]}
+                        pathOptions={{
+                          color: getTrafficColor(traffic),
+                          weight: 3,
+                          opacity: 0.6,
+                        }}
+                      />
+                    );
+                  })}
+                  <Marker position={[route.coordinates[0].lat || route.coordinates[0][0], route.coordinates[0].lng || route.coordinates[0][1]]}>
+                    <Popup>{route.name}</Popup>
+                  </Marker>
+                </React.Fragment>
+              ))}
+
               {/* Destination marker */}
               {destPos && (
                 <Marker position={destPos}>
@@ -454,7 +490,7 @@ const RouteMap = () => {
                 </Marker>
               )}
 
-              {/* If optimized routes exist, draw them with safety coloring */}
+              {/* Draw route polylines with safety coloring */}
               {fastest && showSafetyOverlay && getRoutePolylines(fastest, fastest.segments).map((poly, idx) => (
                 <Polyline
                   key={`fastest-${idx}`}
@@ -489,36 +525,7 @@ const RouteMap = () => {
                 </Polyline>
               ))}
 
-              {/* Fallback: show example sample routes when no optimized data */}
-              {!fastest && !safest && routes.map((route) => (
-                <React.Fragment key={route.id}>
-                  {route.coordinates.map((coord, index) => {
-                    if (index === route.coordinates.length - 1) return null;
-                    const start = route.coordinates[index];
-                    const end = route.coordinates[index + 1];
-                    const traffic = end.traffic || 'low';
-                    return (
-                      <Polyline
-                        key={`${route.id}-${index}`}
-                        positions={[
-                          [start.lat || start[0], start.lng || start[1]],
-                          [end.lat || end[0], end.lng || end[1]]
-                        ]}
-                        pathOptions={{
-                          color: getTrafficColor(traffic),
-                          weight: 3,
-                          opacity: 0.6,
-                        }}
-                      />
-                    );
-                  })}
-                  <Marker position={[route.coordinates[0].lat || route.coordinates[0][0], route.coordinates[0].lng || route.coordinates[0][1]]}>
-                    <Popup>{route.name}</Popup>
-                  </Marker>
-                </React.Fragment>
-              ))}
-
-              {/* Fallback simple connection lines if segments missing */}
+              {/* Fallback: Simple lines if no route geometry */}
               {fastest && (!fastest.segments || fastest.segments.length === 0) && currentPos && destPos && (
                 <Polyline
                   positions={[currentPos, destPos]}
@@ -570,3 +577,4 @@ const RouteMap = () => {
 };
 
 export default RouteMap;
+
