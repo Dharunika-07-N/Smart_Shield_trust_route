@@ -11,6 +11,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from api.schemas.delivery import Coordinate
 from api.services.maps import MapsService
+from api.services.email import EmailService
 from database.models import (
     Rider, PanicAlert, RiderCheckIn, SafeZone, RideAlong,
     DeliveryCompany, DeliveryStatus
@@ -25,6 +26,7 @@ class SafetyService:
     
     def __init__(self):
         self.maps_service = MapsService()
+        self.email_service = EmailService()
     
     def trigger_panic_button(
         self,
@@ -61,6 +63,9 @@ class SafetyService:
             db.commit()
             db.refresh(alert)
             
+            # Send email alert to emergency contact
+            email_sent = self._send_sos_email(rider, alert)
+            
             # Notify company
             company_notified = self._notify_company(db, rider, alert)
             alert.company_notified = company_notified
@@ -93,6 +98,7 @@ class SafetyService:
             return {
                 "alert_id": alert.id,
                 "status": "active",
+                "email_sent": email_sent,
                 "company_notified": company_notified,
                 "emergency_contacts_notified": len(alerted_contacts),
                 "location": {
@@ -106,6 +112,30 @@ class SafetyService:
             logger.error(f"Error triggering panic button: {e}")
             db.rollback()
             raise
+    
+    def _send_sos_email(self, rider: Rider, alert: PanicAlert) -> bool:
+        """Send SOS alert email to emergency contact."""
+        try:
+            # Get location from alert
+            location = alert.location
+            
+            # Send email using email service
+            email_sent = self.email_service.send_sos_alert(
+                rider_name=rider.name or "Unknown Rider",
+                rider_id=rider.id,
+                location=location
+            )
+            
+            if email_sent:
+                logger.info(f"SOS email sent successfully for rider {rider.id}")
+            else:
+                logger.warning(f"Failed to send SOS email for rider {rider.id}")
+            
+            return email_sent
+            
+        except Exception as e:
+            logger.error(f"Error sending SOS email: {e}")
+            return False
     
     def _notify_company(self, db: Session, rider: Rider, alert: PanicAlert) -> bool:
         """Notify delivery company about panic alert."""

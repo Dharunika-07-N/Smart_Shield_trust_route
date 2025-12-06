@@ -78,6 +78,15 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_FILE: str = "logs/app.log"
     
+    # Email Configuration (for SOS alerts)
+    SMTP_SERVER: str = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USERNAME: str = os.getenv("SMTP_USERNAME", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "True").lower() == "true"
+    FROM_EMAIL: str = os.getenv("FROM_EMAIL", "noreply@smartshield.com")
+    EMERGENCY_EMAIL: str = os.getenv("EMERGENCY_EMAIL", "dharunikaktm@gmail.com")
+    
     class Config:
         env_file = ".env"
         case_sensitive = True

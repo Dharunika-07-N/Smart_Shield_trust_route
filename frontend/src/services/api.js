@@ -166,6 +166,14 @@ export const api = {
   // Delivery Tracking
   updateLocation: (data) => apiClient.post('/delivery/location-update', data),
   trackDelivery: (deliveryId) => apiClient.get(`/delivery/${deliveryId}/track`),
+  reoptimizeRoute: (routeId, data) => apiClient.post(`/delivery/routes/${routeId}/reoptimize`, data),
+
+  // Safety Features
+  triggerPanicButton: (data) => apiClient.post('/safety/panic-button', data),
+  checkIn: (data) => apiClient.post('/safety/check-in', data),
+  getSafeZones: (data) => apiClient.post('/safety/safe-zones', data),
+  createRideAlong: (data) => apiClient.post('/safety/ride-along', data),
+  getRideAlongStatus: (shareToken) => apiClient.get(`/safety/ride-along/${shareToken}`),
 };
 
 export default apiClient;

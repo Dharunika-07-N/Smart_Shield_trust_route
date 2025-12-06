@@ -53,8 +53,7 @@ const LiveTracking = ({ deliveryId, isRider = false }) => {
                <div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%) rotate(0deg);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:8px solid #3b82f6"></div>
              </div>`,
       iconSize: [30, 30],
-      iconAnchor: [15, 15]
-    });
+      iconAnchor: [15, 15] 
   }, [heading]);
 
   // Connect to WebSocket for real-time updates (with debouncing)
