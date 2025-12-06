@@ -145,3 +145,62 @@ class RouteResponse(BaseModel):
             }
         }
 
+
+class LocationUpdateRequest(BaseModel):
+    """Request to update delivery location."""
+    delivery_id: str = Field(..., description="Delivery identifier")
+    route_id: Optional[str] = Field(None, description="Route identifier")
+    rider_id: Optional[str] = Field(None, description="Rider identifier")
+    current_location: Coordinate = Field(..., description="Current GPS coordinates")
+    status: Optional[DeliveryStatus] = Field(DeliveryStatus.IN_TRANSIT, description="Current delivery status")
+    speed_kmh: Optional[float] = Field(None, ge=0, description="Current speed in km/h")
+    heading: Optional[float] = Field(None, ge=0, le=360, description="Direction in degrees")
+    battery_level: Optional[int] = Field(None, ge=0, le=100, description="Device battery level")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "delivery_id": "DELIVERY_123",
+                "route_id": "ROUTE_456",
+                "rider_id": "RIDER_789",
+                "current_location": {"latitude": 40.7128, "longitude": -74.0060},
+                "status": "in_transit",
+                "speed_kmh": 45.5,
+                "heading": 180.0,
+                "battery_level": 85
+            }
+        }
+
+
+class LocationUpdate(BaseModel):
+    """Location update data."""
+    id: str
+    delivery_id: str
+    current_location: Coordinate
+    status: str
+    timestamp: datetime
+    speed_kmh: Optional[float] = None
+    heading: Optional[float] = None
+    battery_level: Optional[int] = None
+
+
+class DeliveryTrackingResponse(BaseModel):
+    """Response for delivery tracking."""
+    success: bool
+    message: str
+    data: Optional[Dict] = None
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "message": "Tracking data retrieved successfully",
+                "data": {
+                    "delivery_id": "DELIVERY_123",
+                    "current_location": {"latitude": 40.7128, "longitude": -74.0060},
+                    "status": "in_transit",
+                    "location_history": []
+                }
+            }
+        }
+

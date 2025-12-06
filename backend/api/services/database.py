@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from database.database import get_db, init_db as db_init
-from database.models import Route, SafetyFeedback, SafetyScore
+from database.models import Route, SafetyFeedback, SafetyScore, DeliveryStatus
 
 class DatabaseService:
     """Service for database operations."""
@@ -76,6 +76,70 @@ class DatabaseService:
             self.db.rollback()
             logger.error(f"Error saving safety score: {e}")
             raise
+    
+    def save_location_update(self, location_data: Dict[str, Any]) -> str:
+        """Save delivery location update."""
+        try:
+            status = DeliveryStatus(**location_data)
+            self.db.add(status)
+            self.db.commit()
+            self.db.refresh(status)
+            logger.info(f"Location update saved for delivery {location_data.get('delivery_id')}")
+            return status.id
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Error saving location update: {e}")
+            raise
+    
+    def get_delivery_tracking(self, delivery_id: str, limit: int = 100) -> Dict[str, Any]:
+        """Get delivery tracking data with location history."""
+        try:
+            # Get latest status
+            latest = self.db.query(DeliveryStatus).filter(
+                DeliveryStatus.delivery_id == delivery_id
+            ).order_by(DeliveryStatus.timestamp.desc()).first()
+            
+            if not latest:
+                return {
+                    "delivery_id": delivery_id,
+                    "current_location": None,
+                    "status": "pending",
+                    "location_history": []
+                }
+            
+            # Get location history
+            history = self.db.query(DeliveryStatus).filter(
+                DeliveryStatus.delivery_id == delivery_id
+            ).order_by(DeliveryStatus.timestamp.desc()).limit(limit).all()
+            
+            return {
+                "delivery_id": delivery_id,
+                "current_location": latest.current_location,
+                "status": latest.status,
+                "timestamp": latest.timestamp.isoformat(),
+                "speed_kmh": latest.speed_kmh,
+                "heading": latest.heading,
+                "battery_level": latest.battery_level,
+                "location_history": [
+                    {
+                        "location": h.current_location,
+                        "timestamp": h.timestamp.isoformat(),
+                        "status": h.status,
+                        "speed_kmh": h.speed_kmh,
+                        "heading": h.heading
+                    }
+                    for h in history
+                ]
+            }
+        except Exception as e:
+            logger.error(f"Error getting delivery tracking: {e}")
+            raise
+    
+    def get_latest_location(self, delivery_id: str) -> Optional[DeliveryStatus]:
+        """Get latest location update for a delivery."""
+        return self.db.query(DeliveryStatus).filter(
+            DeliveryStatus.delivery_id == delivery_id
+        ).order_by(DeliveryStatus.timestamp.desc()).first()
 
 def init_db():
     """Initialize database."""

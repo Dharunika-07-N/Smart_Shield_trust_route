@@ -78,7 +78,8 @@ class RouteOptimizer:
             distance_matrix,
             optimize_for,
             rider_info,
-            stops
+            stops,
+            departure_time
         )
         
         # Optimize using multiple algorithms
@@ -149,24 +150,62 @@ class RouteOptimizer:
         distance_matrix: List[List[float]],
         objectives: List[str],
         rider_info: Optional[Dict],
-        stops: List[DeliveryStop]
+        stops: List[DeliveryStop],
+        departure_time: Optional[datetime] = None
     ) -> List[List[float]]:
         """Create weighted cost matrix based on objectives."""
         n = len(points)
         cost_matrix = [[0.0] * n for _ in range(n)]
         
+        # Determine time of day and night mode
+        time_of_day = "day"
+        night_mode = False
+        if departure_time:
+            hour = departure_time.hour
+            if hour < 6 or hour >= 22:
+                time_of_day = "night"
+                night_mode = True
+            elif hour < 8 or hour >= 18:
+                time_of_day = "evening"
+        
+        # Check if night mode is explicitly requested
+        if rider_info and rider_info.get("night_mode"):
+            night_mode = True
+            time_of_day = "night"
+        
         # Get safety scores for all segments
         safety_matrix = [[1.0] * n for _ in range(n)]
-        if "safety" in objectives:
-            time_of_day = "day"  # Could be extracted from departure_time
+        lighting_matrix = [[50.0] * n for _ in range(n)]  # Default lighting score
+        
+        if "safety" in objectives or night_mode:
             for i in range(n):
                 for j in range(n):
                     if i != j:
                         # Get safety score for segment
                         segment_coords = [points[i], points[j]]
                         safety_data = self.safety_scorer.score_route(segment_coords, time_of_day, rider_info)
-                        # Inverse safety score (higher safety = lower cost)
-                        safety_matrix[i][j] = 100 - safety_data["route_safety_score"]
+                        
+                        # Extract lighting score from safety factors
+                        lighting_score = 50.0  # Default
+                        if safety_data.get("segment_scores"):
+                            for seg in safety_data["segment_scores"]:
+                                factors = seg.get("factors", [])
+                                for factor in factors:
+                                    if factor.get("name") == "lighting":
+                                        lighting_score = factor.get("score", 50.0)
+                                        break
+                        
+                        lighting_matrix[i][j] = lighting_score
+                        
+                        # In night mode, heavily penalize low lighting
+                        if night_mode:
+                            # Inverse lighting score (higher lighting = lower cost)
+                            # Heavily weight lighting in night mode
+                            lighting_penalty = (100 - lighting_score) * 2.0  # 2x penalty for low lighting
+                            safety_matrix[i][j] = (100 - safety_data["route_safety_score"]) + lighting_penalty
+                        else:
+                            # Normal safety scoring
+                            safety_matrix[i][j] = 100 - safety_data["route_safety_score"]
         
         for i in range(n):
             for j in range(n):
@@ -191,8 +230,11 @@ class RouteOptimizer:
                         cost += fuel_liters * 10  # Assuming fuel is expensive
                     
                     # Safety cost (for women riders or night deliveries)
-                    if "safety" in objectives:
+                    if "safety" in objectives or night_mode:
                         safety_cost = safety_matrix[i][j] / 100.0
+                        # In night mode, increase safety weight significantly
+                        if night_mode:
+                            safety_cost *= 3.0  # 3x weight for safety in night mode
                         cost += safety_cost
                     
                     # Traffic cost (considering current traffic conditions)
@@ -449,10 +491,9 @@ class RouteOptimizer:
                 "duration_seconds": duration,
                 "safety_score": safety_score,
                 "estimated_fuel_liters": fuel,
-
                 "route_coordinates": route_coords,
                 "weather_data": weather_data,
-                "has_traffic_data": directions and directions.get('has_traffic_data', False)
+                "has_traffic_data": directions and directions.get('has_traffic_data', False),
                 "traffic_level": traffic_level
             })
             

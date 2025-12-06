@@ -7,6 +7,7 @@ import Analytics from './Analytics';
 import RouteMap from './RouteMap';
 import SafetyHeatmap from './SafetyHeatmap';
 import SnapMap from './SnapMap';
+import LiveTracking from './LiveTracking';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -76,6 +77,7 @@ const Dashboard = () => {
             {[
               { id: 'overview', label: 'Overview' },
               { id: 'snap-map', label: 'Live Map' },
+              { id: 'tracking', label: 'Live Tracking' },
               { id: 'analytics', label: 'Analytics' },
               { id: 'route-map', label: 'Route Map' },
               { id: 'safety-heatmap', label: 'Safety Heatmap' },
@@ -214,6 +216,7 @@ const Dashboard = () => {
         )}
 
         {activeTab === 'snap-map' && <SnapMap />}
+        {activeTab === 'tracking' && <LiveTracking />}
         {activeTab === 'analytics' && <Analytics />}
         {activeTab === 'route-map' && <RouteMap />}
         {activeTab === 'safety-heatmap' && <SafetyHeatmap />}

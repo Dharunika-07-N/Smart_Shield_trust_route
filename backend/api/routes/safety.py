@@ -1,7 +1,9 @@
 """Safety endpoints."""
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
+from pydantic import BaseModel, Field
+from datetime import datetime
 import sys
 from pathlib import Path
 
@@ -17,13 +19,16 @@ from api.schemas.safety import (
     SafetyConditionsRequest,
     SafetyConditionsResponse
 )
+from api.schemas.delivery import Coordinate
 from api.models.safety_scorer import SafetyScorer
 from api.services.database import DatabaseService
+from api.services.safety import SafetyService
 from database.database import get_db
 from loguru import logger
 
 router = APIRouter()
 safety_scorer = SafetyScorer()
+safety_service = SafetyService()
 
 
 @router.post("/safety/score", response_model=SafetyScoreResponse)
@@ -167,4 +172,206 @@ async def get_safety_conditions(location: str, request: SafetyConditionsRequest)
     except Exception as e:
         logger.error(f"Error getting safety conditions: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# Safety Features for Women Riders
+
+class PanicButtonRequest(BaseModel):
+    """Panic button request."""
+    rider_id: str = Field(..., description="Rider ID")
+    location: Coordinate = Field(..., description="Current location")
+    route_id: Optional[str] = Field(None, description="Current route ID")
+    delivery_id: Optional[str] = Field(None, description="Current delivery ID")
+
+
+class CheckInRequest(BaseModel):
+    """Check-in request."""
+    rider_id: str = Field(..., description="Rider ID")
+    location: Coordinate = Field(..., description="Current location")
+    route_id: Optional[str] = Field(None, description="Current route ID")
+    delivery_id: Optional[str] = Field(None, description="Current delivery ID")
+    is_night_shift: Optional[bool] = Field(None, description="Is night shift (auto-detected if not provided)")
+
+
+class SafeZoneRequest(BaseModel):
+    """Safe zone search request."""
+    location: Coordinate = Field(..., description="Current location")
+    radius_meters: int = Field(2000, description="Search radius in meters")
+    zone_types: Optional[List[str]] = Field(None, description="Zone types: police_station, shop_24hr, well_lit_area")
+
+
+class RideAlongRequest(BaseModel):
+    """Ride-along creation request."""
+    rider_id: str = Field(..., description="Rider ID")
+    tracker_name: str = Field(..., description="Name of person tracking")
+    tracker_phone: Optional[str] = Field(None, description="Tracker phone number")
+    tracker_email: Optional[str] = Field(None, description="Tracker email")
+    route_id: Optional[str] = Field(None, description="Current route ID")
+    delivery_id: Optional[str] = Field(None, description="Current delivery ID")
+    expires_hours: int = Field(24, description="Hours until tracking expires")
+
+
+@router.post("/safety/panic-button")
+async def trigger_panic_button(
+    request: PanicButtonRequest,
+    db: Session = Depends(get_db)
+):
+    """Trigger panic button - sends alerts to company and emergency contacts.
+    
+    This is a critical safety feature that:
+    - Sends immediate alert to delivery company
+    - Notifies all emergency contacts
+    - Shares live location
+    - Can optionally notify emergency services
+    """
+    try:
+        alert_data = safety_service.trigger_panic_button(
+            db=db,
+            rider_id=request.rider_id,
+            location=request.location,
+            route_id=request.route_id,
+            delivery_id=request.delivery_id
+        )
+        
+        return {
+            "success": True,
+            "message": "Panic alert triggered successfully",
+            "data": alert_data
+        }
+    
+    except Exception as e:
+        logger.error(f"Error triggering panic button: {e}")
+        raise HTTPException(status_code=500, detail=f"Panic button failed: {str(e)}")
+
+
+@router.post("/safety/check-in")
+async def rider_check_in(
+    request: CheckInRequest,
+    db: Session = Depends(get_db)
+):
+    """Record rider check-in.
+    
+    For night shifts, riders must check in every 30 minutes.
+    System automatically alerts if check-in is missed.
+    """
+    try:
+        checkin_data = safety_service.check_in(
+            db=db,
+            rider_id=request.rider_id,
+            location=request.location,
+            route_id=request.route_id,
+            delivery_id=request.delivery_id,
+            is_night_shift=request.is_night_shift
+        )
+        
+        return {
+            "success": True,
+            "message": "Check-in recorded successfully",
+            "data": checkin_data
+        }
+    
+    except Exception as e:
+        logger.error(f"Error recording check-in: {e}")
+        raise HTTPException(status_code=500, detail=f"Check-in failed: {str(e)}")
+
+
+@router.post("/safety/safe-zones")
+async def get_safe_zones(
+    request: SafeZoneRequest,
+    db: Session = Depends(get_db)
+):
+    """Get nearby safe zones (police stations, 24hr shops, well-lit areas).
+    
+    Returns locations of:
+    - Police stations
+    - 24-hour convenience stores/shops
+    - Well-lit public areas
+    """
+    try:
+        safe_zones = safety_service.get_safe_zones(
+            location=request.location,
+            radius_meters=request.radius_meters,
+            zone_types=request.zone_types
+        )
+        
+        return {
+            "success": True,
+            "message": f"Found {len(safe_zones)} safe zones",
+            "data": {
+                "safe_zones": safe_zones,
+                "location": {
+                    "latitude": request.location.latitude,
+                    "longitude": request.location.longitude
+                },
+                "radius_meters": request.radius_meters
+            }
+        }
+    
+    except Exception as e:
+        logger.error(f"Error getting safe zones: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get safe zones: {str(e)}")
+
+
+@router.post("/safety/ride-along")
+async def create_ride_along(
+    request: RideAlongRequest,
+    db: Session = Depends(get_db)
+):
+    """Create ride-along tracking link for friends/family.
+    
+    Allows friends or family to track rider in real-time during deliveries.
+    Returns a shareable token/URL for tracking.
+    """
+    try:
+        ride_along_data = safety_service.create_ride_along(
+            db=db,
+            rider_id=request.rider_id,
+            tracker_name=request.tracker_name,
+            tracker_phone=request.tracker_phone,
+            tracker_email=request.tracker_email,
+            route_id=request.route_id,
+            delivery_id=request.delivery_id,
+            expires_hours=request.expires_hours
+        )
+        
+        return {
+            "success": True,
+            "message": "Ride-along tracking created successfully",
+            "data": ride_along_data
+        }
+    
+    except Exception as e:
+        logger.error(f"Error creating ride-along: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create ride-along: {str(e)}")
+
+
+@router.get("/safety/ride-along/{share_token}")
+async def get_ride_along_status(
+    share_token: str,
+    db: Session = Depends(get_db)
+):
+    """Get current rider location for ride-along tracking.
+    
+    Used by friends/family to track rider location in real-time.
+    """
+    try:
+        status = safety_service.get_ride_along_status(
+            db=db,
+            share_token=share_token
+        )
+        
+        if not status:
+            raise HTTPException(status_code=404, detail="Ride-along not found or expired")
+        
+        return {
+            "success": True,
+            "message": "Ride-along status retrieved",
+            "data": status
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting ride-along status: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get ride-along status: {str(e)}")
 

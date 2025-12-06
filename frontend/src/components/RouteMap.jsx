@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
+import { api } from '../services/api';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
 
@@ -102,13 +103,27 @@ const RouteMap = () => {
 
   // Geolocate user and keep updating
   useEffect(() => {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      setError('Geolocation is not supported by your browser');
+      return;
+    }
+    
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
+        console.log('Current position updated:', { latitude, longitude });
         setCurrentPos([latitude, longitude]);
+        setError(''); // Clear any previous location errors
       },
-      () => setError('Unable to get current location'),
+      (err) => {
+        console.error('Geolocation error:', err);
+        const errorMsg = err.code === 1 
+          ? 'Location access denied. Please enable location permissions.'
+          : err.code === 2
+          ? 'Location unavailable. Please check your GPS settings.'
+          : 'Unable to get current location. Please try again.';
+        setError(errorMsg);
+      },
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
     );
     return () => navigator.geolocation.clearWatch(watchId);
@@ -148,29 +163,86 @@ const RouteMap = () => {
   });
 
   const optimize = async () => {
-    if (!currentPos || !destPos) { setError('Select destination'); return; }
+    if (!currentPos || !destPos) { 
+      setError('Please select a destination by searching or clicking on the map'); 
+      return; 
+    }
+    
     setLoading(true);
     setError('');
-    setFastest(null); setSafest(null); setRecommended(null);
+    setFastest(null); 
+    setSafest(null); 
+    setRecommended(null);
+    
     try {
-      const [fastRes, safeRes] = await Promise.all([
-        fetch(`${API_BASE}/api/v1/delivery/optimize`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(buildRequest(currentPos, destPos, [ 'time', 'distance' ]))
+      // Build requests
+      const fastestRequest = buildRequest(currentPos, destPos, ['time', 'distance']);
+      const safestRequest = buildRequest(currentPos, destPos, ['safety', 'time']);
+      
+      console.log('Optimizing route...', { 
+        currentPos, 
+        destPos,
+        fastestRequest,
+        safestRequest
+      });
+      
+      // Log the full request for debugging
+      console.log('Fastest request:', JSON.stringify(fastestRequest, null, 2));
+      console.log('Safest request:', JSON.stringify(safestRequest, null, 2));
+      
+      // Use API service instead of fetch
+      const [fastJson, safeJson] = await Promise.all([
+        api.optimizeRoute(fastestRequest).catch(err => {
+          console.error('Fastest route error:', {
+            message: err.message,
+            status: err.status,
+            data: err.data,
+            url: err.url,
+            isNetworkError: err.isNetworkError
+          });
+          
+          // Preserve the original error message
+          const error = new Error(err.message || 'Fastest route optimization failed');
+          error.status = err.status;
+          error.isNetworkError = err.isNetworkError;
+          throw error;
         }),
-        fetch(`${API_BASE}/api/v1/delivery/optimize`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(buildRequest(currentPos, destPos, [ 'safety', 'time' ]))
+        api.optimizeRoute(safestRequest).catch(err => {
+          console.error('Safest route error:', {
+            message: err.message,
+            status: err.status,
+            data: err.data,
+            url: err.url,
+            isNetworkError: err.isNetworkError
+          });
+          
+          // Preserve the original error message
+          const error = new Error(err.message || 'Safest route optimization failed');
+          error.status = err.status;
+          error.isNetworkError = err.isNetworkError;
+          throw error;
         })
       ]);
-      const fastJson = await fastRes.json();
-      const safeJson = await safeRes.json();
-      if (!fastJson.success) throw new Error(fastJson.detail || 'Fastest route failed');
-      if (!safeJson.success) throw new Error(safeJson.detail || 'Safest route failed');
+      
+      // Check if responses are successful
+      if (!fastJson || !fastJson.success) {
+        throw new Error(fastJson?.detail || fastJson?.message || 'Fastest route failed');
+      }
+      if (!safeJson || !safeJson.success) {
+        throw new Error(safeJson?.detail || safeJson?.message || 'Safest route failed');
+      }
+      
+      // Check if data exists
+      if (!fastJson.data) {
+        throw new Error('No data returned from fastest route optimization');
+      }
+      if (!safeJson.data) {
+        throw new Error('No data returned from safest route optimization');
+      }
+      
       setFastest(fastJson.data);
       setSafest(safeJson.data);
+      
       // Simple recommendation logic: prefer safe if safety < 65 on fastest or time diff < 20%
       const fastestSecs = fastJson.data?.total_duration_seconds || 0;
       const safestSecs = safeJson.data?.total_duration_seconds || 0;
@@ -181,7 +253,31 @@ const RouteMap = () => {
       // Fetch safety overlay for recommended route
       await fetchSafetyOverlay(chooseSafe ? safeJson.data : fastJson.data);
     } catch (e) {
-      setError(e.message || 'Optimization failed');
+      console.error('Route optimization error:', {
+        message: e.message,
+        status: e.status,
+        isNetworkError: e.isNetworkError,
+        error: e
+      });
+      
+      let errorMessage = e.message || 'Optimization failed';
+      
+      // Provide more helpful error messages based on error type
+      if (e.isNetworkError || errorMessage.includes('Network error') || errorMessage.includes('Unable to connect')) {
+        errorMessage = `Cannot connect to server. Make sure the backend is running on ${API_BASE}`;
+      } else if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
+        errorMessage = 'Request timed out. The server may be slow or unavailable.';
+      } else if (e.status === 400) {
+        errorMessage = 'Invalid request. Please check that both start and destination are valid locations.';
+      } else if (e.status === 404) {
+        errorMessage = 'API endpoint not found. Please check the backend server configuration.';
+      } else if (e.status === 500) {
+        errorMessage = 'Server error occurred. Please try again or contact support.';
+      } else if (e.status === 422) {
+        errorMessage = 'Validation error. Please check your input data.';
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -297,7 +393,12 @@ const RouteMap = () => {
   const ClickToSetDestination = () => {
     useMapEvents({
       click(e) {
-        setDestPos([e.latlng.lat, e.latlng.lng]);
+        const newDest = [e.latlng.lat, e.latlng.lng];
+        console.log('Destination selected from map click:', newDest);
+        setDestPos(newDest);
+        // Clear search query when clicking on map
+        setQuery('');
+        setResults([]);
       }
     });
     return null;
@@ -334,8 +435,14 @@ const RouteMap = () => {
                     {results.map((r) => (
                       <button
                         key={`${r.place_id}`}
-                        className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
-                        onClick={() => { setDestPos([parseFloat(r.lat), parseFloat(r.lon)]); setQuery(r.display_name); setResults([]); }}
+                        className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors"
+                        onClick={() => { 
+                          const newDest = [parseFloat(r.lat), parseFloat(r.lon)];
+                          console.log('Destination selected from search:', newDest, r.display_name);
+                          setDestPos(newDest); 
+                          setQuery(r.display_name); 
+                          setResults([]);
+                        }}
                       >
                         {r.display_name}
                       </button>
@@ -346,14 +453,83 @@ const RouteMap = () => {
               <div className="text-xs text-gray-600">
                 Tip: You can also click anywhere on the map to set destination.
               </div>
+              
+              {/* Status indicators */}
+              <div className="space-y-2 text-xs">
+                {!currentPos && (
+                  <div className="flex items-center space-x-2 text-yellow-600">
+                    <span>⏳</span>
+                    <span>Waiting for your location...</span>
+                  </div>
+                )}
+                {currentPos && (
+                  <div className="flex items-center space-x-2 text-green-600">
+                    <span>✓</span>
+                    <span>Current location detected</span>
+                  </div>
+                )}
+                {destPos && (
+                  <div className="flex items-center space-x-2 text-green-600">
+                    <span>✓</span>
+                    <span>Destination selected</span>
+                  </div>
+                )}
+                {!destPos && currentPos && (
+                  <div className="flex items-center space-x-2 text-gray-500">
+                    <span>→</span>
+                    <span>Select destination above or click on map</span>
+                  </div>
+                )}
+              </div>
+              
               <button
                 onClick={optimize}
                 disabled={!currentPos || !destPos || loading}
-                className={`w-full px-4 py-2 rounded-md text-white ${(!currentPos || !destPos || loading) ? 'bg-gray-400' : 'bg-primary-600 hover:bg-primary-700'}`}
+                className={`w-full px-4 py-2 rounded-md text-white font-medium transition-colors ${
+                  (!currentPos || !destPos || loading) 
+                    ? 'bg-gray-400 cursor-not-allowed' 
+                    : 'bg-primary-600 hover:bg-primary-700'
+                }`}
               >
-                {loading ? 'Optimizing…' : 'Optimize Route'}
+                {loading ? (
+                  <span className="flex items-center justify-center">
+                    <span className="animate-spin mr-2">⏳</span>
+                    Optimizing Route...
+                  </span>
+                ) : (
+                  'Optimize Route'
+                )}
               </button>
-              {error && <div className="text-sm text-red-600">{error}</div>}
+              
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">
+                  <div className="font-medium mb-1">Error</div>
+                  <div className="mb-2">{error}</div>
+                  
+                  {/* Debug info in development */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <div className="mt-2 pt-2 border-t border-red-200 text-xs text-red-600">
+                      <p><strong>Debug Info:</strong></p>
+                      <p>API Base: {process.env.REACT_APP_API_URL || process.env.REACT_APP_API_BASE || 'http://localhost:8000/api/v1'}</p>
+                      <p>Current Pos: {currentPos ? `[${currentPos[0].toFixed(4)}, ${currentPos[1].toFixed(4)}]` : 'Not set'}</p>
+                      <p>Dest Pos: {destPos ? `[${destPos[0].toFixed(4)}, ${destPos[1].toFixed(4)}]` : 'Not set'}</p>
+                      <p className="mt-1">Check browser console (F12) for detailed error logs and actual API URL being used.</p>
+                    </div>
+                  )}
+                  
+                  {(error.includes('Cannot connect') || error.includes('Network error') || error.includes('Unable to connect')) && (
+                    <div className="mt-2 pt-2 border-t border-red-200">
+                      <p className="text-xs text-red-600">
+                        <strong>Tip:</strong> Make sure the backend server is running. 
+                        Start it with: <code className="bg-red-100 px-1 rounded">cd backend && python -m uvicorn api.main:app --reload</code>
+                      </p>
+                      <p className="text-xs text-red-600 mt-1">
+                        Expected backend URL: <code className="bg-red-100 px-1 rounded">{API_BASE}</code>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
               
               {/* Safety overlay toggle */}
               {(fastest || safest) && (
@@ -485,8 +661,22 @@ const RouteMap = () => {
 
               {/* Destination marker */}
               {destPos && (
-                <Marker position={destPos}>
-                  <Popup>Destination</Popup>
+                <Marker 
+                  position={destPos}
+                  icon={L.divIcon({
+                    className: 'destination-marker',
+                    html: `<div style="width:30px;height:30px;border-radius:50%;background:#ef4444;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:18px">📍</div>`,
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15]
+                  })}
+                >
+                  <Popup>
+                    <div>
+                      <strong>Destination</strong><br />
+                      Lat: {destPos[0].toFixed(6)}<br />
+                      Lng: {destPos[1].toFixed(6)}
+                    </div>
+                  </Popup>
                 </Marker>
               )}
 

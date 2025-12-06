@@ -1,6 +1,6 @@
 """Database package."""
 from .database import Base, engine, SessionLocal, get_db, init_db
-from .models import Route, SafetyFeedback, SafetyScore, DeliveryCompany, Rider
+from .models import Route, SafetyFeedback, SafetyScore, DeliveryCompany, Rider, DeliveryStatus
 
 __all__ = [
     "Base",
@@ -12,6 +12,7 @@ __all__ = [
     "SafetyFeedback",
     "SafetyScore",
     "DeliveryCompany",
-    "Rider"
+    "Rider",
+    "DeliveryStatus"
 ]
 
