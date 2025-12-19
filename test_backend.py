@@ -9,15 +9,15 @@ def test_health():
     print("Testing backend health endpoint...")
     try:
         response = requests.get('http://localhost:8000/health', timeout=5)
-        print(f"✓ Health check: Status {response.status_code}")
+        print(f"OK: Health check: Status {response.status_code}")
         print(f"  Response: {json.dumps(response.json(), indent=2)}")
         return True
     except requests.exceptions.ConnectionError:
-        print("✗ Backend is not running on http://localhost:8000")
+        print("FAIL: Backend is not running on http://localhost:8000")
         print("  Start it with: cd backend && python -m uvicorn api.main:app --reload")
         return False
     except Exception as e:
-        print(f"✗ Error: {e}")
+        print(f"FAIL: Error: {e}")
         return False
 
 def test_route_optimization():
@@ -40,7 +40,7 @@ def test_route_optimization():
             json=test_data,
             timeout=30
         )
-        print(f"✓ Route optimization: Status {response.status_code}")
+        print(f"OK: Route optimization: Status {response.status_code}")
         if response.status_code == 200:
             result = response.json()
             if result.get('success'):
@@ -50,13 +50,13 @@ def test_route_optimization():
             else:
                 print(f"  Error: {result.get('message', 'Unknown error')}")
         else:
-            print(f"  Error response: {response.text[:200]}")
+            print(f"  Error response: {response.text}")
         return response.status_code == 200
     except requests.exceptions.ConnectionError:
-        print("✗ Cannot connect to backend")
+        print("FAIL: Cannot connect to backend")
         return False
     except Exception as e:
-        print(f"✗ Error: {e}")
+        print(f"FAIL: Error: {e}")
         return False
 
 if __name__ == "__main__":

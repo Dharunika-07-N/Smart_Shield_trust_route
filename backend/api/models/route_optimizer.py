@@ -39,7 +39,7 @@ class RouteOptimizer:
         self.traffic_service = TrafficService()
 
     
-    def optimize_route(
+    async def optimize_route(
         self,
         starting_point: Coordinate,
         stops: List[DeliveryStop],
@@ -95,7 +95,7 @@ class RouteOptimizer:
             sequence = self._optimize_nearest_neighbor(cost_matrix)
         
         # Build route segments
-        segments, total_stats = self._build_route_segments(
+        segments, total_stats = await self._build_route_segments(
             starting_point,
             stops,
             sequence,
@@ -345,7 +345,7 @@ class RouteOptimizer:
         # In production, implement full GA with population, crossover, mutation
         return self._optimize_nearest_neighbor(cost_matrix)
     
-    def _build_route_segments(
+    async def _build_route_segments(
         self,
         starting_point: Coordinate,
         stops: List[DeliveryStop],
@@ -423,10 +423,8 @@ class RouteOptimizer:
                     for c in route_coords[::step]
                 ] + [next_point]
             
-            # Fetch weather data (async, but we'll run it synchronously for now)
-            weather_data_list = asyncio.run(
-                self.weather_service.get_route_weather(weather_points)
-            )
+            # Fetch weather data
+            weather_data_list = await self.weather_service.get_route_weather(weather_points)
             
             # Average weather hazard for the segment
             avg_weather_hazard = 0

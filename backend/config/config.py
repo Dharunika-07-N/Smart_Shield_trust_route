@@ -33,7 +33,13 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:3001",
+        "http://localhost:3002",
+        "http://localhost:3003",
         "http://localhost:8000",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+        "http://127.0.0.1:3002",
+        "http://127.0.0.1:3003",
     ]
     
     # Server
@@ -70,6 +76,7 @@ class Settings(BaseSettings):
     # ML Models
     MODEL_CACHE_DIR: Path = Path("models/cache")
     SAFETY_MODEL_PATH: str = "models/safety_scorer.h5"
+    SAFETY_SCALER_PATH: str = "models/safety_scaler.pkl"
     
     # Feedback System
     MIN_FEEDBACK_SAMPLES: int = 5  # Minimum samples before retraining

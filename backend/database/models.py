@@ -1,11 +1,9 @@
 """Database models."""
 from sqlalchemy import Column, String, Float, Integer, DateTime, Text, Boolean, JSON
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.ext.declarative import declarative_base
+from database.database import Base
 from datetime import datetime
 import uuid
-
-Base = declarative_base()
 
 
 class Route(Base):

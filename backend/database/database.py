@@ -42,7 +42,7 @@ async def init_db():
     """Initialize database tables."""
     try:
         # Import all models here to ensure they're registered
-        from database import models
+        from database.models import Route, SafetyFeedback, SafetyScore, DeliveryCompany, Rider, DeliveryStatus, RouteMonitoring, PanicAlert, RiderCheckIn, SafeZone, RideAlong
         Base.metadata.create_all(bind=engine)
         logger.info("Database tables created/verified successfully")
     except Exception as e:

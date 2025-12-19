@@ -15,6 +15,30 @@ const Dashboard = () => {
   const [panicAlerting, setPanicAlerting] = useState(false);
   const [riderId, setRiderId] = useState(localStorage.getItem('rider_id') || '');
   const [currentLocation, setCurrentLocation] = useState(null);
+  const [backendConnected, setBackendConnected] = useState(null); // null = checking, true = connected, false = disconnected
+
+  // Check backend connection on mount
+  React.useEffect(() => {
+    const checkBackendConnection = async () => {
+      try {
+        const response = await api.healthCheck();
+        if (response && (response.status === 'healthy' || response.status === 'running')) {
+          setBackendConnected(true);
+          console.log('✅ Backend is connected');
+        } else {
+          setBackendConnected(false);
+        }
+      } catch (error) {
+        console.error('❌ Backend connection failed:', error);
+        setBackendConnected(false);
+      }
+    };
+
+    checkBackendConnection();
+    // Check every 30 seconds
+    const interval = setInterval(checkBackendConnection, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Get current location for SOS button
   React.useEffect(() => {
@@ -59,7 +83,26 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error('Panic button error:', error);
-      alert(`Failed to send emergency alert: ${error.message || 'Unknown error'}`);
+      
+      // Provide more helpful error messages
+      let errorMessage = error.message || 'Unknown error';
+      
+      if (error.isNetworkError || errorMessage.includes('Unable to connect to server') || errorMessage.includes('Network error')) {
+        errorMessage = `Cannot connect to backend server.\n\n` +
+          `The backend server is not running. To start it:\n\n` +
+          `1. Open a terminal/command prompt\n` +
+          `2. Navigate to the backend directory:\n` +
+          `   cd backend\n` +
+          `3. Activate the virtual environment (if using one):\n` +
+          `   venv\\Scripts\\activate  (Windows)\n` +
+          `   source venv/bin/activate  (Mac/Linux)\n` +
+          `4. Start the server:\n` +
+          `   python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000\n\n` +
+          `Or if you have a startup script, use that instead.\n\n` +
+          `Once the server is running, try again.`;
+      }
+      
+      alert(`Failed to send emergency alert: ${errorMessage}`);
     } finally {
       setPanicAlerting(false);
     }
@@ -98,6 +141,31 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Backend Connection Status Banner */}
+      {backendConnected === false && (
+        <div className="bg-red-50 border-b border-red-200 px-4 py-3">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <FiAlertCircle className="text-red-600 text-xl" />
+              <div>
+                <p className="text-sm font-medium text-red-800">
+                  Backend server is not connected
+                </p>
+                <p className="text-xs text-red-600 mt-1">
+                  Please start the backend server. Check the console for instructions or run: <code className="bg-red-100 px-1 rounded">cd backend && python -m uvicorn api.main:app --reload</code>
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              className="text-sm text-red-700 hover:text-red-900 underline"
+            >
+              Retry Connection
+            </button>
+          </div>
+        </div>
+      )}
+      
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -117,8 +185,22 @@ const Dashboard = () => {
             </div>
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
-                <FiCheckCircle className="text-success-500 text-xl" />
-                <span className="text-sm font-medium text-gray-700">System Operational</span>
+                {backendConnected === true ? (
+                  <>
+                    <FiCheckCircle className="text-green-500 text-xl" />
+                    <span className="text-sm font-medium text-gray-700">Backend Connected</span>
+                  </>
+                ) : backendConnected === false ? (
+                  <>
+                    <FiAlertTriangle className="text-red-500 text-xl" />
+                    <span className="text-sm font-medium text-red-700">Backend Disconnected</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-sm font-medium text-gray-700">Checking Connection...</span>
+                  </>
+                )}
               </div>
               {/* Emergency SOS Button */}
               <button

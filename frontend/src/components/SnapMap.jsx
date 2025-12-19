@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, useMap } from 'react-leaflet';
-import { FiMapPin, FiNavigation, FiShield, FiAlertTriangle } from 'react-icons/fi';
+import { FiMapPin, FiNavigation, FiShield } from 'react-icons/fi';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 

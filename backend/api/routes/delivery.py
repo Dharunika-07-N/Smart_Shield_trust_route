@@ -82,7 +82,7 @@ async def optimize_route(
         logger.info(f"Optimizing route for {len(request.stops)} stops")
         
         # Optimize route
-        optimized_data = route_optimizer.optimize_route(
+        optimized_data = await route_optimizer.optimize_route(
             starting_point=request.starting_point,
             stops=request.stops,
             optimize_for=request.optimize_for,
@@ -383,7 +383,7 @@ async def reoptimize_route(
         new_stops = request.new_stops if request else None
         
         # Re-optimize route
-        optimized_data = route_monitor.reoptimize_route(
+        optimized_data = await route_monitor.reoptimize_route(
             db=db,
             route_id=route_id,
             current_location=current_loc,

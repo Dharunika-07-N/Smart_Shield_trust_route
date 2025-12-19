@@ -34,12 +34,13 @@ class SafetyScorer:
         model_dir.mkdir(parents=True, exist_ok=True)
         
         # Try to load existing model
-        if Path(model_path).exists():
+        if Path(model_path).exists() and Path(settings.SAFETY_SCALER_PATH).exists():
             try:
                 self.model = joblib.load(model_path)
-                logger.info("Loaded existing safety scoring model")
+                self.scaler = joblib.load(settings.SAFETY_SCALER_PATH)
+                logger.info("Loaded existing safety scoring model and scaler")
             except Exception as e:
-                logger.warning(f"Could not load model: {e}, creating new model")
+                logger.warning(f"Could not load model or scaler: {e}, creating new ones")
                 self._train_initial_model()
         else:
             self._train_initial_model()
@@ -76,12 +77,13 @@ class SafetyScorer:
         self.model = RandomForestRegressor(n_estimators=100, random_state=42, max_depth=10)
         self.model.fit(X_scaled, y)
         
-        # Save model
+        # Save model and scaler
         try:
             joblib.dump(self.model, settings.SAFETY_MODEL_PATH)
-            logger.info("Trained and saved new safety scoring model")
+            joblib.dump(self.scaler, settings.SAFETY_SCALER_PATH)
+            logger.info("Trained and saved new safety scoring model and scaler")
         except Exception as e:
-            logger.warning(f"Could not save model: {e}")
+            logger.warning(f"Could not save model or scaler: {e}")
     
     def _get_location_features(
         self,

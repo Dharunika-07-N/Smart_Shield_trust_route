@@ -194,7 +194,7 @@ class RouteMonitor:
             )
             return planned_loc, deviation_meters, None
     
-    def reoptimize_route(
+    async def reoptimize_route(
         self,
         db: Session,
         route_id: str,
@@ -257,7 +257,7 @@ class RouteMonitor:
             
             # Re-optimize from current location
             rider_info = route.rider_info or {}
-            optimized_data = self.route_optimizer.optimize_route(
+            optimized_data = await self.route_optimizer.optimize_route(
                 starting_point=current_location,
                 stops=delivery_stops,
                 optimize_for=route.optimizations_applied or ["time", "distance", "safety"],

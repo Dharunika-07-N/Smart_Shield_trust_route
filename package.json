@@ -1,1 +1,17 @@
-{}
+{
+    "name": "smart-shield",
+    "version": "1.0.0",
+    "description": "AI Smart Shield Trust Route - Parent Project",
+    "scripts": {
+        "install:backend": "cd backend && pip install -r requirements.txt",
+        "install:frontend": "cd frontend && npm install",
+        "install:all": "npm run install:frontend && npm run install:backend",
+        "start:backend": "cd backend && python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000",
+        "start:frontend": "cd frontend && npm start",
+        "start": "npx concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+        "build:frontend": "cd frontend && npm run build"
+    },
+    "devDependencies": {
+        "concurrently": "^8.2.1"
+    }
+}
