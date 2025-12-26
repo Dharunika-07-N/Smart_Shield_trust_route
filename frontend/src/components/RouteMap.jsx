@@ -1,16 +1,29 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { api } from '../services/api';
+import useLocation from '../hooks/useLocation';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
 
+const MapUpdater = ({ center }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (center) {
+      map.setView(center, map.getZoom());
+    }
+  }, [center, map]);
+  return null;
+};
+
 const RouteMap = () => {
+  const { location, loading: locationLoading, error: locationError } = useLocation();
   const [currentPos, setCurrentPos] = useState(null);
   const [destPos, setDestPos] = useState(null);
   const [fastest, setFastest] = useState(null);
   const [safest, setSafest] = useState(null);
   const [recommended, setRecommended] = useState(null);
+  const [alternatives, setAlternatives] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
@@ -19,6 +32,9 @@ const RouteMap = () => {
   const [safetyOverlay, setSafetyOverlay] = useState(null);
   const [showSafetyOverlay, setShowSafetyOverlay] = useState(true);
 
+  // Fallback to New York
+  const baseLat = location?.latitude || 40.7128;
+  const baseLon = location?.longitude || -74.0060;
 
   // Animated pulsing dot icon for current location (Snapchat-like)
   const pulsingIcon = useMemo(() => {
@@ -29,18 +45,15 @@ const RouteMap = () => {
     });
   }, []);
 
-  // Get traffic color
-  const getTrafficColor = (traffic) => {
-    switch (traffic) {
-      case 'low': return '#22c55e';
-      case 'medium': return '#eab308';
-      case 'high': return '#ef4444';
-      default: return '#6b7280';
+  // Update current position when location changes
+  useEffect(() => {
+    if (location) {
+      setCurrentPos([location.latitude, location.longitude]);
     }
-  };
+  }, [location]);
 
-  // Mock route data with traffic
-  const routes = [
+  // Mock route data with traffic relative to base location
+  const routes = useMemo(() => [
     {
       id: 1,
       name: 'Route #1247',
@@ -50,11 +63,11 @@ const RouteMap = () => {
       distance: '12.5 km',
       time: '28 min',
       coordinates: [
-        { lat: 40.7128, lng: -74.0060, traffic: 'low', safety: 95 },
-        { lat: 40.7210, lng: -74.0120, traffic: 'medium', safety: 90 },
-        { lat: 40.7285, lng: -74.0050, traffic: 'high', safety: 85 },
-        { lat: 40.7320, lng: -73.9950, traffic: 'low', safety: 95 },
-        { lat: 40.7250, lng: -73.9850, traffic: 'medium', safety: 88 },
+        { lat: baseLat, lng: baseLon, traffic: 'low', safety: 95 },
+        { lat: baseLat + 0.008, lng: baseLon + 0.006, traffic: 'medium', safety: 90 },
+        { lat: baseLat + 0.015, lng: baseLon + 0.01, traffic: 'high', safety: 85 },
+        { lat: baseLat + 0.02, lng: baseLon + 0.005, traffic: 'low', safety: 95 },
+        { lat: baseLat + 0.025, lng: baseLon - 0.005, traffic: 'medium', safety: 88 },
       ],
     },
     {
@@ -66,10 +79,10 @@ const RouteMap = () => {
       distance: '8.3 km',
       time: '22 min',
       coordinates: [
-        { lat: 40.7500, lng: -73.9900, traffic: 'low', safety: 88 },
-        { lat: 40.7550, lng: -73.9850, traffic: 'medium', safety: 85 },
-        { lat: 40.7600, lng: -73.9800, traffic: 'high', safety: 80 },
-        { lat: 40.7650, lng: -73.9750, traffic: 'low', safety: 87 },
+        { lat: baseLat + 0.01, lng: baseLon - 0.01, traffic: 'low', safety: 88 },
+        { lat: baseLat + 0.015, lng: baseLon - 0.015, traffic: 'medium', safety: 85 },
+        { lat: baseLat + 0.02, lng: baseLon - 0.02, traffic: 'high', safety: 80 },
+        { lat: baseLat + 0.025, lng: baseLon - 0.025, traffic: 'low', safety: 87 },
       ],
     },
     {
@@ -81,53 +94,25 @@ const RouteMap = () => {
       distance: '15.2 km',
       time: '35 min',
       coordinates: [
-        { lat: 40.7100, lng: -73.9950, traffic: 'low', safety: 90 },
-        { lat: 40.7150, lng: -73.9900, traffic: 'medium', safety: 88 },
-        { lat: 40.7200, lng: -73.9850, traffic: 'low', safety: 92 },
-        { lat: 40.7250, lng: -73.9800, traffic: 'high', safety: 82 },
-        { lat: 40.7300, lng: -73.9750, traffic: 'medium', safety: 86 },
-        { lat: 40.7350, lng: -73.9700, traffic: 'low', safety: 89 },
+        { lat: baseLat - 0.005, lng: baseLon + 0.01, traffic: 'low', safety: 90 },
+        { lat: baseLat - 0.01, lng: baseLon + 0.015, traffic: 'medium', safety: 88 },
+        { lat: baseLat - 0.015, lng: baseLon + 0.02, traffic: 'low', safety: 92 },
+        { lat: baseLat - 0.02, lng: baseLon + 0.025, traffic: 'high', safety: 82 },
+        { lat: baseLat - 0.025, lng: baseLon + 0.03, traffic: 'medium', safety: 86 },
+        { lat: baseLat - 0.03, lng: baseLon + 0.035, traffic: 'low', safety: 89 },
       ],
     },
-  ];
+  ], [baseLat, baseLon]);
 
-
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.innerHTML = `
-      @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(59,130,246,0.7)} 70%{box-shadow:0 0 0 15px rgba(59,130,246,0)} 100%{box-shadow:0 0 0 0 rgba(59,130,246,0)} }
-    `;
-    document.head.appendChild(style);
-    return () => { document.head.removeChild(style); };
-  }, []);
-
-  // Geolocate user and keep updating
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      setError('Geolocation is not supported by your browser');
-      return;
+  // Get traffic color
+  const getTrafficColor = (traffic) => {
+    switch (traffic) {
+      case 'low': return '#22c55e';
+      case 'medium': return '#eab308';
+      case 'high': return '#ef4444';
+      default: return '#6b7280';
     }
-    
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        console.log('Current position updated:', { latitude, longitude });
-        setCurrentPos([latitude, longitude]);
-        setError(''); // Clear any previous location errors
-      },
-      (err) => {
-        console.error('Geolocation error:', err);
-        const errorMsg = err.code === 1 
-          ? 'Location access denied. Please enable location permissions.'
-          : err.code === 2
-          ? 'Location unavailable. Please check your GPS settings.'
-          : 'Unable to get current location. Please try again.';
-        setError(errorMsg);
-      },
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
-    );
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, []);
+  };
 
   // Destination search via Nominatim
   const searchPlaces = async (text) => {
@@ -163,33 +148,34 @@ const RouteMap = () => {
   });
 
   const optimize = async () => {
-    if (!currentPos || !destPos) { 
-      setError('Please select a destination by searching or clicking on the map'); 
-      return; 
+    if (!currentPos || !destPos) {
+      setError('Please select a destination by searching or clicking on the map');
+      return;
     }
-    
+
     setLoading(true);
     setError('');
-    setFastest(null); 
-    setSafest(null); 
+    setFastest(null);
+    setSafest(null);
     setRecommended(null);
-    
+    setAlternatives([]);
+
     try {
       // Build requests
       const fastestRequest = buildRequest(currentPos, destPos, ['time', 'distance']);
       const safestRequest = buildRequest(currentPos, destPos, ['safety', 'time']);
-      
-      console.log('Optimizing route...', { 
-        currentPos, 
+
+      console.log('Optimizing route...', {
+        currentPos,
         destPos,
         fastestRequest,
         safestRequest
       });
-      
+
       // Log the full request for debugging
       console.log('Fastest request:', JSON.stringify(fastestRequest, null, 2));
       console.log('Safest request:', JSON.stringify(safestRequest, null, 2));
-      
+
       // Use API service instead of fetch
       const [fastJson, safeJson] = await Promise.all([
         api.optimizeRoute(fastestRequest).catch(err => {
@@ -200,7 +186,7 @@ const RouteMap = () => {
             url: err.url,
             isNetworkError: err.isNetworkError
           });
-          
+
           // Preserve the original error message
           const error = new Error(err.message || 'Fastest route optimization failed');
           error.status = err.status;
@@ -215,7 +201,7 @@ const RouteMap = () => {
             url: err.url,
             isNetworkError: err.isNetworkError
           });
-          
+
           // Preserve the original error message
           const error = new Error(err.message || 'Safest route optimization failed');
           error.status = err.status;
@@ -223,7 +209,7 @@ const RouteMap = () => {
           throw error;
         })
       ]);
-      
+
       // Check if responses are successful
       if (!fastJson || !fastJson.success) {
         throw new Error(fastJson?.detail || fastJson?.message || 'Fastest route failed');
@@ -231,7 +217,7 @@ const RouteMap = () => {
       if (!safeJson || !safeJson.success) {
         throw new Error(safeJson?.detail || safeJson?.message || 'Safest route failed');
       }
-      
+
       // Check if data exists
       if (!fastJson.data) {
         throw new Error('No data returned from fastest route optimization');
@@ -239,17 +225,51 @@ const RouteMap = () => {
       if (!safeJson.data) {
         throw new Error('No data returned from safest route optimization');
       }
-      
+
       setFastest(fastJson.data);
       setSafest(safeJson.data);
-      
+
+      // Collect unique alternatives
+      const alts = [];
+      const seenCoords = new Set();
+
+      // Helper to generate a rough signature for a route to dedup
+      const getRouteSig = (r) => {
+        if (!r.segments?.[0]?.route_coordinates?.length) return Math.random();
+        const first = r.segments[0].route_coordinates[0];
+        const last = r.segments[0].route_coordinates[r.segments[0].route_coordinates.length - 1];
+        const mid = r.segments[0].route_coordinates[Math.floor(r.segments[0].route_coordinates.length / 2)];
+        return `${first.lat},${first.lng}-${mid.lat},${mid.lng}-${last.lat},${last.lng}`;
+      };
+
+      // Add main routes to seen
+      if (fastJson.data) seenCoords.add(getRouteSig(fastJson.data));
+      if (safeJson.data) seenCoords.add(getRouteSig(safeJson.data));
+
+      const processAlts = (routeData) => {
+        if (routeData?.alternatives) {
+          routeData.alternatives.forEach(alt => {
+            const sig = getRouteSig(alt);
+            if (!seenCoords.has(sig)) {
+              seenCoords.add(sig);
+              alts.push(alt);
+            }
+          });
+        }
+      };
+
+      processAlts(fastJson.data);
+      processAlts(safeJson.data);
+
+      setAlternatives(alts);
+
       // Simple recommendation logic: prefer safe if safety < 65 on fastest or time diff < 20%
       const fastestSecs = fastJson.data?.total_duration_seconds || 0;
       const safestSecs = safeJson.data?.total_duration_seconds || 0;
       const fastestSafety = fastJson.data?.average_safety_score || 0;
       const chooseSafe = fastestSafety < 65 || (safestSecs && fastestSecs && (safestSecs - fastestSecs) / fastestSecs < 0.2);
       setRecommended(chooseSafe ? 'safest' : 'fastest');
-      
+
       // Fetch safety overlay for recommended route
       await fetchSafetyOverlay(chooseSafe ? safeJson.data : fastJson.data);
     } catch (e) {
@@ -259,9 +279,9 @@ const RouteMap = () => {
         isNetworkError: e.isNetworkError,
         error: e
       });
-      
+
       let errorMessage = e.message || 'Optimization failed';
-      
+
       // Provide more helpful error messages based on error type
       if (e.isNetworkError || errorMessage.includes('Network error') || errorMessage.includes('Unable to connect')) {
         errorMessage = `Cannot connect to server. Make sure the backend is running on ${API_BASE}`;
@@ -276,7 +296,7 @@ const RouteMap = () => {
       } else if (e.status === 422) {
         errorMessage = 'Validation error. Please check your input data.';
       }
-      
+
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -285,14 +305,14 @@ const RouteMap = () => {
 
   const fetchSafetyOverlay = async (routeData) => {
     if (!routeData || !routeData.segments || routeData.segments.length === 0) return;
-    
+
     try {
       // Collect coordinates from route segments
       const coords = [];
       if (currentPos) {
         coords.push({ latitude: currentPos[0], longitude: currentPos[1] });
       }
-      
+
       // Extract coordinates from segments
       routeData.segments.forEach(segment => {
         if (segment.route_coordinates && segment.route_coordinates.length > 0) {
@@ -301,13 +321,13 @@ const RouteMap = () => {
           });
         }
       });
-      
+
       if (destPos) {
         coords.push({ latitude: destPos[0], longitude: destPos[1] });
       }
-      
+
       if (coords.length < 2) return;
-      
+
       // Call safety score API
       const response = await fetch(`${API_BASE}/api/v1/safety/score`, {
         method: 'POST',
@@ -319,7 +339,7 @@ const RouteMap = () => {
           include_factors: true
         })
       });
-      
+
       const safetyData = await response.json();
       if (safetyData.segment_scores) {
         setSafetyOverlay(safetyData);
@@ -347,16 +367,16 @@ const RouteMap = () => {
   // Convert route segments to polyline coordinates with safety coloring
   const getRoutePolylines = (routeData, segments) => {
     if (!routeData || !segments || segments.length === 0) return [];
-    
+
     const polylines = [];
     let currentPos_ = currentPos;
-    
+
     segments.forEach((segment, idx) => {
       const coords = [];
       if (currentPos_) {
         coords.push(currentPos_);
       }
-      
+
       // Use route coordinates if available, otherwise use straight line
       if (segment.route_coordinates && segment.route_coordinates.length > 0) {
         segment.route_coordinates.forEach(coord => {
@@ -365,11 +385,11 @@ const RouteMap = () => {
       } else if (destPos) {
         coords.push(destPos);
       }
-      
+
       if (coords.length >= 2) {
         const safetyScore = segment.safety_score || 70;
-        const isRecommended = (recommended === 'fastest' && routeData === fastest) || 
-                             (recommended === 'safest' && routeData === safest);
+        const isRecommended = (recommended === 'fastest' && routeData === fastest) ||
+          (recommended === 'safest' && routeData === safest);
         polylines.push({
           positions: coords,
           color: getSafetyColor(safetyScore),
@@ -378,27 +398,36 @@ const RouteMap = () => {
           safetyScore: safetyScore
         });
       }
-      
+
       // Update current position for next segment
       if (coords.length > 0) {
         currentPos_ = coords[coords.length - 1];
       }
     });
-    
+
     return polylines;
   };
 
   const centerPosition = currentPos || [11.0168, 76.9558]; // Default to Coimbatore
 
-  const ClickToSetDestination = () => {
+  const [selectionMode, setSelectionMode] = useState('destination'); // 'start' or 'destination'
+
+  const ClickToSetLocation = () => {
     useMapEvents({
       click(e) {
-        const newDest = [e.latlng.lat, e.latlng.lng];
-        console.log('Destination selected from map click:', newDest);
-        setDestPos(newDest);
-        // Clear search query when clicking on map
-        setQuery('');
-        setResults([]);
+        const coords = [e.latlng.lat, e.latlng.lng];
+        if (selectionMode === 'start') {
+          console.log('Start point selected from map click:', coords);
+          setCurrentPos(coords);
+          // Auto-switch to destination mode after setting start
+          setSelectionMode('destination');
+        } else {
+          console.log('Destination selected from map click:', coords);
+          setDestPos(coords);
+          // Clear search query when clicking on map
+          setQuery('');
+          setResults([]);
+        }
       }
     });
     return null;
@@ -436,11 +465,11 @@ const RouteMap = () => {
                       <button
                         key={`${r.place_id}`}
                         className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors"
-                        onClick={() => { 
+                        onClick={() => {
                           const newDest = [parseFloat(r.lat), parseFloat(r.lon)];
                           console.log('Destination selected from search:', newDest, r.display_name);
-                          setDestPos(newDest); 
-                          setQuery(r.display_name); 
+                          setDestPos(newDest);
+                          setQuery(r.display_name);
                           setResults([]);
                         }}
                       >
@@ -453,19 +482,30 @@ const RouteMap = () => {
               <div className="text-xs text-gray-600">
                 Tip: You can also click anywhere on the map to set destination.
               </div>
-              
+
               {/* Status indicators */}
               <div className="space-y-2 text-xs">
                 {!currentPos && (
-                  <div className="flex items-center space-x-2 text-yellow-600">
-                    <span>⏳</span>
-                    <span>Waiting for your location...</span>
+                  <div className="flex flex-col space-y-2">
+                    <div className="flex items-center space-x-2 text-yellow-600">
+                      <span>⏳</span>
+                      <span>Waiting for your location...</span>
+                    </div>
+                    <button
+                      onClick={() => setCurrentPos([11.0168, 76.9558])}
+                      className="text-primary-600 hover:text-primary-700 underline text-left"
+                    >
+                      Use Demo Location (Coimbatore)
+                    </button>
+                    <div className="text-gray-500">
+                      Or click "Set Start Point" below to choose manually
+                    </div>
                   </div>
                 )}
                 {currentPos && (
                   <div className="flex items-center space-x-2 text-green-600">
                     <span>✓</span>
-                    <span>Current location detected</span>
+                    <span>Current location set</span>
                   </div>
                 )}
                 {destPos && (
@@ -481,15 +521,14 @@ const RouteMap = () => {
                   </div>
                 )}
               </div>
-              
+
               <button
                 onClick={optimize}
                 disabled={!currentPos || !destPos || loading}
-                className={`w-full px-4 py-2 rounded-md text-white font-medium transition-colors ${
-                  (!currentPos || !destPos || loading) 
-                    ? 'bg-gray-400 cursor-not-allowed' 
-                    : 'bg-primary-600 hover:bg-primary-700'
-                }`}
+                className={`w-full px-4 py-2 rounded-md text-white font-medium transition-colors ${(!currentPos || !destPos || loading)
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-primary-600 hover:bg-primary-700'
+                  }`}
               >
                 {loading ? (
                   <span className="flex items-center justify-center">
@@ -500,12 +539,12 @@ const RouteMap = () => {
                   'Optimize Route'
                 )}
               </button>
-              
+
               {error && (
                 <div className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">
                   <div className="font-medium mb-1">Error</div>
                   <div className="mb-2">{error}</div>
-                  
+
                   {/* Debug info in development */}
                   {process.env.NODE_ENV === 'development' && (
                     <div className="mt-2 pt-2 border-t border-red-200 text-xs text-red-600">
@@ -516,11 +555,11 @@ const RouteMap = () => {
                       <p className="mt-1">Check browser console (F12) for detailed error logs and actual API URL being used.</p>
                     </div>
                   )}
-                  
+
                   {(error.includes('Cannot connect') || error.includes('Network error') || error.includes('Unable to connect')) && (
                     <div className="mt-2 pt-2 border-t border-red-200">
                       <p className="text-xs text-red-600">
-                        <strong>Tip:</strong> Make sure the backend server is running. 
+                        <strong>Tip:</strong> Make sure the backend server is running.
                         Start it with: <code className="bg-red-100 px-1 rounded">cd backend && python -m uvicorn api.main:app --reload</code>
                       </p>
                       <p className="text-xs text-red-600 mt-1">
@@ -530,7 +569,7 @@ const RouteMap = () => {
                   )}
                 </div>
               )}
-              
+
               {/* Safety overlay toggle */}
               {(fastest || safest) && (
                 <div className="mt-3 flex items-center space-x-2">
@@ -556,13 +595,13 @@ const RouteMap = () => {
                 {fastest && (
                   <div className="flex items-center justify-between">
                     <span className="text-gray-700">Fastest</span>
-                    <span className="text-gray-900 font-medium">{Math.round((fastest.total_duration_seconds||0)/60)} min • {(fastest.total_distance_meters/1000).toFixed(1)} km</span>
+                    <span className="text-gray-900 font-medium">{Math.round((fastest.total_duration_seconds || 0) / 60)} min • {(fastest.total_distance_meters / 1000).toFixed(1)} km</span>
                   </div>
                 )}
                 {safest && (
                   <div className="flex items-center justify-between">
                     <span className="text-gray-700">Safest</span>
-                    <span className="text-gray-900 font-medium">{Math.round((safest.total_duration_seconds||0)/60)} min • {(safest.total_distance_meters/1000).toFixed(1)} km • {Math.round(safest.average_safety_score)} safety</span>
+                    <span className="text-gray-900 font-medium">{Math.round((safest.total_duration_seconds || 0) / 60)} min • {(safest.total_distance_meters / 1000).toFixed(1)} km • {Math.round(safest.average_safety_score)} safety</span>
                   </div>
                 )}
                 {recommended && (
@@ -621,7 +660,26 @@ const RouteMap = () => {
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
 
-              <ClickToSetDestination />
+              <ClickToSetLocation />
+
+              <div className="leaflet-top leaflet-right" style={{ top: '80px', right: '10px', zIndex: 1000 }}>
+                <div className="bg-white rounded-md shadow-md p-1 flex flex-col space-y-1">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setSelectionMode('start'); }}
+                    className={`p-2 rounded ${selectionMode === 'start' ? 'bg-blue-100 text-blue-700 font-bold' : 'hover:bg-gray-100 text-gray-700'}`}
+                    title="Set Start Point"
+                  >
+                    <span className="text-xl">🚩</span>
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setSelectionMode('destination'); }}
+                    className={`p-2 rounded ${selectionMode === 'destination' ? 'bg-red-100 text-red-700 font-bold' : 'hover:bg-gray-100 text-gray-700'}`}
+                    title="Set Destination"
+                  >
+                    <span className="text-xl">📍</span>
+                  </button>
+                </div>
+              </div>
 
               {/* Current location */}
               {currentPos && (
@@ -661,7 +719,7 @@ const RouteMap = () => {
 
               {/* Destination marker */}
               {destPos && (
-                <Marker 
+                <Marker
                   position={destPos}
                   icon={L.divIcon({
                     className: 'destination-marker',
@@ -681,6 +739,32 @@ const RouteMap = () => {
               )}
 
               {/* Draw route polylines with safety coloring */}
+              {/* Alternative Routes */}
+              {alternatives.map((alt, altIdx) => (
+                <React.Fragment key={`alt-${altIdx}`}>
+                  {showSafetyOverlay && getRoutePolylines(alt, alt.segments).map((poly, idx) => (
+                    <Polyline
+                      key={`alt-${altIdx}-${idx}`}
+                      positions={poly.positions}
+                      pathOptions={{
+                        color: poly.color,
+                        weight: 4,
+                        opacity: 0.4,
+                      }}
+                    >
+                      <Popup>
+                        <div>
+                          <strong>Alternative Route {altIdx + 1}</strong><br />
+                          Time: {Math.round((alt.total_duration_seconds || 0) / 60)} min<br />
+                          Distance: {(alt.total_distance_meters / 1000).toFixed(1)} km<br />
+                          Safety Score: {Math.round(alt.average_safety_score)}
+                        </div>
+                      </Popup>
+                    </Polyline>
+                  ))}
+                </React.Fragment>
+              ))}
+
               {fastest && showSafetyOverlay && getRoutePolylines(fastest, fastest.segments).map((poly, idx) => (
                 <Polyline
                   key={`fastest-${idx}`}

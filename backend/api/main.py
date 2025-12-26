@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from config.config import settings
-from api.routes import delivery, safety, feedback, traffic
+from api.routes import delivery, safety, feedback, traffic, auth
 import sys
 from pathlib import Path
 
@@ -30,43 +30,35 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS middleware - Enhanced for frontend connection
-# In development, allow all localhost ports for easier development
-if settings.ENVIRONMENT == "development":
-    # Allow all localhost ports in development
-    cors_origins = [
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://localhost:3002",
-        "http://localhost:3003",
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:5175",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:3001",
-        "http://127.0.0.1:3002",
-        "http://127.0.0.1:3003",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
-        "http://127.0.0.1:5175",
-    ] + settings.BACKEND_CORS_ORIGINS
-else:
-    cors_origins = settings.BACKEND_CORS_ORIGINS
+logger.info(f"Setting up API in {settings.ENVIRONMENT} mode")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-)
+# CORS middleware - Setup as early as possible
+if settings.ENVIRONMENT == "development":
+    logger.info("Enabling permissive CORS for development")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.BACKEND_CORS_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+        allow_headers=["*"],
+        expose_headers=["*"],
+    )
 
 # Include routers
 app.include_router(delivery.router, prefix=settings.API_V1_PREFIX, tags=["Delivery"])
 app.include_router(safety.router, prefix=settings.API_V1_PREFIX, tags=["Safety"])
 app.include_router(feedback.router, prefix=settings.API_V1_PREFIX, tags=["Feedback"])
 app.include_router(traffic.router, prefix=settings.API_V1_PREFIX, tags=["Traffic"])
+app.include_router(auth.router, prefix=settings.API_V1_PREFIX, tags=["Authentication"])
 
 
 @app.on_event("startup")

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { 
-  FiShield, FiPackage, FiTrendingUp, FiMap, 
+import {
+  FiShield, FiPackage, FiTrendingUp, FiMap,
   FiActivity, FiAlertCircle, FiCheckCircle, FiAlertTriangle
 } from 'react-icons/fi';
 import Analytics from './Analytics';
@@ -9,13 +9,14 @@ import SafetyHeatmap from './SafetyHeatmap';
 import SnapMap from './SnapMap';
 import LiveTracking from './LiveTracking';
 import { api } from '../services/api';
+import useLocation from '../hooks/useLocation';
 
-const Dashboard = () => {
+const Dashboard = ({ setAuth }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [panicAlerting, setPanicAlerting] = useState(false);
   const [riderId, setRiderId] = useState(localStorage.getItem('rider_id') || '');
-  const [currentLocation, setCurrentLocation] = useState(null);
-  const [backendConnected, setBackendConnected] = useState(null); // null = checking, true = connected, false = disconnected
+  const { location: currentLocation, loading: locationLoading } = useLocation();
+  const [backendConnected, setBackendConnected] = useState(null);
 
   // Check backend connection on mount
   React.useEffect(() => {
@@ -24,37 +25,17 @@ const Dashboard = () => {
         const response = await api.healthCheck();
         if (response && (response.status === 'healthy' || response.status === 'running')) {
           setBackendConnected(true);
-          console.log('✅ Backend is connected');
         } else {
           setBackendConnected(false);
         }
       } catch (error) {
-        console.error('❌ Backend connection failed:', error);
         setBackendConnected(false);
       }
     };
 
     checkBackendConnection();
-    // Check every 30 seconds
     const interval = setInterval(checkBackendConnection, 30000);
     return () => clearInterval(interval);
-  }, []);
-
-  // Get current location for SOS button
-  React.useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setCurrentLocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-          });
-        },
-        (error) => {
-          console.error('Geolocation error:', error);
-        }
-      );
-    }
   }, []);
 
   const handlePanicButton = async () => {
@@ -83,10 +64,10 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error('Panic button error:', error);
-      
+
       // Provide more helpful error messages
       let errorMessage = error.message || 'Unknown error';
-      
+
       if (error.isNetworkError || errorMessage.includes('Unable to connect to server') || errorMessage.includes('Network error')) {
         errorMessage = `Cannot connect to backend server.\n\n` +
           `The backend server is not running. To start it:\n\n` +
@@ -101,11 +82,17 @@ const Dashboard = () => {
           `Or if you have a startup script, use that instead.\n\n` +
           `Once the server is running, try again.`;
       }
-      
+
       alert(`Failed to send emergency alert: ${errorMessage}`);
     } finally {
       setPanicAlerting(false);
     }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setAuth(false);
   };
 
   const stats = [
@@ -165,7 +152,7 @@ const Dashboard = () => {
           </div>
         </div>
       )}
-      
+
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -202,15 +189,21 @@ const Dashboard = () => {
                   </>
                 )}
               </div>
+              <button
+                onClick={handleLogout}
+                className="flex items-center space-x-2 px-4 py-2 rounded-lg font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-all border border-gray-300"
+              >
+                <span>Logout</span>
+              </button>
+
               {/* Emergency SOS Button */}
               <button
                 onClick={handlePanicButton}
                 disabled={panicAlerting || !currentLocation || !riderId}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-semibold text-white transition-all ${
-                  panicAlerting
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-red-600 hover:bg-red-700 active:bg-red-800 shadow-lg hover:shadow-xl'
-                }`}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-semibold text-white transition-all ${panicAlerting
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-red-600 hover:bg-red-700 active:bg-red-800 shadow-lg hover:shadow-xl'
+                  }`}
                 title={!riderId ? 'Please set Rider ID to use SOS' : !currentLocation ? 'Location not available' : 'Emergency SOS Alert'}
               >
                 <FiAlertTriangle className="text-xl" />
@@ -236,11 +229,10 @@ const Dashboard = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-primary-500 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id
+                  ? 'border-primary-500 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
               >
                 {tab.label}
               </button>
@@ -293,11 +285,10 @@ const Dashboard = () => {
                 <button
                   onClick={handlePanicButton}
                   disabled={panicAlerting || !currentLocation || !riderId}
-                  className={`px-6 py-3 rounded-lg font-bold text-white transition-all ${
-                    panicAlerting
-                      ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-red-600 hover:bg-red-700 active:bg-red-800 shadow-lg hover:shadow-xl transform hover:scale-105'
-                  }`}
+                  className={`px-6 py-3 rounded-lg font-bold text-white transition-all ${panicAlerting
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-red-600 hover:bg-red-700 active:bg-red-800 shadow-lg hover:shadow-xl transform hover:scale-105'
+                    }`}
                 >
                   {panicAlerting ? 'Sending Alert...' : 'TRIGGER SOS'}
                 </button>

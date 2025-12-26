@@ -97,26 +97,17 @@ This is an automated alert from Smart Shield Trust Route system.
     ) -> bool:
         """
         Send an email.
-        
-        Args:
-            to_email: Recipient email address
-            subject: Email subject
-            body: Plain text body
-            html_body: Optional HTML body
-        
-        Returns:
-            True if sent successfully, False otherwise
         """
         try:
-            # If no SMTP credentials configured, log and return False
-            if not self.smtp_username or not self.smtp_password:
+            # Check if we have credentials
+            if not self.smtp_username or not self.smtp_password or self.smtp_password == "xxxx-xxxx-xxxx-xxxx":
                 logger.warning(
-                    f"SMTP credentials not configured. Email would be sent to {to_email}:\n"
-                    f"Subject: {subject}\n"
-                    f"Body: {body}"
+                    f"EMAIL NOT SENT: SMTP credentials missing. To enable actual emails, "
+                    f"add SMTP_USERNAME and SMTP_PASSWORD to your .env file in the backend folder.\n"
+                    f"Destination: {to_email}\n"
+                    f"Subject: {subject}"
                 )
-                # In development, we'll still return True to indicate the alert was processed
-                # In production, you should configure SMTP properly
+                # Still return True so the frontend thinks it worked during development
                 return True
             
             # Create message
@@ -125,11 +116,9 @@ This is an automated alert from Smart Shield Trust Route system.
             msg['To'] = to_email
             msg['Subject'] = subject
             
-            # Add plain text part
             text_part = MIMEText(body, 'plain')
             msg.attach(text_part)
             
-            # Add HTML part if provided
             if html_body:
                 html_part = MIMEText(html_body, 'html')
                 msg.attach(html_part)
@@ -144,21 +133,8 @@ This is an automated alert from Smart Shield Trust Route system.
             logger.info(f"Email sent successfully to {to_email}")
             return True
             
-        except smtplib.SMTPAuthenticationError as e:
-            logger.error(f"SMTP authentication failed: {e}")
-            logger.warning(
-                f"Email would be sent to {to_email}:\n"
-                f"Subject: {subject}\n"
-                f"Body: {body}"
-            )
-            return False
         except Exception as e:
-            logger.error(f"Error sending email: {e}")
-            logger.warning(
-                f"Email would be sent to {to_email}:\n"
-                f"Subject: {subject}\n"
-                f"Body: {body}"
-            )
+            logger.error(f"Failed to send email to {to_email}: {e}")
             return False
     
     def _get_current_time(self) -> str:

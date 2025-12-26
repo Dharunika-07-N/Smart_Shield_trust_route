@@ -189,3 +189,30 @@ class RideAlong(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     last_accessed = Column(DateTime, nullable=True)
 
+
+class User(Base):
+    """User model for authentication and profile info."""
+    __tablename__ = "users"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    username = Column(String, unique=True, nullable=False, index=True)
+    hashed_password = Column(String, nullable=False)
+    role = Column(String, default="rider")  # delivery_person, rider
+    
+    # Common Profile Info
+    full_name = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    email = Column(String, nullable=True)
+    
+    # Delivery Person Specific
+    license_number = Column(String, nullable=True)
+    vehicle_type = Column(String, nullable=True)
+    company_name = Column(String, nullable=True)
+    
+    # Rider Specific
+    gender = Column(String, nullable=True)
+    emergency_contact_name = Column(String, nullable=True)
+    emergency_contact_phone = Column(String, nullable=True)
+    
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

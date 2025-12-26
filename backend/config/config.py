@@ -91,12 +91,14 @@ class Settings(BaseSettings):
     SMTP_USERNAME: str = os.getenv("SMTP_USERNAME", "")
     SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
     SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "True").lower() == "true"
-    FROM_EMAIL: str = os.getenv("FROM_EMAIL", "noreply@smartshield.com")
+    FROM_EMAIL: str = os.getenv("FROM_EMAIL", "dharunikaktm@gmail.com")
     EMERGENCY_EMAIL: str = os.getenv("EMERGENCY_EMAIL", "dharunikaktm@gmail.com")
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = {
+        "env_file": ".env",
+        "case_sensitive": True,
+        "extra": "ignore"
+    }
 
 # Create global settings instance
 settings = Settings()

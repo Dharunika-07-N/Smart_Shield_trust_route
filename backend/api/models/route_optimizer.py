@@ -5,6 +5,7 @@ import numpy as np
 from datetime import datetime, timedelta
 import sys
 from pathlib import Path
+import uuid
 
 # Optional: OR-Tools for advanced optimization
 try:
@@ -83,7 +84,16 @@ class RouteOptimizer:
         )
         
         # Optimize using multiple algorithms
-        if settings.OPTIMIZATION_ALGORITHM == "genetic":
+        if len(stops) == 1:
+            # For finding alternatives between A and B
+            return await self._optimize_single_leg_alternatives(
+                starting_point,
+                stops[0],
+                optimize_for,
+                rider_info,
+                departure_time
+            )
+        elif settings.OPTIMIZATION_ALGORITHM == "genetic":
             sequence = self._optimize_genetic(cost_matrix, len(stops))
         elif settings.OPTIMIZATION_ALGORITHM == "nearest_neighbor":
             sequence = self._optimize_nearest_neighbor(cost_matrix)
@@ -104,8 +114,8 @@ class RouteOptimizer:
             departure_time
         )
         
-        # Generate route ID
-        route_id = f"ROUTE_{int(datetime.now().timestamp())}"
+        # Generate unique route ID
+        route_id = f"ROUTE_{uuid.uuid4().hex[:10]}"
         
         # Estimate arrivals
         estimated_arrivals = self._calculate_arrivals(
@@ -534,4 +544,198 @@ class RouteOptimizer:
             arrivals[stop_id] = current_time
         
         return arrivals
+
+    async def _optimize_single_leg_alternatives(
+        self,
+        starting_point: Coordinate,
+        stop: DeliveryStop,
+        optimize_for: List[str],
+        rider_info: Optional[Dict],
+        departure_time: Optional[datetime]
+    ) -> Dict:
+        """Find and rank alternative routes for a single stop."""
+        dep_timestamp = int(departure_time.timestamp()) if departure_time else None
+        
+        # Get all route variations
+        all_directions = self.maps_service.get_all_directions(
+            origin=starting_point,
+            destination=stop.coordinates,
+            mode="driving",
+            departure_time=dep_timestamp,
+            traffic_model="best_guess"
+        )
+        
+        candidates = []
+        
+        for directions in all_directions:
+            # Process this route option
+            segment, stats = await self._process_segment_data(
+                starting_point,
+                stop.coordinates,
+                directions,
+                rider_info,
+                departure_time
+            )
+            
+            # Create unique route object for this candidate
+            route_id = f"ROUTE_{uuid.uuid4().hex[:10]}"
+            
+            # Calculate cost/score for ranking
+            score = 0
+            if "time" in optimize_for:
+                score += stats["duration"]
+            if "distance" in optimize_for:
+                score += stats["distance"] * 0.1
+            if "safety" in optimize_for:
+                # Lower score is better for ranking (so invert safety)
+                score += (100 - stats["avg_safety"]) * 10
+            
+            candidate = {
+                "route_id": route_id,
+                "sequence": [stop.stop_id],
+                "segments": [segment.copy()],
+                "total_distance_meters": stats["distance"],
+                "total_duration_seconds": stats["duration"],
+                "average_safety_score": stats["avg_safety"],
+                "total_fuel_liters": stats["fuel"],
+                "optimizations_applied": optimize_for,
+                "estimated_arrivals": {
+                    stop.stop_id: (departure_time or datetime.now()) + timedelta(seconds=stats["duration"])
+                },
+                "created_at": datetime.now(),
+                "_ranking_score": score
+            }
+            segment["to_stop"] = stop.stop_id # Ensure ID is set
+            candidates.append(candidate)
+            
+        if not candidates:
+            # Fallback if no routes found (shouldn't happen with mock/real)
+            raise ValueError("No routes found between points")
+            
+        # Sort candidates based on objectives
+        # Default sort is ascending score (lower cost is better)
+        candidates.sort(key=lambda x: x["_ranking_score"])
+        
+        best_route = candidates[0]
+        alternatives = candidates[1:] if len(candidates) > 1 else []
+        
+        # Clean up internal ranking score
+        del best_route["_ranking_score"]
+        for alt in alternatives:
+            del alt["_ranking_score"]
+            
+        best_route["alternatives"] = alternatives
+        return best_route
+
+    async def _process_segment_data(
+        self,
+        start_point: Coordinate,
+        end_point: Coordinate,
+        directions: Dict,
+        rider_info: Optional[Dict],
+        departure_time: Optional[datetime]
+    ) -> Tuple[Dict, Dict]:
+        """Process directions into a route segment with safety/weather data."""
+        
+        # Extract basic metrics
+        distance = 0
+        duration = 0
+        
+        if directions and directions.get('legs'):
+            leg = directions['legs'][0]
+            distance = leg['distance']['value']
+            if 'duration_in_traffic' in leg:
+                duration = leg['duration_in_traffic']['value']
+            else:
+                duration = leg['duration']['value']
+        else:
+            distance = self.maps_service.calculate_straight_distance(start_point, end_point)
+            duration = distance / 8.33
+            
+        route_coords = directions.get('route_coordinates')
+        
+        # Weather
+        weather_points = [start_point, end_point]
+        if route_coords:
+            step = max(1, len(route_coords) // 5)
+            weather_points = [start_point] + [
+                Coordinate(latitude=c['lat'], longitude=c['lng'])
+                for c in route_coords[::step]
+            ] + [end_point]
+            
+        weather_data_list = await self.weather_service.get_route_weather(weather_points)
+        
+        avg_weather_hazard = 0
+        weather_conditions = []
+        if weather_data_list:
+            hazards = [w['weather'].get('hazard_score', 0) for w in weather_data_list]
+            avg_weather_hazard = sum(hazards) / len(hazards) if hazards else 0
+            for w in weather_data_list:
+                weather_conditions.extend(w['weather'].get('hazard_conditions', []))
+        
+        weather_data = {
+            'hazard_score': avg_weather_hazard,
+            'hazard_conditions': list(set(weather_conditions))
+        }
+        
+        # Safety
+        segment_coords = [start_point, end_point]
+        if route_coords:
+            segment_coords = [
+                Coordinate(latitude=c['lat'], longitude=c['lng'])
+                for c in route_coords
+            ]
+            
+        time_of_day = "day"
+        if departure_time:
+            hour = departure_time.hour
+            if hour < 6 or hour >= 22:
+                time_of_day = "night"
+            elif hour < 8 or hour >= 18:
+                time_of_day = "evening"
+                
+        safety_data = self.safety_scorer.score_route(
+            segment_coords, time_of_day, rider_info
+        )
+        safety_score = safety_data["route_safety_score"]
+        
+        # Adjustments
+        weather_penalty = self.weather_service.calculate_weather_penalty(weather_data)
+        duration = duration * weather_penalty
+        
+        fuel = distance / 1000 * settings.FUEL_CONSUMPTION_PER_KM
+        
+        # Traffic level (simplified check)
+        traffic_level = "low"
+        if directions.get('has_traffic_data'):
+             # If duration in traffic is significantly higher than base duration
+             # We can't easily get base duration from here without another call, 
+             # so we rely on what traffic service would say or infer from speed
+             avg_speed_kmh = (distance / 1000) / (duration / 3600) if duration > 0 else 30
+             if avg_speed_kmh < 15:
+                 traffic_level = "high"
+             elif avg_speed_kmh < 30:
+                 traffic_level = "medium"
+        
+        segment = {
+            "from_stop": "START", # Placeholder, should be fixed by caller if needed
+            "to_stop": "END",
+            "distance_meters": distance,
+            "duration_seconds": duration,
+            "safety_score": safety_score,
+            "estimated_fuel_liters": fuel,
+            "route_coordinates": route_coords,
+            "weather_data": weather_data,
+            "has_traffic_data": directions.get('has_traffic_data', False),
+            "traffic_level": traffic_level
+        }
+        
+        stats = {
+            "distance": distance,
+            "duration": duration,
+            "avg_safety": safety_score,
+            "fuel": fuel
+        }
+        
+        return segment, stats
 

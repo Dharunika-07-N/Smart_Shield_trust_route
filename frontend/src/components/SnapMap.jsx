@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, useMap } from 'react-leaflet';
 import { FiMapPin, FiNavigation, FiShield } from 'react-icons/fi';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import useLocation from '../hooks/useLocation';
 
 // Fix Leaflet default icon issue
 delete L.Icon.Default.prototype._getIconUrl;
@@ -23,14 +24,31 @@ function FitBounds({ bounds }) {
   return null;
 }
 
+// Component to update map view
+const MapUpdater = ({ center }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (center) {
+      map.setView(center, map.getZoom());
+    }
+  }, [center, map]);
+  return null;
+};
+
 const SnapMap = () => {
+  const { location, loading, error: locationError } = useLocation();
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [showTraffic, setShowTraffic] = useState(true);
   const [showSafety, setShowSafety] = useState(true);
   const [mapStyle, setMapStyle] = useState('standard'); // standard, satellite, dark
 
-  // Mock route data with traffic and safety info
-  const routes = [
+  // New York as fallback
+  const fallbackLocation = { latitude: 40.7128, longitude: -74.0060 };
+  const baseLat = location?.latitude || fallbackLocation.latitude;
+  const baseLon = location?.longitude || fallbackLocation.longitude;
+
+  // Mock route data with traffic and safety info relative to base location
+  const routes = useMemo(() => [
     {
       id: 1,
       name: 'Route #1247',
@@ -40,12 +58,12 @@ const SnapMap = () => {
       distance: '12.5 km',
       time: '28 min',
       coordinates: [
-        { lat: 40.7128, lng: -74.0060, name: 'Start', traffic: 'low', safety: 95 },
-        { lat: 40.7210, lng: -74.0120, name: 'Stop 1', traffic: 'medium', safety: 90 },
-        { lat: 40.7285, lng: -74.0050, name: 'Stop 2', traffic: 'high', safety: 85 },
-        { lat: 40.7320, lng: -73.9950, name: 'Stop 3', traffic: 'low', safety: 95 },
-        { lat: 40.7250, lng: -73.9850, name: 'Stop 4', traffic: 'medium', safety: 88 },
-        { lat: 40.7150, lng: -73.9800, name: 'End', traffic: 'low', safety: 92 },
+        { lat: baseLat, lng: baseLon, name: 'Start (My Location)', traffic: 'low', safety: 95 },
+        { lat: baseLat + 0.005, lng: baseLon + 0.006, name: 'Stop 1', traffic: 'medium', safety: 90 },
+        { lat: baseLat + 0.012, lng: baseLon + 0.003, name: 'Stop 2', traffic: 'high', safety: 85 },
+        { lat: baseLat + 0.015, lng: baseLon - 0.005, name: 'Stop 3', traffic: 'low', safety: 95 },
+        { lat: baseLat + 0.008, lng: baseLon - 0.012, name: 'Stop 4', traffic: 'medium', safety: 88 },
+        { lat: baseLat - 0.002, lng: baseLon - 0.008, name: 'End', traffic: 'low', safety: 92 },
       ],
     },
     {
@@ -57,13 +75,13 @@ const SnapMap = () => {
       distance: '8.3 km',
       time: '22 min',
       coordinates: [
-        { lat: 40.7500, lng: -73.9900, name: 'Start', traffic: 'low', safety: 88 },
-        { lat: 40.7550, lng: -73.9850, name: 'Stop 1', traffic: 'medium', safety: 85 },
-        { lat: 40.7600, lng: -73.9800, name: 'Stop 2', traffic: 'high', safety: 80 },
-        { lat: 40.7650, lng: -73.9750, name: 'End', traffic: 'low', safety: 87 },
+        { lat: baseLat + 0.01, lng: baseLon + 0.015, name: 'Start', traffic: 'low', safety: 88 },
+        { lat: baseLat + 0.015, lng: baseLon + 0.01, name: 'Stop 1', traffic: 'medium', safety: 85 },
+        { lat: baseLat + 0.02, lng: baseLon + 0.005, name: 'Stop 2', traffic: 'high', safety: 80 },
+        { lat: baseLat + 0.025, lng: baseLon, name: 'End', traffic: 'low', safety: 87 },
       ],
     },
-  ];
+  ], [baseLat, baseLon]);
 
   // Get traffic color
   const getTrafficColor = (traffic) => {
@@ -118,6 +136,17 @@ const SnapMap = () => {
   const currentRoute = selectedRoute || routes[0];
   const segments = createRouteSegments(currentRoute);
 
+  if (loading) {
+    return (
+      <div className="w-full h-screen bg-gray-900 flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <div className="w-16 h-16 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+          <p className="text-white text-lg">Locating and loading Map...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative w-full h-screen bg-gray-900">
       {/* Snapchat-like Top Bar */}
@@ -129,23 +158,29 @@ const SnapMap = () => {
             </div>
             <div>
               <h1 className="text-white text-xl font-bold">Smart Shield Map</h1>
-              <p className="text-gray-300 text-sm">{currentRoute.name}</p>
+              <div className="flex items-center space-x-2">
+                <p className="text-gray-300 text-sm">{currentRoute.name}</p>
+                {location && (
+                  <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded border border-green-500/30 flex items-center">
+                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1 animate-pulse"></span>
+                    Live Location
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center space-x-2">
             <button
               onClick={() => setShowTraffic(!showTraffic)}
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                showTraffic ? 'bg-primary-500 text-white' : 'bg-white/20 text-gray-300'
-              }`}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${showTraffic ? 'bg-primary-500 text-white' : 'bg-white/20 text-gray-300'
+                }`}
             >
               Traffic
             </button>
             <button
               onClick={() => setShowSafety(!showSafety)}
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                showSafety ? 'bg-success-500 text-white' : 'bg-white/20 text-gray-300'
-              }`}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${showSafety ? 'bg-success-500 text-white' : 'bg-white/20 text-gray-300'
+                }`}
             >
               Safety
             </button>
@@ -155,8 +190,8 @@ const SnapMap = () => {
 
       {/* Map Container */}
       <MapContainer
-        center={[40.7128, -74.0060]}
-        zoom={13}
+        center={[baseLat, baseLon]}
+        zoom={14}
         style={{ height: '100vh', width: '100%', zIndex: 0 }}
         zoomControl={false}
       >
@@ -168,6 +203,8 @@ const SnapMap = () => {
               : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
           }
         />
+
+        <MapUpdater center={[baseLat, baseLon]} />
 
         {/* Fit bounds to route */}
         <FitBounds bounds={calculateBounds(currentRoute)} />
@@ -219,19 +256,19 @@ const SnapMap = () => {
             icon={
               index === 0 || index === currentRoute.coordinates.length - 1
                 ? new L.Icon({
-                    iconUrl: index === 0
-                      ? 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png'
-                      : 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
-                    iconSize: [25, 41],
-                    iconAnchor: [12, 41],
-                    popupAnchor: [1, -34],
-                  })
+                  iconUrl: index === 0
+                    ? 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png'
+                    : 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+                  iconSize: [25, 41],
+                  iconAnchor: [12, 41],
+                  popupAnchor: [1, -34],
+                })
                 : new L.Icon({
-                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
-                    iconSize: [25, 41],
-                    iconAnchor: [12, 41],
-                    popupAnchor: [1, -34],
-                  })
+                  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+                  iconSize: [25, 41],
+                  iconAnchor: [12, 41],
+                  popupAnchor: [1, -34],
+                })
             }
           >
             <Popup>
@@ -272,11 +309,10 @@ const SnapMap = () => {
               <button
                 key={route.id}
                 onClick={() => setSelectedRoute(route)}
-                className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
-                  (selectedRoute?.id || routes[0].id) === route.id
+                className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${(selectedRoute?.id || routes[0].id) === route.id
                     ? 'bg-primary-500 text-white'
                     : 'bg-white/20 text-gray-300 hover:bg-white/30'
-                }`}
+                  }`}
               >
                 {route.name}
               </button>
