@@ -60,7 +60,7 @@ class CrimeDataService:
             self._load_default_crime_data()
     
     def _parse_crime_row(self, district: str, row: Dict):
-        """Parse a row of crime data."""
+        """Parse a row of crime data with flexible column matching."""
         if district not in self.crime_data:
             self.crime_data[district] = {
                 "total_crimes": 0,
@@ -68,18 +68,73 @@ class CrimeDataService:
                 "sexual_harassment": 0,
                 "road_accidents": 0,
                 "suicides": 0,
+                "theft": 0,
                 "coordinates": self.DISTRICT_COORDS.get(district, (11.0, 77.0))
             }
         
-        # Parse different crime types
-        try:
-            self.crime_data[district]["total_crimes"] += int(row.get('Total Crimes', 0) or 0)
-            self.crime_data[district]["murders"] += int(row.get('Murders', 0) or 0)
-            self.crime_data[district]["sexual_harassment"] += int(row.get('Sexual Harassment', 0) or 0)
-            self.crime_data[district]["road_accidents"] += int(row.get('Road Accidents', 0) or 0)
-            self.crime_data[district]["suicides"] += int(row.get('Suicides', 0) or 0)
-        except (ValueError, TypeError):
-            pass
+        # Helper to safely parse int from string with commas
+        def get_val(val_str):
+            try:
+                if not val_str:
+                    return 0
+                clean_val = str(val_str).replace(',', '').strip()
+                return int(float(clean_val))
+            except (ValueError, TypeError):
+                return 0
+
+        # 1. Try explicit columns first (backward compatibility)
+        if 'Total Crimes' in row:
+            self.crime_data[district]["total_crimes"] += get_val(row.get('Total Crimes'))
+        if 'Murders' in row:
+            self.crime_data[district]["murders"] += get_val(row.get('Murders'))
+        if 'Road Accidents' in row:
+            self.crime_data[district]["road_accidents"] += get_val(row.get('Road Accidents'))
+            
+        # 2. Scan all columns for keywords (handling the detailed dataset provided)
+        # We assume columns like "Assault on women...", "Sexual Harassment...", etc.
+        for key, value in row.items():
+            if not key or not value:
+                continue
+                
+            key_lower = key.lower()
+            val = get_val(value)
+            
+            if val == 0:
+                continue
+
+            # Sexual Harassment & Women Safety Indicators
+            if any(k in key_lower for k in ['sexual', 'harassment', 'rape', 'modesty', 'dowry', 'women', 'assault']):
+                self.crime_data[district]["sexual_harassment"] += val
+                
+            # Murders
+            elif 'murder' in key_lower:
+                self.crime_data[district]["murders"] += val
+                
+            # Accidents
+            elif any(k in key_lower for k in ['accident', 'fatal', 'traffic death']):
+                self.crime_data[district]["road_accidents"] += val
+            
+            # Suicides
+            elif 'suicide' in key_lower:
+                 self.crime_data[district]["suicides"] += val
+            
+            # Theft & Robbery & Burglary
+            elif any(k in key_lower for k in ['theft', 'robbery', 'burglary', 'extortion', 'snatching']):
+                self.crime_data[district]["theft"] += val
+                self.crime_data[district]["total_crimes"] += val
+
+        # Ensure total crimes is at least the sum of components
+        calculated_total = (
+            self.crime_data[district]["murders"] + 
+            self.crime_data[district]["sexual_harassment"] + 
+            self.crime_data[district]["road_accidents"] +
+            self.crime_data[district]["suicides"] +
+            self.crime_data[district]["theft"]
+        )
+        self.crime_data[district]["total_crimes"] = max(
+            self.crime_data[district]["total_crimes"], 
+            calculated_total
+        )
     
     def _load_default_crime_data(self):
         """Load default crime statistics for Tamil Nadu districts."""
@@ -92,6 +147,7 @@ class CrimeDataService:
                 "sexual_harassment": 850,
                 "road_accidents": 2100,
                 "suicides": 450,
+                "theft": 5000,
                 "coordinates": self.DISTRICT_COORDS["Chennai"]
             },
             "Coimbatore": {
@@ -100,6 +156,7 @@ class CrimeDataService:
                 "sexual_harassment": 320,
                 "road_accidents": 850,
                 "suicides": 180,
+                "theft": 500,
                 "coordinates": self.DISTRICT_COORDS["Coimbatore"]
             },
             "Madurai": {
@@ -108,6 +165,7 @@ class CrimeDataService:
                 "sexual_harassment": 280,
                 "road_accidents": 720,
                 "suicides": 150,
+                 "theft": 400,
                 "coordinates": self.DISTRICT_COORDS["Madurai"]
             },
             "Tiruchirappalli": {
@@ -116,6 +174,7 @@ class CrimeDataService:
                 "sexual_harassment": 220,
                 "road_accidents": 580,
                 "suicides": 120,
+                "theft": 300,
                 "coordinates": self.DISTRICT_COORDS["Tiruchirappalli"]
             },
             "Salem": {
@@ -124,6 +183,7 @@ class CrimeDataService:
                 "sexual_harassment": 180,
                 "road_accidents": 490,
                 "suicides": 100,
+                "theft": 200,
                 "coordinates": self.DISTRICT_COORDS["Salem"]
             },
         }
@@ -137,6 +197,7 @@ class CrimeDataService:
                     "sexual_harassment": 90,
                     "road_accidents": 240,
                     "suicides": 50,
+                    "theft": 100,
                     "coordinates": coords
                 }
         
@@ -168,8 +229,9 @@ class CrimeDataService:
                 
                 # Add specific crime type weights
                 crime_density += data["murders"] * 10 * weight  # Heavy weight for murders
-                crime_density += data["sexual_harassment"] * 5 * weight
+                crime_density += data["sexual_harassment"] * 20 * weight # Critical for women safety
                 crime_density += data["road_accidents"] * 2 * weight
+                crime_density += data.get("theft", 0) * 1 * weight # Lower weight for theft
                 
                 max_crime_density = max(max_crime_density, crime_density)
         
@@ -213,7 +275,8 @@ class CrimeDataService:
             "murders": 0,
             "sexual_harassment": 0,
             "road_accidents": 0,
-            "suicides": 0
+            "suicides": 0,
+            "theft": 0
         }
     
     def get_heatmap_data(self, bbox: Dict[str, float], resolution: int = 50) -> List[Dict]:

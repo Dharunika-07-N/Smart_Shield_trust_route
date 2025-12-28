@@ -394,8 +394,12 @@ class RouteOptimizer:
             
             # Extract route geometry if available
             route_coords = None
+            instructions = None
             if directions and 'route_coordinates' in directions:
                 route_coords = directions['route_coordinates']
+            
+            if directions and 'instructions' in directions:
+                instructions = directions['instructions']
 
             # Get traffic-aware duration
             traffic_level = "low"
@@ -500,6 +504,7 @@ class RouteOptimizer:
                 "safety_score": safety_score,
                 "estimated_fuel_liters": fuel,
                 "route_coordinates": route_coords,
+                "instructions": instructions,
                 "weather_data": weather_data,
                 "has_traffic_data": directions and directions.get('has_traffic_data', False),
                 "traffic_level": traffic_level
@@ -653,6 +658,7 @@ class RouteOptimizer:
             duration = distance / 8.33
             
         route_coords = directions.get('route_coordinates')
+        instructions = directions.get('instructions')
         
         # Weather
         weather_points = [start_point, end_point]
@@ -725,6 +731,7 @@ class RouteOptimizer:
             "safety_score": safety_score,
             "estimated_fuel_liters": fuel,
             "route_coordinates": route_coords,
+            "instructions": instructions,
             "weather_data": weather_data,
             "has_traffic_data": directions.get('has_traffic_data', False),
             "traffic_level": traffic_level

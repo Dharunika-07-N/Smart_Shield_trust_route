@@ -152,6 +152,7 @@ class MapsService:
                     # Decode polyline to get coordinates (simplified - in production use polyline library)
                     # For now, extract from legs
                     route_coords = []
+                    instructions = []
                     for leg in route.get('legs', []):
                         for step in leg.get('steps', []):
                             start = step.get('start_location', {})
@@ -164,8 +165,14 @@ class MapsService:
                                 'lat': end.get('lat'),
                                 'lng': end.get('lng')
                             })
+                            
+                            # Extract instruction
+                            if 'html_instructions' in step:
+                                # Clean HTML tags if needed, or keep for frontend to render
+                                instructions.append(step['html_instructions'])
                     
                     route['route_coordinates'] = route_coords
+                    route['instructions'] = instructions
                     route['polyline'] = polyline_points
                 
                 # Add traffic duration if available
@@ -205,8 +212,7 @@ class MapsService:
         """
         if not self.gmaps:
             logger.warning("Directions without API key - returning mock data")
-            # Return single mock route in a list
-            return [self._mock_directions(origin, destination)]
+            return self._generate_mock_alternatives(origin, destination)
         
         try:
             origin_str = f"{origin.latitude},{origin.longitude}"
@@ -238,6 +244,7 @@ class MapsService:
                         
                         # Extract coords from legs
                         route_coords = []
+                        instructions = []
                         for leg in route.get('legs', []):
                             for step in leg.get('steps', []):
                                 start = step.get('start_location', {})
@@ -250,8 +257,12 @@ class MapsService:
                                     'lat': end.get('lat'),
                                     'lng': end.get('lng')
                                 })
+                                
+                                if 'html_instructions' in step:
+                                    instructions.append(step['html_instructions'])
                         
                         route['route_coordinates'] = route_coords
+                        route['instructions'] = instructions
                         route['polyline'] = polyline_points
                     
                     # Add traffic duration if available
@@ -262,12 +273,30 @@ class MapsService:
                     
                     routes.append(route)
                 
-                return routes
+                if routes:
+                    return routes
                 
         except Exception as e:
             logger.error(f"Directions error: {e}")
         
-        return []
+        # Fallback to mock if API fails or returns no routes
+        logger.warning(f"Falling back to mock directions for {origin} -> {destination}")
+        return self._generate_mock_alternatives(origin, destination)
+
+    def _generate_mock_alternatives(self, origin: Coordinate, destination: Coordinate) -> List[Dict]:
+        """Generate multiple mock route alternatives with different characteristics."""
+        routes = []
+        
+        # 1. Standard/Fastest Route (Straight-ish)
+        routes.append(self._mock_directions(origin, destination, "fastest", 0))
+        
+        # 2. Safer Route (Slightly longer diversion)
+        routes.append(self._mock_directions(origin, destination, "safest", 0.012))
+        
+        # 3. Alternative Route (Larger diversion)
+        routes.append(self._mock_directions(origin, destination, "alternative", -0.018))
+        
+        return routes
 
     def decode_polyline(self, encoded: str) -> List[Dict]:
         """Decode Google polyline string to list of coordinates."""
@@ -308,22 +337,78 @@ class MapsService:
     def _mock_directions(
         self,
         origin: Coordinate,
-        destination: Coordinate
+        destination: Coordinate,
+        name: str = "standard",
+        offset: float = 0
     ) -> Dict:
-        """Generate mock directions data."""
-        dist = geopy_distance(
+        """Generate mock directions data with variability."""
+        # Calculate base metrics
+        base_dist = geopy_distance(
             (origin.latitude, origin.longitude),
             (destination.latitude, destination.longitude)
         ).meters
         
-        duration = dist / 8.33
+        # Add variability based on offset
+        # Offset shifts the midpoint to create a 'curve'
+        dist_factor = 1.0 + abs(offset) * 10 
+        dist = base_dist * dist_factor
+        
+        # Slower speed for safer/alternative routes in mock
+        speed = 8.33 # ~30km/h
+        if offset != 0:
+            speed = 7.5 # ~27km/h
+            
+        duration = dist / speed
+        
+        # Mock route coordinates (curved path using offset)
+        num_points = 8
+        route_coords = []
+        for i in range(num_points + 1):
+            ratio = i / num_points
+            # Linear interpolation
+            lat = origin.latitude + (destination.latitude - origin.latitude) * ratio
+            lng = origin.longitude + (destination.longitude - origin.longitude) * ratio
+            
+            # Add 'bulge' in the middle based on offset
+            # bulge follows a simple parabola: offset * (1 - (2*ratio - 1)^2)
+            bulge = offset * (1.0 - (2.0 * ratio - 1.0)**2)
+            
+            # Apply bulge perpendicular to the general direction (simplified as adding to lat/lng)
+            route_coords.append({
+                'lat': lat + bulge,
+                'lng': lng + bulge * 0.5
+            })
+            
+        instructions = [
+            f'Head towards {name} route direction',
+            f'Continue on path with {abs(offset)*1000:.1f}m diversion',
+            'Arrive at destination'
+        ]
         
         return {
             'legs': [{
                 'distance': {'value': int(dist), 'text': f"{dist/1000:.1f} km"},
                 'duration': {'value': int(duration), 'text': f"{duration/60:.1f} mins"},
-                'steps': []
+                'steps': [
+                    {
+                        'html_instructions': instructions[0],
+                        'start_location': {'lat': origin.latitude, 'lng': origin.longitude},
+                        'end_location': {'lat': route_coords[2]['lat'], 'lng': route_coords[2]['lng']}
+                    },
+                    {
+                        'html_instructions': instructions[1],
+                        'start_location': {'lat': route_coords[2]['lat'], 'lng': route_coords[2]['lng']},
+                        'end_location': {'lat': route_coords[6]['lat'], 'lng': route_coords[6]['lng']}
+                    },
+                    {
+                         'html_instructions': instructions[2],
+                         'start_location': {'lat': route_coords[6]['lat'], 'lng': route_coords[6]['lng']},
+                         'end_location': {'lat': destination.latitude, 'lng': destination.longitude}
+                    }
+                ]
             }],
+            'route_coordinates': route_coords,
+            'instructions': instructions,
             'overview_polyline': {'points': ''}
         }
     
@@ -337,4 +422,111 @@ class MapsService:
             (coord1.latitude, coord1.longitude),
             (coord2.latitude, coord2.longitude)
         ).meters
+
+    def find_nearby_places(
+            self,
+            location: Coordinate,
+            radius_meters: int = 2000,
+            place_type: str = "police"
+        ) -> List[Dict]:
+            """
+            Find nearby places using Google Places API.
+            
+            Args:
+                location: Search center
+                radius_meters: Search radius in meters
+                place_type: Type of place to search (police, hospital, store, etc.)
+            
+            Returns:
+                List of places with details
+            """
+            if not self.gmaps:
+                logger.warning("Places search without API key - returning empty list")
+                # Return mock data for development
+                return self._mock_nearby_places(location, place_type)
+            
+            try:
+                # Search nearby places
+                places_result = self.gmaps.places_nearby(
+                    location=(location.latitude, location.longitude),
+                    radius=radius_meters,
+                    type=place_type
+                )
+                
+                places = []
+                if 'results' in places_result:
+                    for result in places_result['results']:
+                        place = {
+                            "name": result.get('name'),
+                            "location": {
+                                "latitude": result['geometry']['location']['lat'],
+                                "longitude": result['geometry']['location']['lng']
+                            },
+                            "address": result.get('vicinity'),
+                            "place_id": result.get('place_id'),
+                            "rating": result.get('rating'),
+                            "types": result.get('types', []),
+                            "is_open": result.get('opening_hours', {}).get('open_now')
+                        }
+                        
+                        # Calculate distance from search center
+                        dist = self.calculate_straight_distance(
+                            location,
+                            Coordinate(
+                                latitude=place['location']['latitude'],
+                                longitude=place['location']['longitude']
+                            )
+                        )
+                        place['distance_meters'] = dist
+                        
+                        places.append(place)
+                
+                return places
+                
+            except Exception as e:
+                logger.error(f"Places search error: {e}")
+                return []
+
+    def _mock_nearby_places(self, location: Coordinate, place_type: str) -> List[Dict]:
+        """Generate mock nearby places."""
+        import random
+        
+        places = []
+        count = random.randint(1, 5)
+        
+        for i in range(count):
+            # Random offset from current location
+            lat_offset = (random.random() - 0.5) * 0.02
+            lng_offset = (random.random() - 0.5) * 0.02
+            
+            place_lat = location.latitude + lat_offset
+            place_lng = location.longitude + lng_offset
+            
+            dist = self.calculate_straight_distance(
+                location,
+                Coordinate(latitude=place_lat, longitude=place_lng)
+            )
+            
+            if place_type == "police":
+                name = f"Police Station {i+1}"
+            elif place_type == "hospital":
+                name = f"City Hospital {i+1}"
+            else:
+                name = f"Safe Store {i+1}"
+            
+            places.append({
+                "name": name,
+                "location": {
+                    "latitude": place_lat,
+                    "longitude": place_lng
+                },
+                "address": f"Mock Address {i+1}",
+                "place_id": f"mock_place_{i}",
+                "rating": 4.5,
+                "types": [place_type, "establishment"],
+                "distance_meters": dist,
+                "is_open": True
+            })
+            
+        return places
 

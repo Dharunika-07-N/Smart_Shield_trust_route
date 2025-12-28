@@ -45,3 +45,27 @@ code {
   background: #555;
 }
 
+/* Route Label Tooltips (Google Maps style) */
+.route-label-tooltip {
+  background: rgba(45, 55, 72, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 8px !important;
+  padding: 4px 8px !important;
+  color: white !important;
+  font-family: 'Inter', sans-serif !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  pointer-events: none !important;
+}
+
+.route-label-tooltip::before {
+  border-top-color: rgba(45, 55, 72, 0.95) !important;
+}
+
+.fastest-active {
+  background: #2563eb !important;
+  border-color: #60a5fa !important;
+}
+
+.route-label-tooltip .leaflet-tooltip-tip {
+  display: none;
+}

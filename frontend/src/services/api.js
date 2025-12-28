@@ -67,17 +67,17 @@ apiClient.interceptors.response.use(
       const status = error.response.status;
       const data = error.response.data;
       const url = error.config?.url || 'unknown endpoint';
-      
+
       console.error('API Error:', {
         status,
         url,
         data,
         message: data?.detail || data?.message || data?.error || 'API request failed'
       });
-      
+
       // Provide more specific error messages based on status code
       let errorMessage = data?.detail || data?.message || data?.error;
-      
+
       if (!errorMessage) {
         switch (status) {
           case 400:
@@ -105,14 +105,14 @@ apiClient.interceptors.response.use(
             errorMessage = `API request failed (Status ${status})`;
         }
       }
-      
+
       // Create error with more context
       const enhancedError = new Error(errorMessage);
       enhancedError.status = status;
       enhancedError.data = data;
       enhancedError.url = url;
       throw enhancedError;
-      
+
     } else if (error.request) {
       // Request made but no response received
       console.error('Network Error:', {
@@ -120,15 +120,15 @@ apiClient.interceptors.response.use(
         url: error.config?.url,
         request: error.request
       });
-      
+
       const errorMessage = error.code === 'ECONNABORTED'
         ? 'Request timed out. The server may be slow or unavailable.'
         : 'Network error: Unable to connect to server. Make sure the backend is running on ' + (process.env.REACT_APP_API_URL || 'http://localhost:8000');
-      
+
       const enhancedError = new Error(errorMessage);
       enhancedError.isNetworkError = true;
       throw enhancedError;
-      
+
     } else {
       // Something else happened (setup error, etc.)
       console.error('Request Setup Error:', error.message);
@@ -150,7 +150,6 @@ export const api = {
 
   // Safety
   calculateSafetyScore: (data) => apiClient.post('/safety/score', data),
-  getSafetyHeatmap: (data) => apiClient.post('/safety/heatmap', data),
   getSafetyConditions: (location, data) => apiClient.post(`/safety/conditions/${location}`, data),
 
   // Feedback

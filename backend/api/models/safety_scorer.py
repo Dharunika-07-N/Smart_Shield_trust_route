@@ -13,6 +13,9 @@ from config.config import settings
 from api.schemas.delivery import Coordinate
 from api.services.crime_data import CrimeDataService
 from loguru import logger
+import json
+from geopy.distance import distance
+
 
 
 class SafetyScorer:
@@ -23,7 +26,20 @@ class SafetyScorer:
         self.scaler = StandardScaler()
         self.weights = settings.SAFETY_WEIGHTS
         self.crime_service = crime_service or CrimeDataService()
+        self.police_stations = self._load_police_stations()
         self._initialize_model()
+
+    def _load_police_stations(self) -> List[Dict]:
+        """Load police stations from JSON file."""
+        try:
+            data_path = Path(settings.SAFETY_MODEL_PATH).parent.parent / "data" / "police_stations.json"
+            if data_path.exists():
+                with open(data_path, 'r') as f:
+                    return json.load(f)
+        except Exception as e:
+            logger.error(f"Error loading police stations: {e}")
+        return []
+
     
     def _initialize_model(self):
         """Initialize or load the safety scoring model."""
@@ -38,6 +54,11 @@ class SafetyScorer:
             try:
                 self.model = joblib.load(model_path)
                 self.scaler = joblib.load(settings.SAFETY_SCALER_PATH)
+                
+                # Check for feature mismatch (we now have 6 features)
+                if hasattr(self.model, "n_features_in_") and self.model.n_features_in_ != 6:
+                    raise ValueError(f"Model expects {self.model.n_features_in_} features, but we need 6")
+                    
                 logger.info("Loaded existing safety scoring model and scaler")
             except Exception as e:
                 logger.warning(f"Could not load model or scaler: {e}, creating new ones")
@@ -51,23 +72,25 @@ class SafetyScorer:
         n_samples = 1000
         np.random.seed(42)
         
-        # Feature: [crime_rate, lighting_score, patrol_density, traffic_density, hour_of_day]
-        X = np.random.rand(n_samples, 5)
+        # Feature: [crime_rate, lighting_score, patrol_density, traffic_density, hour_of_day, police_proximity]
+        X = np.random.rand(n_samples, 6)
         # Normalize features to realistic ranges
         X[:, 0] = X[:, 0] * 10  # crime incidents (0-10)
         X[:, 1] = X[:, 1] * 100  # lighting score (0-100)
         X[:, 2] = X[:, 2] * 100  # patrol density (0-100)
         X[:, 3] = X[:, 3] * 100  # traffic density (0-100)
         X[:, 4] = X[:, 4] * 24  # hour (0-24)
+        X[:, 5] = X[:, 5] * 100 # police proximity score (0-100, higher is closer/safer)
         
         # Target: safety score (0-100)
-        # Lower crime, higher lighting, higher patrol = higher safety
+        # Lower crime, higher lighting, higher patrol, closer police = higher safety
         y = (
             50 - X[:, 0] * 2.5 +  # crime impact
             X[:, 1] * 0.15 +  # lighting contribution
             X[:, 2] * 0.15 +  # patrol contribution
             (50 - X[:, 3]) * 0.1 +  # lower traffic is safer
-            np.sin(X[:, 4] * np.pi / 12) * 10  # time of day effect
+            np.sin(X[:, 4] * np.pi / 12) * 10 + # time of day effect
+            X[:, 5] * 0.2 # police proximity contribution
         )
         y = np.clip(y, 0, 100)
         
@@ -124,6 +147,9 @@ class SafetyScorer:
         weather_hazard = 0
         if weather_data:
             weather_hazard = weather_data.get("hazard_score", 0) / 10.0  # Scale to 0-10
+            
+        # Police Proximity
+        police_proximity = self._calculate_police_proximity(coord)
         
         return np.array([
             crime_rate,
@@ -131,8 +157,36 @@ class SafetyScorer:
             patrol_density,
             traffic_density,
             hour,
-            weather_hazard
+            police_proximity, # Feature 5 (0-100)
+            weather_hazard    # Extra feature, not in main model X
         ])
+
+    def _calculate_police_proximity(self, coord: Coordinate) -> float:
+        """Calculate proximity score to nearest police station (0-100)."""
+        if not self.police_stations:
+            return 50.0 # Default if no data
+            
+        min_dist_km = float('inf')
+        
+        for station in self.police_stations:
+            try:
+                dist = distance(
+                    (coord.latitude, coord.longitude),
+                    (station['latitude'], station['longitude'])
+                ).km
+                if dist < min_dist_km:
+                    min_dist_km = dist
+            except Exception:
+                continue
+                
+        # Proximity score: 100 if < 500m, decays to 0 at 10km
+        # Logic: score = 100 * exp(-0.5 * dist_km)
+        # 1km -> 60, 2km -> 36, 5km -> 8
+        if min_dist_km == float('inf'):
+            return 0.0
+            
+        score = 100 * np.exp(-0.5 * min_dist_km)
+        return min(100.0, max(0.0, score))
     
     def score_location(
         self,
@@ -148,11 +202,14 @@ class SafetyScorer:
         """
         features = self._get_location_features(coord, time_of_day, weather_data)
         # Handle different feature sizes (with/without weather)
-        if features.shape[0] == 6:
-            # New format with weather
-            features_for_model = features[:5].reshape(1, -1)  # Use first 5 for model
+        # Handle different feature sizes (with/without weather)
+        # Expected model features: 6
+        if features.shape[0] >= 6:
+            # Taking first 6 features for the model
+             features_for_model = features[:6].reshape(1, -1)
         else:
-            features_for_model = features.reshape(1, -1)
+             # Fallback (shouldn't happen with new logic)
+             features_for_model = features.reshape(1, -1)
         
         features_scaled = self.scaler.transform(features_for_model)
         
@@ -176,10 +233,10 @@ class SafetyScorer:
         # Create factors breakdown
         factors = [
             {
-                "factor": "crime",
+                "factor": "crime_overall",
                 "score": max(0, 100 - crime_score),
                 "weight": self.weights["crime"],
-                "description": f"Crime risk: {crime_data.get('district', 'Unknown')} - {crime_data.get('total_crimes', 0)} incidents"
+                "description": f"Overall Crime Risk: {crime_data.get('district', 'Unknown')}"
             },
             {
                 "factor": "lighting",
@@ -198,8 +255,31 @@ class SafetyScorer:
                 "score": max(0, 100 - features[3]),
                 "weight": self.weights["traffic"],
                 "description": f"Traffic conditions: {features[3]:.1f}/100"
+            },
+            {
+                "factor": "police_proximity",
+                "score": features[5],
+                "weight": 0.20, # Higher weight for police proximity
+                "description": "Proximity to Police Station"
             }
         ]
+        
+        # Add specific high-risk warnings based on raw counts
+        if crime_data.get('theft', 0) > 100:
+             factors.append({
+                "factor": "theft_risk",
+                "score": 40, # Low safety score specifically for theft
+                "weight": 0.1,
+                "description": "High Theft Zone"
+            })
+            
+        if crime_data.get('sexual_harassment', 0) > 20:
+             factors.append({
+                "factor": "harassment_risk",
+                "score": 20, # Very low safety score
+                "weight": 0.2,
+                "description": "High Harassment Risk Area"
+            })
         
         # Add weather factor if available
         if weather_data:

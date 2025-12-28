@@ -94,6 +94,8 @@ class RouteSegment(BaseModel):
     safety_score: float = Field(..., ge=0, le=100, description="Safety score (0-100)")
     estimated_fuel_liters: float = Field(..., ge=0, description="Estimated fuel consumption")
     traffic_level: Optional[str] = Field("low", description="Traffic level: low, medium, high")
+    route_coordinates: Optional[List[Dict]] = Field(None, description="Detailed route coordinates for mapping")
+    instructions: Optional[List[str]] = Field(None, description="Turn-by-turn instructions")
 
 
 class OptimizedRoute(BaseModel):

@@ -14,8 +14,6 @@ from api.schemas.safety import (
     SafetyScoreResponse,
     LocationSafetyScore,
     SafetyFactor,
-    HeatmapRequest,
-    SafetyHeatmapResponse,
     SafetyConditionsRequest,
     SafetyConditionsResponse
 )
@@ -81,63 +79,7 @@ async def calculate_safety_score(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/safety/heatmap", response_model=SafetyHeatmapResponse)
-async def get_safety_heatmap(request: HeatmapRequest):
-    """Get safety heatmap for a geographic region."""
-    try:
-        logger.info("Generating safety heatmap")
-        
-        # In production, this would fetch real safety data
-        # For now, generate sample heatmap points
-        bbox = request.bounding_box
-        resolution = request.resolution
-        
-        heatmap_points = []
-        
-        # Generate grid points
-        lat_step = (bbox.get("max_lat", 41) - bbox.get("min_lat", 40)) / resolution
-        lon_step = (bbox.get("max_lon", -73) - bbox.get("min_lon", -74)) / resolution
-        
-        for i in range(resolution):
-            for j in range(resolution):
-                lat = bbox.get("min_lat", 40) + i * lat_step
-                lon = bbox.get("min_lon", -74) + j * lon_step
-                
-                from api.schemas.delivery import Coordinate
-                coord = Coordinate(latitude=lat, longitude=lon)
-                
-                # Get safety score
-                segment_data = safety_scorer.score_route(
-                    coordinates=[coord],
-                    time_of_day=request.time_of_day
-                )
-                score = segment_data["route_safety_score"]
-                
-                # Mock density
-                import random
-                density = random.randint(0, 10)
-                
-                from api.schemas.safety import HeatmapPoint
-                heatmap_points.append(
-                    HeatmapPoint(
-                        coordinates=coord,
-                        safety_score=score,
-                        density=density
-                    )
-                )
-        
-        scores = [p.safety_score for p in heatmap_points]
-        
-        return SafetyHeatmapResponse(
-            heatmap_points=heatmap_points,
-            min_score=min(scores),
-            max_score=max(scores),
-            average_score=sum(scores) / len(scores)
-        )
-    
-    except Exception as e:
-        logger.error(f"Error generating heatmap: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @router.post("/safety/conditions/{location}", response_model=SafetyConditionsResponse)

@@ -3,6 +3,7 @@ from typing import Optional, Any, Union
 from jose import jwt
 from passlib.context import CryptContext
 from config.config import settings
+from loguru import logger
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -16,6 +17,11 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def get_password_hash(password: str) -> str:
     """Hash a password."""
+    # bcrypt has a limit of 72 bytes
+    pwd_bytes = password.encode('utf-8')
+    if len(pwd_bytes) > 72:
+        # Decode back to utf-8, ignoring any partial multi-byte character at the end
+        password = pwd_bytes[:72].decode('utf-8', 'ignore')
     return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

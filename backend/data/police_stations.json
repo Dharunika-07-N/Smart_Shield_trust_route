@@ -1,0 +1,194 @@
+[
+  {
+    "name": "B2 R.S. Puram Police Station",
+    "phone": "0422-2475777",
+    "type": "West",
+    "latitude": 11.014206,
+    "longitude": 76.951475,
+    "address": "R.S. Puram, Coimbatore"
+  },
+  {
+    "name": "West @ R.S.Puram Awps",
+    "phone": "0422-2476869",
+    "type": "West",
+    "latitude": 11.0135,
+    "longitude": 76.9530,
+    "address": "R.S. Puram, Coimbatore"
+  },
+  {
+    "name": "Vadavalli Police Station",
+    "phone": "0422-2423100",
+    "type": "West",
+    "latitude": 11.0416,
+    "longitude": 76.9016,
+    "address": "Vadavalli, Coimbatore"
+  },
+  {
+    "name": "B8 Variety Hall Road Police Station",
+    "phone": "0422-2307821",
+    "type": "West",
+    "latitude": 10.9984,
+    "longitude": 76.9599,
+    "address": "Variety Hall Road, Coimbatore"
+  },
+  {
+    "name": "B12 Ukkadam Police Station",
+    "phone": "9498101152",
+    "type": "West",
+    "latitude": 10.9902,
+    "longitude": 76.9610,
+    "address": "Ukkadam, Coimbatore"
+  },
+  {
+    "name": "B1 Bazaar Police Station",
+    "phone": "0422-2306482",
+    "type": "West",
+    "latitude": 10.9947,
+    "longitude": 76.9641,
+    "address": "Bazaar, Coimbatore"
+  },
+  {
+    "name": "East @ Ramanathapuram Awps",
+    "phone": "9498101159",
+    "type": "East",
+    "latitude": 10.9950,
+    "longitude": 76.9850,
+    "address": "Ramanathapuram, Coimbatore"
+  },
+  {
+    "name": "B9 Saravanapatti Police Station",
+    "phone": "0422-2666445",
+    "type": "East",
+    "latitude": 11.0797,
+    "longitude": 76.9957,
+    "address": "Saravanapatti, Coimbatore"
+  },
+  {
+    "name": "B6 Peelamedu Police Station",
+    "phone": "0422-2570200",
+    "type": "East",
+    "latitude": 11.0261,
+    "longitude": 77.0090,
+    "address": "Peelamedu, Coimbatore"
+  },
+  {
+    "name": "B5 Singanallur Police Station",
+    "phone": "0422-2580354",
+    "type": "East",
+    "latitude": 11.0007,
+    "longitude": 77.0298,
+    "address": "Singanallur, Coimbatore"
+  },
+  {
+    "name": "B11 Saibaba Colony Police Station",
+    "phone": "94981-01151",
+    "type": "Central",
+    "latitude": 11.0267,
+    "longitude": 76.9442,
+    "address": "Saibaba Colony, Coimbatore"
+  },
+  {
+    "name": "B3 Kattur Police Station",
+    "phone": "9498101143",
+    "type": "Central",
+    "latitude": 11.0175,
+    "longitude": 76.9712,
+    "address": "Kattur, Coimbatore"
+  },
+  {
+    "name": "Kavundampalayam Police Station",
+    "phone": "0422-2980093",
+    "type": "Central",
+    "latitude": 11.0506,
+    "longitude": 76.9388,
+    "address": "Kavundampalayam, Coimbatore"
+  },
+  {
+    "name": "Central @ Gandhipuram Awps",
+    "phone": "9498101160",
+    "type": "Central",
+    "latitude": 11.0178,
+    "longitude": 76.9659,
+    "address": "Gandhipuram, Coimbatore"
+  },
+  {
+    "name": "Thudialur Police Station",
+    "phone": "9498101198",
+    "type": "Central",
+    "latitude": 11.0759,
+    "longitude": 76.9482,
+    "address": "Thudialur, Coimbatore"
+  },
+  {
+    "name": "B4 Race Course Police Station",
+    "phone": "94981-01144",
+    "type": "Central",
+    "latitude": 10.9997,
+    "longitude": 76.9839,
+    "address": "Race Course, Coimbatore"
+  },
+  {
+    "name": "B-15 Rathinapuri Police Station",
+    "phone": "9498101155",
+    "type": "Central",
+    "latitude": 11.0286,
+    "longitude": 76.9654,
+    "address": "Rathinapuri, Coimbatore"
+  },
+  {
+    "name": "Sundarapuram Police Station",
+    "phone": "0422-2980092",
+    "type": "South",
+    "latitude": 10.9576,
+    "longitude": 76.9669,
+    "address": "Sundarapuram, Coimbatore"
+  },
+  {
+    "name": "Awps - Coimbatore South",
+    "phone": "0422-2980094",
+    "type": "South",
+    "latitude": 10.9639,
+    "longitude": 76.9687,
+    "address": "Coimbatore South"
+  },
+  {
+    "name": "Karumbukadai Police Station",
+    "phone": "0422-2980091",
+    "type": "South",
+    "latitude": 10.9782,
+    "longitude": 76.9529,
+    "address": "Karumbukadai, Coimbatore"
+  },
+  {
+    "name": "B-10 Selvapuram Police Station",
+    "phone": "0422-2347400",
+    "type": "South",
+    "latitude": 10.9877,
+    "longitude": 76.9488,
+    "address": "Selvapuram, Coimbatore"
+  },
+  {
+    "name": "B-7 Ramanathapuram Police Station",
+    "phone": "0422-2320628",
+    "type": "South",
+    "latitude": 10.9950,
+    "longitude": 76.9850,
+    "address": "Ramanathapuram, Coimbatore"
+  },
+  {
+    "name": "B-13 Podanur Police Station",
+    "phone": "94981-01153",
+    "type": "South",
+    "latitude": 10.9665,
+    "longitude": 76.9882,
+    "address": "Podanur, Coimbatore"
+  },
+  {
+    "name": "B-14 Kuniamuthur Police Station",
+    "phone": "0422-2250500",
+    "type": "South",
+    "latitude": 10.9634,
+    "longitude": 76.9442,
+    "address": "Kuniamuthur, Coimbatore"
+  }
+]

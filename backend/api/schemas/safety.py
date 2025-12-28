@@ -47,26 +47,7 @@ class SafetyScoreResponse(BaseModel):
         }
 
 
-class HeatmapRequest(BaseModel):
-    """Request for safety heatmap."""
-    bounding_box: Dict[str, float] = Field(..., description="Bounding box coordinates")
-    resolution: int = Field(100, ge=10, le=500, description="Grid resolution")
-    time_of_day: Optional[str] = "day"
 
-
-class HeatmapPoint(BaseModel):
-    """Point in heatmap."""
-    coordinates: Coordinate
-    safety_score: float = Field(..., ge=0, le=100)
-    density: int = Field(..., ge=0, description="Number of incidents/events")
-
-
-class SafetyHeatmapResponse(BaseModel):
-    """Response for safety heatmap."""
-    heatmap_points: List[HeatmapPoint]
-    min_score: float = Field(..., ge=0, le=100)
-    max_score: float = Field(..., ge=0, le=100)
-    average_score: float = Field(..., ge=0, le=100)
 
 
 class SafetyConditionsRequest(BaseModel):

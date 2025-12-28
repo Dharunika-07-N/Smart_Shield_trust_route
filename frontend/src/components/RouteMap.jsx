@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents, useMap, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
 import { api } from '../services/api';
 import useLocation from '../hooks/useLocation';
@@ -22,6 +22,7 @@ const RouteMap = () => {
   const [destPos, setDestPos] = useState(null);
   const [fastest, setFastest] = useState(null);
   const [safest, setSafest] = useState(null);
+  const [shortest, setShortest] = useState(null);
   const [recommended, setRecommended] = useState(null);
   const [alternatives, setAlternatives] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -31,6 +32,13 @@ const RouteMap = () => {
   const [results, setResults] = useState([]);
   const [safetyOverlay, setSafetyOverlay] = useState(null);
   const [showSafetyOverlay, setShowSafetyOverlay] = useState(true);
+
+  // Navigation State
+  const [navigationMode, setNavigationMode] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [eta, setEta] = useState(null);
+  const [distanceRemaining, setDistanceRemaining] = useState(null);
+
 
   // Fallback to New York
   const baseLat = location?.latitude || 40.7128;
@@ -157,6 +165,7 @@ const RouteMap = () => {
     setError('');
     setFastest(null);
     setSafest(null);
+    setShortest(null);
     setRecommended(null);
     setAlternatives([]);
 
@@ -164,70 +173,45 @@ const RouteMap = () => {
       // Build requests
       const fastestRequest = buildRequest(currentPos, destPos, ['time', 'distance']);
       const safestRequest = buildRequest(currentPos, destPos, ['safety', 'time']);
+      const shortestRequest = buildRequest(currentPos, destPos, ['distance']);
 
       console.log('Optimizing route...', {
         currentPos,
         destPos,
         fastestRequest,
-        safestRequest
+        safestRequest,
+        shortestRequest
       });
 
       // Log the full request for debugging
       console.log('Fastest request:', JSON.stringify(fastestRequest, null, 2));
       console.log('Safest request:', JSON.stringify(safestRequest, null, 2));
+      console.log('Shortest request:', JSON.stringify(shortestRequest, null, 2));
 
       // Use API service instead of fetch
-      const [fastJson, safeJson] = await Promise.all([
+      const [fastJson, safeJson, shortJson] = await Promise.all([
         api.optimizeRoute(fastestRequest).catch(err => {
-          console.error('Fastest route error:', {
-            message: err.message,
-            status: err.status,
-            data: err.data,
-            url: err.url,
-            isNetworkError: err.isNetworkError
-          });
-
-          // Preserve the original error message
-          const error = new Error(err.message || 'Fastest route optimization failed');
-          error.status = err.status;
-          error.isNetworkError = err.isNetworkError;
-          throw error;
+          console.error('Fastest route error:', err);
+          return null;
         }),
         api.optimizeRoute(safestRequest).catch(err => {
-          console.error('Safest route error:', {
-            message: err.message,
-            status: err.status,
-            data: err.data,
-            url: err.url,
-            isNetworkError: err.isNetworkError
-          });
-
-          // Preserve the original error message
-          const error = new Error(err.message || 'Safest route optimization failed');
-          error.status = err.status;
-          error.isNetworkError = err.isNetworkError;
-          throw error;
+          console.error('Safest route error:', err);
+          return null;
+        }),
+        api.optimizeRoute(shortestRequest).catch(err => {
+          console.error('Shortest route error:', err);
+          return null;
         })
       ]);
 
-      // Check if responses are successful
-      if (!fastJson || !fastJson.success) {
-        throw new Error(fastJson?.detail || fastJson?.message || 'Fastest route failed');
-      }
-      if (!safeJson || !safeJson.success) {
-        throw new Error(safeJson?.detail || safeJson?.message || 'Safest route failed');
+      // Check if ANY response is successful
+      if ((!fastJson || !fastJson.success) && (!safeJson || !safeJson.success) && (!shortJson || !shortJson.success)) {
+        throw new Error('All route optimizations failed');
       }
 
-      // Check if data exists
-      if (!fastJson.data) {
-        throw new Error('No data returned from fastest route optimization');
-      }
-      if (!safeJson.data) {
-        throw new Error('No data returned from safest route optimization');
-      }
-
-      setFastest(fastJson.data);
-      setSafest(safeJson.data);
+      if (fastJson?.success && fastJson.data) setFastest(fastJson.data);
+      if (safeJson?.success && safeJson.data) setSafest(safeJson.data);
+      if (shortJson?.success && shortJson.data) setShortest(shortJson.data);
 
       // Collect unique alternatives
       const alts = [];
@@ -243,8 +227,9 @@ const RouteMap = () => {
       };
 
       // Add main routes to seen
-      if (fastJson.data) seenCoords.add(getRouteSig(fastJson.data));
-      if (safeJson.data) seenCoords.add(getRouteSig(safeJson.data));
+      if (fastJson?.data) seenCoords.add(getRouteSig(fastJson.data));
+      if (safeJson?.data) seenCoords.add(getRouteSig(safeJson.data));
+      if (shortJson?.data) seenCoords.add(getRouteSig(shortJson.data));
 
       const processAlts = (routeData) => {
         if (routeData?.alternatives) {
@@ -258,20 +243,34 @@ const RouteMap = () => {
         }
       };
 
-      processAlts(fastJson.data);
-      processAlts(safeJson.data);
+      processAlts(fastJson?.data);
+      processAlts(safeJson?.data);
+      processAlts(shortJson?.data);
 
       setAlternatives(alts);
 
-      // Simple recommendation logic: prefer safe if safety < 65 on fastest or time diff < 20%
-      const fastestSecs = fastJson.data?.total_duration_seconds || 0;
-      const safestSecs = safeJson.data?.total_duration_seconds || 0;
-      const fastestSafety = fastJson.data?.average_safety_score || 0;
-      const chooseSafe = fastestSafety < 65 || (safestSecs && fastestSecs && (safestSecs - fastestSecs) / fastestSecs < 0.2);
-      setRecommended(chooseSafe ? 'safest' : 'fastest');
+      // Simple recommendation logic
+      let best = 'fastest';
+      // If we have data, logic: prefer safe if safety < 65 on fastest or time diff < 20%
+      const fastData = fastJson?.data;
+      const safeData = safeJson?.data;
+      const shortData = shortJson?.data;
+
+      if (fastData && safeData) {
+        const fastestSecs = fastData.total_duration_seconds || 0;
+        const safestSecs = safeData.total_duration_seconds || 0;
+        const fastestSafety = fastData.average_safety_score || 0;
+        const chooseSafe = fastestSafety < 65 || (safestSecs && fastestSecs && (safestSecs - fastestSecs) / fastestSecs < 0.2);
+        if (chooseSafe) best = 'safest';
+      } else if (safeData) {
+        best = 'safest';
+      }
+      // Could accept Shortest if specifically much shorter, but for now stick to 2 main defaults unless user clicks
+      setRecommended(best);
 
       // Fetch safety overlay for recommended route
-      await fetchSafetyOverlay(chooseSafe ? safeJson.data : fastJson.data);
+      const recData = best === 'safest' ? safeData : (best === 'shortest' ? shortData : fastData);
+      if (recData) await fetchSafetyOverlay(recData);
     } catch (e) {
       console.error('Route optimization error:', {
         message: e.message,
@@ -571,7 +570,7 @@ const RouteMap = () => {
               )}
 
               {/* Safety overlay toggle */}
-              {(fastest || safest) && (
+              {(fastest || safest || shortest) && (
                 <div className="mt-3 flex items-center space-x-2">
                   <input
                     type="checkbox"
@@ -588,33 +587,147 @@ const RouteMap = () => {
             </div>
           </div>
 
-          {(fastest || safest) && (
+          {(fastest || safest || shortest) && (
             <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-200">
               <h3 className="font-semibold text-gray-900 mb-4">Results</h3>
               <div className="space-y-3 text-sm">
-                {fastest && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-700">Fastest</span>
-                    <span className="text-gray-900 font-medium">{Math.round((fastest.total_duration_seconds || 0) / 60)} min • {(fastest.total_distance_meters / 1000).toFixed(1)} km</span>
-                  </div>
-                )}
-                {safest && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-700">Safest</span>
-                    <span className="text-gray-900 font-medium">{Math.round((safest.total_duration_seconds || 0) / 60)} min • {(safest.total_distance_meters / 1000).toFixed(1)} km • {Math.round(safest.average_safety_score)} safety</span>
-                  </div>
-                )}
-                {recommended && (
-                  <div className="text-xs text-success-700 bg-success-50 border border-success-200 rounded px-2 py-1 inline-block">
-                    Recommended: {recommended === 'safest' ? 'Safest Route' : 'Fastest Route'}
-                  </div>
-                )}
+                {(() => {
+                  // Consolidate unique routes
+                  const allRoutes = [];
+                  const seenIds = new Set();
+
+                  const addRoute = (route, type) => {
+                    if (!route) return;
+                    // Use a rough signature if IDs are not stable across calls (though they should be unique per optimization)
+                    // For now, assuming route objects are distinct references but might have same content
+                    const sig = route.route_id || `${route.total_duration_seconds}-${route.total_distance_meters}`;
+
+                    let existing = allRoutes.find(r => r.sig === sig);
+                    if (!existing) {
+                      existing = { ...route, sig, types: [] };
+                      allRoutes.push(existing);
+                    }
+                    if (!existing.types.includes(type)) {
+                      existing.types.push(type);
+                    }
+                  };
+
+                  addRoute(fastest, 'Fastest');
+                  addRoute(safest, 'Safest');
+                  addRoute(shortest, 'Shortest');
+
+                  // Calculate ranges for normalization
+                  const maxDuration = Math.max(...allRoutes.map(r => r.total_duration_seconds));
+                  const minDuration = Math.min(...allRoutes.map(r => r.total_duration_seconds));
+                  const maxDistance = Math.max(...allRoutes.map(r => r.total_distance_meters));
+                  const minDistance = Math.min(...allRoutes.map(r => r.total_distance_meters));
+
+                  return allRoutes.map((route, idx) => {
+                    // Normalize scores (0-100), higher is better
+                    // Speed Score: Lower duration is better
+                    const speedScore = maxDuration === minDuration ? 100 :
+                      Math.round(100 * (1 - (route.total_duration_seconds - minDuration) / (maxDuration - minDuration + 1))); // +1 to avoid div by zero if equal
+
+                    // Distance Score: Lower distance is better
+                    const distScore = maxDistance === minDistance ? 100 :
+                      Math.round(100 * (1 - (route.total_distance_meters - minDistance) / (maxDistance - minDistance + 1)));
+
+                    // Safety Score: Already 0-100
+                    const safeScore = Math.round(route.average_safety_score);
+
+                    // Check if this route is currently 'recommended' (active)
+                    // matched by simple reference or type
+                    const isActive =
+                      (recommended === 'fastest' && route.types.includes('Fastest')) ||
+                      (recommended === 'safest' && route.types.includes('Safest')) ||
+                      (recommended === 'shortest' && route.types.includes('Shortest'));
+
+                    // If multiple match (e.g. fastest is also safest), isActive might default to one.
+                    // Better logic: if we clicked this specific CARD, it sets the mode.
+                    // But we just want to highlight the *Active Navigation Route*.
+
+                    return (
+                      <div
+                        key={route.sig}
+                        className={`p-3 rounded-lg cursor-pointer border-2 transition-all ${isActive ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500' : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        onClick={() => {
+                          // Set recommended based on the primary type or 'fastest' if multiple
+                          if (route.types.includes('Fastest')) setRecommended('fastest');
+                          else if (route.types.includes('Safest')) setRecommended('safest');
+                          else if (route.types.includes('Shortest')) setRecommended('shortest');
+                        }}
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex flex-wrap gap-1">
+                            {route.types.map(t => (
+                              <span key={t} className={`text-xs px-2 py-0.5 rounded-full font-bold ${t === 'Fastest' ? 'bg-blue-100 text-blue-700' :
+                                t === 'Safest' ? 'bg-green-100 text-green-700' :
+                                  'bg-purple-100 text-purple-700'
+                                }`}>
+                                {t}
+                              </span>
+                            ))}
+                          </div>
+                          <div className="text-right">
+                            <div className="font-bold text-gray-900">{Math.round(route.total_duration_seconds / 60)} min</div>
+                            <div className="text-xs text-gray-500">{(route.total_distance_meters / 1000).toFixed(1)} km</div>
+                          </div>
+                        </div>
+
+                        {/* Level Scores */}
+                        <div className="space-y-2">
+                          {/* Safety */}
+                          <div>
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="text-gray-600">Safety Score</span>
+                              <span className="font-medium text-gray-900">{safeScore}/100</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                              <div className="h-full bg-green-500 rounded-full" style={{ width: `${safeScore}%` }}></div>
+                            </div>
+                          </div>
+
+                          {/* Speed/Time Efficiency */}
+                          <div>
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="text-gray-600">Speed Score</span>
+                              <span className="font-medium text-gray-900">{speedScore}/100</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                              <div className="h-full bg-blue-500 rounded-full" style={{ width: `${speedScore}%` }}></div>
+                            </div>
+                          </div>
+
+                          {/* Distance Efficiency */}
+                          <div>
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="text-gray-600">Distance Score</span>
+                              <span className="font-medium text-gray-900">{distScore}/100</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                              <div className="h-full bg-purple-500 rounded-full" style={{ width: `${distScore}%` }}></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+
+                <button
+                  onClick={() => setNavigationMode(true)}
+                  className="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
+                >
+                  <span>🚀</span>
+                  <span>Start Navigation</span>
+                </button>
               </div>
             </div>
           )}
 
           {/* Safety Legend */}
-          {showSafetyOverlay && (fastest || safest) && (
+          {showSafetyOverlay && (fastest || safest || shortest) && (
             <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-200">
               <h3 className="font-semibold text-gray-900 mb-3 text-sm">Safety Legend</h3>
               <div className="space-y-2 text-xs">
@@ -647,204 +760,334 @@ const RouteMap = () => {
           )}
         </div>
 
-        {/* Map */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200">
-          <div style={{ height: '600px', width: '100%' }}>
-            <MapContainer
-              center={centerPosition}
-              zoom={12}
-              style={{ height: '100%', width: '100%' }}
-            >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-
-              <ClickToSetLocation />
-
-              <div className="leaflet-top leaflet-right" style={{ top: '80px', right: '10px', zIndex: 1000 }}>
-                <div className="bg-white rounded-md shadow-md p-1 flex flex-col space-y-1">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setSelectionMode('start'); }}
-                    className={`p-2 rounded ${selectionMode === 'start' ? 'bg-blue-100 text-blue-700 font-bold' : 'hover:bg-gray-100 text-gray-700'}`}
-                    title="Set Start Point"
-                  >
-                    <span className="text-xl">🚩</span>
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setSelectionMode('destination'); }}
-                    className={`p-2 rounded ${selectionMode === 'destination' ? 'bg-red-100 text-red-700 font-bold' : 'hover:bg-gray-100 text-gray-700'}`}
-                    title="Set Destination"
-                  >
-                    <span className="text-xl">📍</span>
-                  </button>
+        {/* Navigation Overlay (Mobile-like) */}
+        {navigationMode && (recommended === 'fastest' ? fastest : (recommended === 'shortest' ? shortest : safest)) && (
+          <div className="lg:col-span-2 relative h-[600px] bg-gray-900 rounded-xl overflow-hidden text-white flex flex-col">
+            <div className="absolute top-0 left-0 right-0 z-[1001] bg-gray-900/90 backdrop-blur p-4 shadow-lg">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-2xl font-bold flex items-center">
+                    <span className="mr-2">⬆️</span>
+                    {(distanceRemaining || ((recommended === 'fastest' ? fastest : (recommended === 'shortest' ? shortest : safest)).total_distance_meters / 1000).toFixed(1))} km
+                  </h2>
+                  <p className="text-gray-300 text-sm">
+                    {/* Display first instruction if available */}
+                    {(recommended === 'fastest' ? fastest : (recommended === 'shortest' ? shortest : safest)).segments?.[0]?.instructions?.[0]
+                      ? <span dangerouslySetInnerHTML={{ __html: (recommended === 'fastest' ? fastest : (recommended === 'shortest' ? shortest : safest)).segments[0].instructions[0] }} />
+                      : "Head towards destination"}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setNavigationMode(false)}
+                  className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg font-bold text-sm"
+                >
+                  Exit
+                </button>
+              </div>
+              <div className="flex justify-between items-center bg-gray-800 rounded-lg p-3">
+                <div className="text-center">
+                  <div className="text-xl font-bold text-green-400">
+                    {eta || Math.round(((recommended === 'fastest' ? fastest : (recommended === 'shortest' ? shortest : safest)).total_duration_seconds) / 60)} min
+                  </div>
+                  <div className="text-xs text-gray-400">ETA</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-xl font-bold">
+                    {(distanceRemaining || ((recommended === 'fastest' ? fastest : (recommended === 'shortest' ? shortest : safest)).total_distance_meters / 1000).toFixed(1))} km
+                  </div>
+                  <div className="text-xs text-gray-400">Remaining</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-xl font-bold text-blue-400">
+                    {Math.round((recommended === 'fastest' ? fastest : (recommended === 'shortest' ? shortest : safest)).average_safety_score)}
+                  </div>
+                  <div className="text-xs text-gray-400">Safety Score</div>
                 </div>
               </div>
+            </div>
 
-              {/* Current location */}
-              {currentPos && (
-                <Marker position={currentPos} icon={pulsingIcon}>
-                  <Popup>Your location</Popup>
-                </Marker>
-              )}
+            <div className="flex-1 relative">
+              {/* Re-using MapContainer but in dark/nav mode would be ideal. For now, we render the map similarly but customized for nav */}
+              <MapContainer
+                center={currentPos || centerPosition} // Center on user
+                zoom={18} // Zoomed in for navigation
+                style={{ height: '100%', width: '100%' }}
+                zoomControl={false}
+                attributionControl={false}
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  // Dark mode tiles for navigation feel
+                  url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                />
 
-              {/* Display all routes */}
-              {routes.map((route) => (
-                <React.Fragment key={route.id}>
-                  {route.coordinates.map((coord, index) => {
-                    if (index === route.coordinates.length - 1) return null;
-                    const start = route.coordinates[index];
-                    const end = route.coordinates[index + 1];
-                    const traffic = end.traffic || 'low';
-                    return (
-                      <Polyline
-                        key={`${route.id}-${index}`}
-                        positions={[
-                          [start.lat || start[0], start.lng || start[1]],
-                          [end.lat || end[0], end.lng || end[1]]
-                        ]}
-                        pathOptions={{
-                          color: getTrafficColor(traffic),
-                          weight: 3,
-                          opacity: 0.6,
-                        }}
-                      />
-                    );
-                  })}
-                  <Marker position={[route.coordinates[0].lat || route.coordinates[0][0], route.coordinates[0].lng || route.coordinates[0][1]]}>
-                    <Popup>{route.name}</Popup>
+                {/* User Location Arrow */}
+                {currentPos && (
+                  <Marker position={currentPos} icon={pulsingIcon}>
                   </Marker>
-                </React.Fragment>
-              ))}
+                )}
 
-              {/* Destination marker */}
-              {destPos && (
-                <Marker
-                  position={destPos}
-                  icon={L.divIcon({
-                    className: 'destination-marker',
-                    html: `<div style="width:30px;height:30px;border-radius:50%;background:#ef4444;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:18px">📍</div>`,
-                    iconSize: [30, 30],
-                    iconAnchor: [15, 15]
-                  })}
-                >
-                  <Popup>
-                    <div>
-                      <strong>Destination</strong><br />
-                      Lat: {destPos[0].toFixed(6)}<br />
-                      Lng: {destPos[1].toFixed(6)}
-                    </div>
-                  </Popup>
-                </Marker>
-              )}
+                {/* Route Line */}
+                {/* Route Line */}
+                {getRoutePolylines(
+                  recommended === 'fastest' ? fastest : (recommended === 'shortest' ? shortest : safest),
+                  (recommended === 'fastest' ? fastest : (recommended === 'shortest' ? shortest : safest)).segments
+                ).map((poly, idx) => (
+                  <Polyline
+                    key={`nav-poly-${idx}`}
+                    positions={poly.positions}
+                    pathOptions={{
+                      color: poly.color, // Keep safety colors
+                      weight: 8, // Thicker line for navigation
+                      opacity: 0.8,
+                    }}
+                  />
+                ))}
 
-              {/* Draw route polylines with safety coloring */}
-              {/* Alternative Routes */}
-              {alternatives.map((alt, altIdx) => (
-                <React.Fragment key={`alt-${altIdx}`}>
-                  {showSafetyOverlay && getRoutePolylines(alt, alt.segments).map((poly, idx) => (
-                    <Polyline
-                      key={`alt-${altIdx}-${idx}`}
-                      positions={poly.positions}
-                      pathOptions={{
-                        color: poly.color,
-                        weight: 4,
-                        opacity: 0.4,
-                      }}
+                {/* Destination */}
+                {destPos && (
+                  <Marker position={destPos}>
+                    <Popup>Destination</Popup>
+                  </Marker>
+                )}
+
+                <MapUpdater center={currentPos} />
+              </MapContainer>
+            </div>
+
+            <div className="absolute bottom-6 left-4 right-4 z-[1001] pointer-events-none">
+              <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/20 text-center">
+                <p className="text-sm font-medium text-white shadow-black drop-shadow-md">
+                  ⚠️ You are on a {recommended === 'safest' ? 'Safe Route' : (recommended === 'shortest' ? 'Shortest Route' : 'Fast Route')}. High patrol area nearby.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Standard Map (Hidden in Nav Mode) */}
+        {!navigationMode && (
+          <div className="lg:col-span-2 bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200">
+
+            <div style={{ height: '600px', width: '100%' }}>
+              <MapContainer
+                center={centerPosition}
+                zoom={12}
+                style={{ height: '100%', width: '100%' }}
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+
+                <ClickToSetLocation />
+
+                <div className="leaflet-top leaflet-right" style={{ top: '80px', right: '10px', zIndex: 1000 }}>
+                  <div className="bg-white rounded-md shadow-md p-1 flex flex-col space-y-1">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setSelectionMode('start'); }}
+                      className={`p-2 rounded ${selectionMode === 'start' ? 'bg-blue-100 text-blue-700 font-bold' : 'hover:bg-gray-100 text-gray-700'}`}
+                      title="Set Start Point"
                     >
-                      <Popup>
-                        <div>
-                          <strong>Alternative Route {altIdx + 1}</strong><br />
-                          Time: {Math.round((alt.total_duration_seconds || 0) / 60)} min<br />
-                          Distance: {(alt.total_distance_meters / 1000).toFixed(1)} km<br />
-                          Safety Score: {Math.round(alt.average_safety_score)}
-                        </div>
-                      </Popup>
-                    </Polyline>
-                  ))}
-                </React.Fragment>
-              ))}
+                      <span className="text-xl">🚩</span>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setSelectionMode('destination'); }}
+                      className={`p-2 rounded ${selectionMode === 'destination' ? 'bg-red-100 text-red-700 font-bold' : 'hover:bg-gray-100 text-gray-700'}`}
+                      title="Set Destination"
+                    >
+                      <span className="text-xl">📍</span>
+                    </button>
+                  </div>
+                </div>
 
-              {fastest && showSafetyOverlay && getRoutePolylines(fastest, fastest.segments).map((poly, idx) => (
-                <Polyline
-                  key={`fastest-${idx}`}
-                  positions={poly.positions}
-                  pathOptions={{
-                    color: poly.color,
-                    weight: recommended === 'fastest' ? 5 : 3,
-                    opacity: poly.opacity
-                  }}
-                >
-                  <Popup>
-                    Fastest Route Segment<br />
-                    Safety Score: {Math.round(poly.safetyScore)}
-                  </Popup>
-                </Polyline>
-              ))}
+                {/* Current location */}
+                {currentPos && (
+                  <Marker position={currentPos} icon={pulsingIcon}>
+                    <Popup>Your location</Popup>
+                  </Marker>
+                )}
 
-              {safest && showSafetyOverlay && getRoutePolylines(safest, safest.segments).map((poly, idx) => (
-                <Polyline
-                  key={`safest-${idx}`}
-                  positions={poly.positions}
-                  pathOptions={{
-                    color: poly.color,
-                    weight: recommended === 'safest' ? 5 : 3,
-                    opacity: poly.opacity
-                  }}
-                >
-                  <Popup>
-                    Safest Route Segment<br />
-                    Safety Score: {Math.round(poly.safetyScore)}
-                  </Popup>
-                </Polyline>
-              ))}
+                {/* Display all routes */}
+                {routes.map((route) => (
+                  <React.Fragment key={route.id}>
+                    {route.coordinates.map((coord, index) => {
+                      if (index === route.coordinates.length - 1) return null;
+                      const start = route.coordinates[index];
+                      const end = route.coordinates[index + 1];
+                      const traffic = end.traffic || 'low';
+                      return (
+                        <Polyline
+                          key={`${route.id}-${index}`}
+                          positions={[
+                            [start.lat || start[0], start.lng || start[1]],
+                            [end.lat || end[0], end.lng || end[1]]
+                          ]}
+                          pathOptions={{
+                            color: getTrafficColor(traffic),
+                            weight: 3,
+                            opacity: 0.6,
+                          }}
+                        />
+                      );
+                    })}
+                    <Marker position={[route.coordinates[0].lat || route.coordinates[0][0], route.coordinates[0].lng || route.coordinates[0][1]]}>
+                      <Popup>{route.name}</Popup>
+                    </Marker>
+                  </React.Fragment>
+                ))}
 
-              {/* Fallback: Simple lines if no route geometry */}
-              {fastest && (!fastest.segments || fastest.segments.length === 0) && currentPos && destPos && (
-                <Polyline
-                  positions={[currentPos, destPos]}
-                  pathOptions={{
-                    color: recommended === 'fastest' ? '#2563eb' : '#9ca3af',
-                    weight: recommended === 'fastest' ? 5 : 3,
-                    opacity: 0.8
-                  }}
-                />
-              )}
-
-              {safest && (!safest.segments || safest.segments.length === 0) && currentPos && destPos && (
-                <Polyline
-                  positions={[currentPos, destPos]}
-                  pathOptions={{
-                    color: recommended === 'safest' ? '#16a34a' : '#9ca3af',
-                    weight: recommended === 'safest' ? 5 : 3,
-                    opacity: 0.8
-                  }}
-                />
-              )}
-
-              {/* Safety overlay markers for segment scores */}
-              {showSafetyOverlay && safetyOverlay && safetyOverlay.segment_scores && safetyOverlay.segment_scores.map((segment, idx) => {
-                const coord = segment.coordinates;
-                const score = segment.overall_score;
-                return (
+                {/* Destination marker */}
+                {destPos && (
                   <Marker
-                    key={`safety-${idx}`}
-                    position={[coord.latitude, coord.longitude]}
+                    position={destPos}
                     icon={L.divIcon({
-                      className: 'safety-marker',
-                      html: `<div style="width:12px;height:12px;border-radius:50%;background:${getSafetyColor(score)};border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3)"></div>`
+                      className: 'destination-marker',
+                      html: `<div style="width:30px;height:30px;border-radius:50%;background:#ef4444;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:18px">📍</div>`,
+                      iconSize: [30, 30],
+                      iconAnchor: [15, 15]
                     })}
                   >
                     <Popup>
-                      Safety Score: {Math.round(score)}<br />
-                      Risk Level: {segment.risk_level}
+                      <div>
+                        <strong>Destination</strong><br />
+                        Lat: {destPos[0].toFixed(6)}<br />
+                        Lng: {destPos[1].toFixed(6)}
+                      </div>
                     </Popup>
                   </Marker>
-                );
-              })}
-            </MapContainer>
+                )}
+
+                {/* Draw route polylines with safety coloring */}
+                {/* Alternative Routes */}
+                {alternatives.map((alt, altIdx) => (
+                  <React.Fragment key={`alt-${altIdx}`}>
+                    {showSafetyOverlay && getRoutePolylines(alt, alt.segments).map((poly, idx) => (
+                      <Polyline
+                        key={`alt-${altIdx}-${idx}`}
+                        positions={poly.positions}
+                        pathOptions={{
+                          color: poly.color,
+                          weight: 4,
+                          opacity: 0.4,
+                        }}
+                      >
+                        <Popup>
+                          <div>
+                            <strong>Alternative Route {altIdx + 1}</strong><br />
+                            Time: {Math.round((alt.total_duration_seconds || 0) / 60)} min<br />
+                            Distance: {(alt.total_distance_meters / 1000).toFixed(1)} km<br />
+                            Safety Score: {Math.round(alt.average_safety_score)}
+                          </div>
+                        </Popup>
+                      </Polyline>
+                    ))}
+                  </React.Fragment>
+                ))}
+
+                {fastest && showSafetyOverlay && getRoutePolylines(fastest, fastest.segments).map((poly, idx) => (
+                  <Polyline
+                    key={`fastest-${idx}`}
+                    positions={poly.positions}
+                    pathOptions={{
+                      color: poly.color,
+                      weight: recommended === 'fastest' ? 5 : 3,
+                      opacity: poly.opacity
+                    }}
+                  >
+                    <Popup>
+                      Fastest Route Segment<br />
+                      Safety Score: {Math.round(poly.safetyScore)}
+                    </Popup>
+                  </Polyline>
+                ))}
+
+                {shortest && showSafetyOverlay && getRoutePolylines(shortest, shortest.segments).map((poly, idx) => (
+                  <Polyline
+                    key={`shortest-${idx}`}
+                    positions={poly.positions}
+                    pathOptions={{
+                      color: poly.color,
+                      weight: recommended === 'shortest' ? 5 : 3,
+                      opacity: poly.opacity
+                    }}
+                  >
+                    <Popup>
+                      Shortest Route Segment<br />
+                      Safety Score: {Math.round(poly.safetyScore)}
+                    </Popup>
+                  </Polyline>
+                ))}
+
+                {safest && showSafetyOverlay && getRoutePolylines(safest, safest.segments).map((poly, idx) => (
+                  <Polyline
+                    key={`safest-${idx}`}
+                    positions={poly.positions}
+                    pathOptions={{
+                      color: poly.color,
+                      weight: recommended === 'safest' ? 6 : 4,
+                      opacity: poly.opacity
+                    }}
+                  >
+                    <Popup>
+                      Safest Route Segment<br />
+                      Safety Score: {Math.round(poly.safetyScore)}
+                    </Popup>
+                    {/* Add time label label to the path like Google Maps */}
+                    {idx === Math.floor(getRoutePolylines(safest, safest.segments).length / 2) && (
+                      <Tooltip permanent direction="center" className="route-label-tooltip">
+                        <div className="flex items-center gap-1">
+                          <span className="font-bold">{Math.round((safest.total_duration_seconds || 0) / 60)} min</span>
+                          {recommended === 'safest' && <span className="text-xs">🛡️</span>}
+                        </div>
+                      </Tooltip>
+                    )}
+                  </Polyline>
+                ))}
+
+                {/* Fastest Labels */}
+                {fastest && recommended === 'fastest' && getRoutePolylines(fastest, fastest.segments).length > 0 && (
+                  <Tooltip
+                    position={getRoutePolylines(fastest, fastest.segments)[Math.floor(getRoutePolylines(fastest, fastest.segments).length / 2)].positions[0]}
+                    permanent
+                    direction="top"
+                    className="route-label-tooltip fastest-active"
+                  >
+                    <div className="flex flex-col items-center">
+                      <span className="font-bold text-white">{Math.round((fastest.total_duration_seconds || 0) / 60)} min</span>
+                      <span className="text-[10px] text-blue-100">Fastest</span>
+                    </div>
+                  </Tooltip>
+                )}
+
+                {/* Fallback: Simple lines if no route geometry */}
+                {fastest && (!fastest.segments || fastest.segments.length === 0) && currentPos && destPos && (
+                  <Polyline
+                    positions={[currentPos, destPos]}
+                    pathOptions={{
+                      color: recommended === 'fastest' ? '#2563eb' : '#9ca3af',
+                      weight: recommended === 'fastest' ? 5 : 3,
+                      opacity: 0.8
+                    }}
+                  />
+                )}
+
+                {safest && (!safest.segments || safest.segments.length === 0) && currentPos && destPos && (
+                  <Polyline
+                    positions={[currentPos, destPos]}
+                    pathOptions={{
+                      color: recommended === 'safest' ? '#16a34a' : '#9ca3af',
+                      weight: recommended === 'safest' ? 5 : 3,
+                      opacity: 0.8
+                    }}
+                  />
+                )}
+
+
+              </MapContainer>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

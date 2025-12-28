@@ -299,31 +299,54 @@ class SafetyService:
             List of safe zones with distance
         """
         try:
-            # In production, use Google Places API or similar to find:
-            # - Police stations
-            # - 24-hour shops/stores
-            # - Well-lit areas (parks, public spaces)
-            
-            # For now, return mock data structure
-            # TODO: Integrate with Google Places API or similar service
-            
             safe_zones = []
             
-            # Example: Search for police stations
-            if not zone_types or "police_station" in zone_types:
-                # Use Google Places API to find police stations
-                # For now, return empty list
-                pass
+            # Map internal types to Google Places types
+            type_mapping = {
+                "police_station": "police",
+                "shop_24hr": "convenience_store",
+                "well_lit_area": "store"  # Fallback as there isn't a direct "well lit" type
+            }
             
-            # Example: Search for 24-hour shops
-            if not zone_types or "shop_24hr" in zone_types:
-                # Use Google Places API to find 24-hour convenience stores
-                pass
+            types_to_search = []
+            if zone_types:
+                for zt in zone_types:
+                    if zt in type_mapping:
+                        types_to_search.append(type_mapping[zt])
+            else:
+                # Default search
+                types_to_search = ["police", "convenience_store"]
             
-            # Example: Well-lit areas (could be based on street lighting data)
-            if not zone_types or "well_lit_area" in zone_types:
-                # Use street lighting data or public spaces
-                pass
+            # Search for each type
+            for place_type in types_to_search:
+                places = self.maps_service.find_nearby_places(
+                    location=location,
+                    radius_meters=radius_meters,
+                    place_type=place_type
+                )
+                
+                # Transform to SafeZone format
+                for place in places:
+                    zone_type = "safe_zone"
+                    # Reverse map type
+                    for internal, external in type_mapping.items():
+                        if external == place_type:
+                            zone_type = internal
+                            break
+                    
+                    safe_zones.append({
+                        "id": place.get("place_id"),
+                        "name": place.get("name"),
+                        "zone_type": zone_type,
+                        "location": place.get("location"),
+                        "address": place.get("address"),
+                        "rating": place.get("rating"),
+                        "distance_meters": place.get("distance_meters"),
+                        "is_open": place.get("is_open")
+                    })
+            
+            # Sort by distance
+            safe_zones.sort(key=lambda x: x.get("distance_meters", float('inf')))
             
             logger.info(f"Found {len(safe_zones)} safe zones near location")
             

@@ -5,7 +5,6 @@ import {
 } from 'react-icons/fi';
 import Analytics from './Analytics';
 import RouteMap from './RouteMap';
-import SafetyHeatmap from './SafetyHeatmap';
 import SnapMap from './SnapMap';
 import LiveTracking from './LiveTracking';
 import { api } from '../services/api';
@@ -224,7 +223,6 @@ const Dashboard = ({ setAuth }) => {
               { id: 'tracking', label: 'Live Tracking' },
               { id: 'analytics', label: 'Analytics' },
               { id: 'route-map', label: 'Route Map' },
-              { id: 'safety-heatmap', label: 'Safety Heatmap' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -410,7 +408,6 @@ const Dashboard = ({ setAuth }) => {
         {activeTab === 'tracking' && <LiveTracking />}
         {activeTab === 'analytics' && <Analytics />}
         {activeTab === 'route-map' && <RouteMap />}
-        {activeTab === 'safety-heatmap' && <SafetyHeatmap />}
       </main>
 
       {/* Footer */}
