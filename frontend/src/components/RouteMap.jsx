@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents, useMap,
 import L from 'leaflet';
 import { api } from '../services/api';
 import useLocation from '../hooks/useLocation';
+import SafetyHeatmap from './SafetyHeatmap';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
 
@@ -732,20 +733,16 @@ const RouteMap = () => {
               <h3 className="font-semibold text-gray-900 mb-3 text-sm">Safety Legend</h3>
               <div className="space-y-2 text-xs">
                 <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#16a34a' }}></div>
-                  <span className="text-gray-700">High Safety (85-100)</span>
+                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#22c55e' }}></div>
+                  <span className="text-gray-700">Safe Zone (75-100)</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#ea580c' }}></div>
-                  <span className="text-gray-700">Medium Safety (70-84)</span>
+                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#f59e0b' }}></div>
+                  <span className="text-gray-700">Moderate Risk (50-74)</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#dc2626' }}></div>
-                  <span className="text-gray-700">Low Safety (50-69)</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#991b1b' }}></div>
-                  <span className="text-gray-700">Very Low Safety (&lt;50)</span>
+                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#ef4444' }}></div>
+                  <span className="text-gray-700">Caution: High Risk (&lt;50)</span>
                 </div>
               </div>
               <div className="mt-3 text-xs text-gray-600">
@@ -879,6 +876,8 @@ const RouteMap = () => {
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
+
+                <SafetyHeatmap show={showSafetyOverlay} />
 
                 <ClickToSetLocation />
 

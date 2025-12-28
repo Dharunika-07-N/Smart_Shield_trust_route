@@ -1,4 +1,4 @@
 """API routes package."""
-from . import delivery, safety, feedback, traffic
+from . import delivery, safety, feedback, traffic, auth, training
 
-__all__ = ["delivery", "safety", "feedback", "traffic"]
+__all__ = ["delivery", "safety", "feedback", "traffic", "auth", "training"]

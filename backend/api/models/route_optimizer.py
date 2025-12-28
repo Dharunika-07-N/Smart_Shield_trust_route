@@ -24,6 +24,17 @@ from api.models.safety_scorer import SafetyScorer
 from api.services.weather import WeatherService
 from api.services.traffic import TrafficService
 
+# Renovation ML Models
+try:
+    from ml.feature_engineer import FeatureEngineer
+    from ml.time_predictor import DeliveryTimePredictor
+    from ml.safety_classifier import SafetyClassifier
+    from ml.rl_agent import SARSARouteAgent
+    HAS_RENOVATION_ML = True
+except ImportError:
+    HAS_RENOVATION_ML = False
+
+from database.database import SessionLocal
 from loguru import logger
 import asyncio
 
@@ -38,6 +49,18 @@ class RouteOptimizer:
         self.weather_service = WeatherService()
 
         self.traffic_service = TrafficService()
+        
+        # Initialize Renovation ML components
+        if HAS_RENOVATION_ML:
+            self.db = SessionLocal()
+            self.feature_engineer = FeatureEngineer(self.db)
+            self.time_predictor = DeliveryTimePredictor()
+            self.safety_classifier = SafetyClassifier()
+            self.rl_agent = SARSARouteAgent()
+            # Load models if they exist
+            self.time_predictor.load_model()
+            self.safety_classifier.load_model()
+            self.rl_agent.load_model()
 
     
     async def optimize_route(
@@ -630,6 +653,32 @@ class RouteOptimizer:
             del alt["_ranking_score"]
             
         best_route["alternatives"] = alternatives
+        
+        # RENOVATION: RL Agent Recommendation
+        if HAS_RENOVATION_ML and candidates:
+            try:
+                # Prepare state for RL
+                context = {
+                    'current_lat': starting_point.latitude,
+                    'current_lng': starting_point.longitude,
+                    'hour': departure_time.hour if departure_time else datetime.now().hour,
+                    'traffic_level': best_route.get('traffic_level', 'medium'),
+                    'weather_condition': 'clear' # Default
+                }
+                state = self.rl_agent.get_state(context)
+                
+                # Available route IDs (indices)
+                route_ids = [str(i) for i in range(len(candidates))]
+                
+                # Choose best action according to RL
+                chosen_id = self.rl_agent.choose_action(state, route_ids)
+                
+                best_route["rl_recommended_id"] = chosen_id
+                best_route["rl_state"] = str(state)
+                logger.info(f"RL Agent Recommended Route ID: {chosen_id}")
+            except Exception as e:
+                logger.warning(f"RL recommendation failed: {e}")
+
         return best_route
 
     async def _process_segment_data(
@@ -704,7 +753,38 @@ class RouteOptimizer:
             segment_coords, time_of_day, rider_info
         )
         safety_score = safety_data["route_safety_score"]
-        
+
+        # RENOVATION: ML Model Integration
+        if HAS_RENOVATION_ML:
+            try:
+                # Prepare context for feature extraction
+                route_context = {
+                    'delivery_time': departure_time.isoformat() if departure_time else datetime.utcnow().isoformat(),
+                    'total_distance': distance / 1000,
+                    'segments': [{
+                        'distance': distance / 1000,
+                        'start_lat': start_point.latitude,
+                        'start_lng': start_point.longitude,
+                        'end_lat': end_point.latitude,
+                        'end_lng': end_point.longitude
+                    }]
+                }
+                
+                # Extract features
+                features_df = self.feature_engineer.extract_features(route_context)
+                
+                # Predict Time (minutes to seconds)
+                ml_time_min = self.time_predictor.predict(features_df)[0]
+                duration = float(ml_time_min * 60)
+                
+                # Predict Safety Score (Random Forest)
+                ml_safety_score = self.safety_classifier.predict_safety_score(features_df)[0]
+                safety_score = float(ml_safety_score)
+                
+                logger.info(f"ML Metrics - Time: {ml_time_min:.1f}m, Safety: {safety_score:.1f}")
+            except Exception as e:
+                logger.warning(f"ML prediction failed, using rule-based fallback: {e}")
+
         # Adjustments
         weather_penalty = self.weather_service.calculate_weather_penalty(weather_data)
         duration = duration * weather_penalty

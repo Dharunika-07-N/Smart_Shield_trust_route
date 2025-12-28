@@ -173,6 +173,13 @@ export const api = {
   getSafeZones: (data) => apiClient.post('/safety/safe-zones', data),
   createRideAlong: (data) => apiClient.post('/safety/ride-along', data),
   getRideAlongStatus: (shareToken) => apiClient.get(`/safety/ride-along/${shareToken}`),
+
+  // Training
+  retrainModel: () => apiClient.post('/training/retrain'),
+
+  // Generic methods
+  get: (url, config) => apiClient.get(url, config),
+  post: (url, data, config) => apiClient.post(url, data, config),
 };
 
 export default apiClient;

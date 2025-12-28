@@ -1,9 +1,11 @@
-"""Database models."""
-from sqlalchemy import Column, String, Float, Integer, DateTime, Text, Boolean, JSON
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, Float, Integer, DateTime, Text, Boolean, JSON, ForeignKey
+from sqlalchemy.orm import relationship
+from sqlalchemy.ext.declarative import declarative_base
+from geoalchemy2 import Geometry
 from database.database import Base
 from datetime import datetime
 import uuid
+import datetime as dt
 
 
 class Route(Base):
@@ -216,3 +218,153 @@ class User(Base):
     
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class DeliveryRoute(Base):
+    __tablename__ = "delivery_routes"
+    
+    id = Column(Integer, primary_key=True)
+    route_id = Column(String, unique=True, index=True)
+    origin_lat = Column(Float, nullable=False)
+    origin_lng = Column(Float, nullable=False)
+    destination_lat = Column(Float, nullable=False)
+    destination_lng = Column(Float, nullable=False)
+    
+    # Route geometry storage
+    route_geometry = Column(JSON, nullable=True) # List of [lat, lng]
+    
+    # Predictions
+    predicted_time = Column(Float)  # minutes
+    predicted_distance = Column(Float)  # km
+    safety_score = Column(Float)  # 0-100
+    
+    # Actuals (filled after delivery)
+    actual_time = Column(Float, nullable=True)
+    actual_distance = Column(Float, nullable=True)
+    delivery_success = Column(Boolean, nullable=True)
+    
+    # Multi-objective scores
+    time_score = Column(Float)
+    distance_score = Column(Float)
+    fuel_score = Column(Float)
+    composite_score = Column(Float)
+    
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow)
+    delivery_time = Column(DateTime)
+    weather_conditions = Column(JSON)
+    traffic_conditions = Column(JSON)
+    
+    # Relationships
+    segments = relationship("RouteSegment", back_populates="route")
+    feedback = relationship("DeliveryFeedback", back_populates="route")
+
+
+class RouteSegment(Base):
+    __tablename__ = "route_segments"
+    
+    id = Column(Integer, primary_key=True)
+    route_id = Column(Integer, ForeignKey("delivery_routes.id"))
+    segment_order = Column(Integer)
+    
+    # Segment geometry
+    segment_geometry = Column(JSON, nullable=True) # List of [lat, lng]
+    start_lat = Column(Float)
+    start_lng = Column(Float)
+    end_lat = Column(Float)
+    end_lng = Column(Float)
+    
+    # Segment features
+    distance = Column(Float)  # km
+    duration = Column(Float)  # minutes
+    safety_score = Column(Float)  # 0-100
+    crime_score = Column(Float)
+    accident_history = Column(Float)
+    lighting_score = Column(Float)
+    road_quality = Column(Float)
+    traffic_density = Column(Float)
+    
+    # Time features
+    hour_of_day = Column(Integer)
+    day_of_week = Column(Integer)
+    is_peak_hour = Column(Boolean)
+    
+    route = relationship("DeliveryRoute", back_populates="segments")
+
+
+class CrimeData(Base):
+    __tablename__ = "crime_data"
+    
+    id = Column(Integer, primary_key=True)
+    district = Column(String, index=True)
+    location = Column(JSON, nullable=True) # {latitude, longitude}
+    
+    # Crime statistics
+    murder_count = Column(Integer, default=0)
+    sexual_harassment_count = Column(Integer, default=0)
+    road_accident_count = Column(Integer, default=0)
+    theft_count = Column(Integer, default=0)
+    
+    # Aggregated risk score
+    crime_risk_score = Column(Float)  # 0-100
+    
+    # Temporal data
+    year = Column(Integer)
+    month = Column(Integer, nullable=True)
+    
+    # Geographic coverage
+    radius_km = Column(Float, default=5.0)  # Area of influence
+
+
+class DeliveryFeedback(Base):
+    __tablename__ = "delivery_feedback"
+    
+    id = Column(Integer, primary_key=True)
+    route_id = Column(Integer, ForeignKey("delivery_routes.id"))
+    
+    # Rider feedback
+    rider_id = Column(String)
+    safety_rating = Column(Integer)  # 1-5
+    route_quality_rating = Column(Integer)  # 1-5
+    comfort_rating = Column(Integer)  # 1-5
+    
+    # Incident reports
+    incidents_reported = Column(JSON)  # List of incidents
+    unsafe_areas = Column(JSON)  # List of coordinates
+    
+    # Comments
+    feedback_text = Column(String, nullable=True)
+    
+    # Metadata
+    submitted_at = Column(DateTime, default=datetime.utcnow)
+    
+    route = relationship("DeliveryRoute", back_populates="feedback")
+
+
+class HistoricalDelivery(Base):
+    __tablename__ = "historical_deliveries"
+    
+    id = Column(Integer, primary_key=True)
+    delivery_id = Column(String, unique=True, index=True)
+    
+    # Route info
+    origin_lat = Column(Float)
+    origin_lng = Column(Float)
+    destination_lat = Column(Float)
+    destination_lng = Column(Float)
+    
+    # Outcome
+    delivery_time_minutes = Column(Float)
+    distance_km = Column(Float)
+    fuel_consumed = Column(Float, nullable=True)
+    success = Column(Boolean)
+    
+    # Conditions
+    weather = Column(JSON)
+    traffic = Column(JSON)
+    time_of_day = Column(Integer)
+    day_of_week = Column(Integer)
+    
+    # Metadata
+    completed_at = Column(DateTime)
+    created_at = Column(DateTime, default=dt.datetime.utcnow)
+

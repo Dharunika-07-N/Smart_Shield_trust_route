@@ -1,121 +1,55 @@
-"""Feedback endpoints."""
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
-from typing import Dict
-import sys
-from pathlib import Path
+from typing import List, Optional
+from datetime import datetime
+from pydantic import BaseModel
 
-sys.path.append(str(Path(__file__).parent.parent.parent))
-
-from api.schemas.feedback import (
-    SafetyFeedback,
-    FeedbackSubmissionResponse,
-    FeedbackStats,
-    RouteFeedback
-)
-from api.services.database import DatabaseService
 from database.database import get_db
+from database.models import DeliveryFeedback, DeliveryRoute
 from loguru import logger
 
 router = APIRouter()
 
+class FeedbackSubmit(BaseModel):
+    route_id: str
+    rider_id: str
+    safety_rating: int
+    route_quality_rating: int
+    comfort_rating: int
+    incidents_reported: List[dict] = []
+    unsafe_areas: List[dict] = []
+    feedback_text: Optional[str] = None
 
-@router.post("/feedback/submit", response_model=FeedbackSubmissionResponse)
-async def submit_feedback(
-    feedback: SafetyFeedback,
-    db: Session = Depends(get_db)
-):
-    """Submit rider feedback on route safety."""
+@router.post("/feedback/submit")
+async def submit_feedback(feedback: FeedbackSubmit, db: Session = Depends(get_db)):
+    """Submit rider feedback for a completed route."""
     try:
-        logger.info(f"Received feedback for route {feedback.route_id}")
+        # Find the internal route ID
+        db_route = db.query(DeliveryRoute).filter(DeliveryRoute.route_id == feedback.route_id).first()
+        if not db_route:
+            # Fallback if route not in new table yet
+            logger.warning(f"Route {feedback.route_id} not found in delivery_routes table")
+            # In a real app, we might create a placeholder or error out
         
-        db_service = DatabaseService(db)
-        
-        # Save feedback
-        feedback_data = feedback.dict()
-        feedback_data["route_id"] = feedback.route_id
-        feedback_data["rider_id"] = feedback.rider_id
-        feedback_data["feedback_type"] = feedback.feedback_type
-        feedback_data["rating"] = feedback.rating
-        feedback_data["comments"] = feedback.comments
-        feedback_data["time_of_day"] = feedback.time_of_day
-        feedback_data["date_submitted"] = feedback.date_submitted
-        
-        if feedback.location:
-            feedback_data["location"] = {
-                "lat": feedback.location.latitude,
-                "lng": feedback.location.longitude
-            }
-        
-        feedback_id = db_service.save_feedback(feedback_data)
-        
-        # If we have enough samples, trigger model retraining
-        # (implementation would check thresholds and retrain)
-        
-        return FeedbackSubmissionResponse(
-            success=True,
-            message="Feedback submitted successfully",
-            feedback_id=feedback_id
+        new_feedback = DeliveryFeedback(
+            route_id=db_route.id if db_route else None,
+            rider_id=feedback.rider_id,
+            safety_rating=feedback.safety_rating,
+            route_quality_rating=feedback.route_quality_rating,
+            comfort_rating=feedback.comfort_rating,
+            incidents_reported=feedback.incidents_reported,
+            unsafe_areas=feedback.unsafe_areas,
+            feedback_text=feedback.feedback_text,
+            submitted_at=datetime.utcnow()
         )
-    
+        
+        db.add(new_feedback)
+        db.commit()
+        
+        # After feedback is submitted, the RL agent could be updated
+        # This is part of the feedback loop renovation
+        
+        return {"status": "success", "message": "Feedback submitted successfully"}
     except Exception as e:
         logger.error(f"Error submitting feedback: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/feedback/route")
-async def submit_route_feedback(
-    feedback: RouteFeedback,
-    db: Session = Depends(get_db)
-):
-    """Submit overall route feedback."""
-    try:
-        logger.info(f"Received route feedback for {feedback.route_id}")
-        
-        # In production, would save more detailed route feedback
-        return {
-            "success": True,
-            "message": "Route feedback submitted successfully"
-        }
-    
-    except Exception as e:
-        logger.error(f"Error submitting route feedback: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/feedback/stats", response_model=FeedbackStats)
-async def get_feedback_stats(db: Session = Depends(get_db)):
-    """Get feedback statistics."""
-    try:
-        db_service = DatabaseService(db)
-        stats = db_service.get_feedback_stats()
-        
-        return FeedbackStats(
-            total_feedback=stats["total_feedback"],
-            average_rating=stats["average_rating"],
-            feedback_by_type=stats.get("feedback_by_type", {}),
-            recent_trends=[],
-            safety_improvement_rate=0.0
-        )
-    
-    except Exception as e:
-        logger.error(f"Error getting feedback stats: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/feedback/route/{route_id}")
-async def get_route_feedback(route_id: str, db: Session = Depends(get_db)):
-    """Get feedback for a specific route."""
-    try:
-        # In production, would query database for route-specific feedback
-        return {
-            "route_id": route_id,
-            "feedback_count": 0,
-            "average_rating": 0,
-            "feedback": []
-        }
-    
-    except Exception as e:
-        logger.error(f"Error getting route feedback: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-

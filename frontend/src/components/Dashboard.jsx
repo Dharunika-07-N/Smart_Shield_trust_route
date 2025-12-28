@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import {
   FiShield, FiPackage, FiTrendingUp, FiMap,
-  FiActivity, FiAlertCircle, FiCheckCircle, FiAlertTriangle
+  FiActivity, FiAlertCircle, FiCheckCircle, FiAlertTriangle, FiCpu, FiNavigation
 } from 'react-icons/fi';
 import Analytics from './Analytics';
 import RouteMap from './RouteMap';
 import SnapMap from './SnapMap';
 import LiveTracking from './LiveTracking';
+import TrainingCenter from './TrainingCenter';
 import { api } from '../services/api';
 import useLocation from '../hooks/useLocation';
 
@@ -222,6 +223,7 @@ const Dashboard = ({ setAuth }) => {
               { id: 'snap-map', label: 'Live Map' },
               { id: 'tracking', label: 'Live Tracking' },
               { id: 'analytics', label: 'Analytics' },
+              { id: 'training', label: 'AI Training' },
               { id: 'route-map', label: 'Route Map' },
             ].map((tab) => (
               <button
@@ -407,6 +409,7 @@ const Dashboard = ({ setAuth }) => {
         {activeTab === 'snap-map' && <SnapMap />}
         {activeTab === 'tracking' && <LiveTracking />}
         {activeTab === 'analytics' && <Analytics />}
+        {activeTab === 'training' && <TrainingCenter />}
         {activeTab === 'route-map' && <RouteMap />}
       </main>
 

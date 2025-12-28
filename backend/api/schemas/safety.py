@@ -37,17 +37,20 @@ class SafetyScoreResponse(BaseModel):
     safest_alternatives: Optional[List[Coordinate]] = None
     improvement_suggestions: List[str] = Field(default_factory=list)
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "route_safety_score": 85.5,
-                "average_score": 85.5,
-                "risk_level": "low"
-            }
-        }
+
+class HeatmapRequest(BaseModel):
+    """Request for safety heatmap."""
+    min_lat: float
+    min_lng: float
+    max_lat: float
+    max_lng: float
+    grid_size: Optional[int] = 10
 
 
-
+class SafetyHeatmapResponse(BaseModel):
+    """Response for safety heatmap."""
+    bounds: Dict[str, float]
+    points: List[Dict]
 
 
 class SafetyConditionsRequest(BaseModel):
@@ -67,4 +70,3 @@ class SafetyConditionsResponse(BaseModel):
     user_safety_rating: Optional[float] = Field(None, ge=0, le=5)
     overall_score: float = Field(..., ge=0, le=100)
     recommendations: List[str] = Field(default_factory=list)
-
