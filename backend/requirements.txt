@@ -1,56 +1,39 @@
-# Web Framework
-fastapi>=0.104.1
-uvicorn[standard]>=0.24.0
-python-multipart>=0.0.6
-python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
-bcrypt<4.0.0
+# Core Framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.9.0
 python-dotenv>=1.0.0
 
+# Google Maps Integration
+googlemaps>=4.10.0
+polyline>=2.0.0
+
 # Database
-sqlalchemy>=2.0.23
-psycopg2-binary>=2.9.9
-alembic>=1.12.1
-geoalchemy2>=0.14.2
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+geoalchemy2>=0.14.0
+alembic>=1.12.0
 
 # Data Processing
-pandas>=2.1.3
-numpy>=1.26.2
-pydantic>=2.5.0
-pydantic-settings>=2.1.0
+pandas>=2.2.0
+numpy>=2.1.0
 
-# Machine Learning
-scikit-learn>=1.3.2
-xgboost>=2.0.2
-joblib>=1.3.2
-# tensorflow>=2.15.0
+# Weather API
+requests>=2.31.0
 
-# Graph Algorithms
-networkx>=3.2.1
-# ortools>=9.9.3963
+# Network Graph Algorithms
+networkx>=3.0
 
-# Maps & Geospatial
-googlemaps>=4.10.0
-geopy>=2.4.1
-shapely>=2.0.2
-folium>=0.15.1
+# API Testing & Development
+pytest>=7.4.0
+httpx>=0.25.0
 
-# HTTP Requests
-httpx>=0.25.2
-aiohttp>=3.9.1
-
-# CORS
-# fastapi-cors is often redundant with fastapi.middleware.cors
-# but if needed:
-# fastapi-cors>=0.0.6
-
-# Utilities
-python-dateutil>=2.8.2
-pytz>=2023.3
-
-# Testing
-pytest>=7.4.3
-pytest-asyncio>=0.21.1
+# Rate Limiting
+slowapi>=0.1.9
 
 # Logging
-loguru>=0.7.2
+loguru>=0.7.0
+
+# Date/Time handling
+python-dateutil>=2.8.0
+pytz>=2023.0

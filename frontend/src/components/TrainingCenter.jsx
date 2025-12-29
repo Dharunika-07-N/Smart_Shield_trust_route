@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import {
     FiRefreshCw, FiDatabase, FiCpu, FiCheckCircle,
-    FiAlertCircle, FiActivity, FiArrowRight
+    FiAlertCircle, FiActivity, FiArrowRight, FiShield
 } from 'react-icons/fi';
 
 const TrainingCenter = () => {
@@ -54,8 +54,8 @@ const TrainingCenter = () => {
                         onClick={handleRetrain}
                         disabled={retraining}
                         className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-bold transition-all ${retraining
-                                ? 'bg-indigo-500/50 cursor-not-allowed'
-                                : 'bg-indigo-500 hover:bg-indigo-600 shadow-lg shadow-indigo-500/30'
+                            ? 'bg-indigo-500/50 cursor-not-allowed'
+                            : 'bg-indigo-500 hover:bg-indigo-600 shadow-lg shadow-indigo-500/30'
                             }`}
                     >
                         <FiRefreshCw className={retraining ? 'animate-spin' : ''} />

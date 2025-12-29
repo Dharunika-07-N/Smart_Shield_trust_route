@@ -22,12 +22,54 @@ from api.schemas.delivery import (
 from api.models.route_optimizer import RouteOptimizer
 from api.services.database import DatabaseService
 from api.services.route_monitor import RouteMonitor
+from api.services.maps import MapsService
 from database.database import get_db
 from loguru import logger
 
 router = APIRouter()
 route_optimizer = RouteOptimizer()
 route_monitor = RouteMonitor()
+maps_service_instance = MapsService()
+
+@router.post("/optimize-route")
+async def optimize_route_simple(
+    origin: dict,
+    destination: dict
+):
+    """Simple route optimization with safety scores for multiple alternatives."""
+    maps_service = MapsService() # Instantiate here to ensure env vars are loaded
+    logger.info(f"Optimize route request: origin={origin}, destination={destination}")
+    
+    if not maps_service.gmaps:
+        logger.error("MapsService gmaps not initialized! check API key.")
+        raise HTTPException(status_code=500, detail="Maps service not configured")
+        
+    # Get multiple route alternatives
+    directions = maps_service.get_directions(origin, destination, alternatives=True)
+    
+    if not directions:
+        logger.error(f"Failed to get directions for {origin} to {destination}")
+        raise HTTPException(status_code=400, detail="Could not calculate routes")
+    
+    routes = []
+    for idx, route in enumerate(directions):
+        if not route.get('legs'):
+            continue
+            
+        leg = route['legs'][0]
+        
+        route_info = {
+            'index': idx,
+            'duration': leg['duration']['value'],
+            'distance': leg['distance']['value'],
+            'summary': route.get('summary', f'Route {idx+1}'),
+            'polyline': route.get('overview_polyline', {}).get('points', ''),
+            'safety_score': maps_service.calculate_safety_score(route),
+            'steps': leg.get('steps', [])
+        }
+        routes.append(route_info)
+    
+    return {'routes': routes}
 
 # WebSocket connection manager
 class ConnectionManager:

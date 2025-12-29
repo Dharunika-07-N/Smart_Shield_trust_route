@@ -1,532 +1,594 @@
-"""Maps API service."""
+"""
+backend/api/services/maps.py - Complete Maps Service with Real Routing
+"""
 import googlemaps
-from typing import List, Dict, Tuple, Optional
-from geopy.distance import distance as geopy_distance
+import requests
+from datetime import datetime
+from typing import List, Dict, Optional, Tuple
+import polyline
+import math
 import sys
 from pathlib import Path
 
+# Add project root to path for imports
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from config.config import settings
 from api.schemas.delivery import Coordinate
-from loguru import logger
+try:
+    from geopy.distance import distance as geopy_distance
+except ImportError:
+    geopy_distance = None
 
 class MapsService:
-    """Service for maps and geocoding operations."""
-    
-    def __init__(self):
-        self.gmaps = None
-        if settings.GOOGLE_MAPS_API_KEY:
-            self.gmaps = googlemaps.Client(key=settings.GOOGLE_MAPS_API_KEY)
-            logger.info("Google Maps client initialized")
+    def __init__(self, api_key: str = None, weather_api_key: Optional[str] = None):
+        # Use provided key or fall back to settings
+        self.api_key = api_key or settings.GOOGLE_MAPS_API_KEY
+        self.weather_api_key = weather_api_key or os.getenv("OPENWEATHER_API_KEY") # Attempt to get from env if not passed
+        
+        if self.api_key:
+            self.gmaps = googlemaps.Client(key=self.api_key)
         else:
-            logger.warning("Google Maps API key not provided")
-    
-    def geocode(self, address: str) -> Optional[Coordinate]:
-        """Geocode an address to coordinates."""
-        if not self.gmaps:
-            logger.warning("Geocoding without API key - returning mock data")
-            return Coordinate(latitude=40.7128, longitude=-74.0060)
-        
-        try:
-            geocode_result = self.gmaps.geocode(address)
-            if geocode_result:
-                location = geocode_result[0]['geometry']['location']
-                return Coordinate(
-                    latitude=location['lat'],
-                    longitude=location['lng']
-                )
-        except Exception as e:
-            logger.error(f"Geocoding error: {e}")
-        
-        return None
-    
-    def reverse_geocode(self, coord: Coordinate) -> Optional[str]:
-        """Reverse geocode coordinates to address."""
-        if not self.gmaps:
-            return "Unknown Address"
-        
-        try:
-            result = self.gmaps.reverse_geocode((coord.latitude, coord.longitude))
-            if result:
-                return result[0].get('formatted_address', 'Unknown Address')
-        except Exception as e:
-            logger.error(f"Reverse geocoding error: {e}")
-        
-        return None
-    
-    def calculate_distance_matrix(
-        self,
-        origins: List[Coordinate],
-        destinations: List[Coordinate],
-        mode: str = "driving"
-    ) -> Optional[List[List[Dict]]]:
-        """Calculate distance matrix between multiple points."""
-        if not self.gmaps:
-            # Return mock distance matrix
-            logger.warning("Distance matrix without API key - returning mock data")
-            return self._mock_distance_matrix(origins, destinations)
-        
-        try:
-            origins_list = [(c.latitude, c.longitude) for c in origins]
-            destinations_list = [(c.latitude, c.longitude) for c in destinations]
+            self.gmaps = None
+            print("Warning: Google Maps API key not provided")
             
-            result = self.gmaps.distance_matrix(
-                origins_list,
-                destinations_list,
-                mode=mode,
-                units="metric"
+        # Crime data by district (Tamil Nadu 2022)
+        self.crime_data = {
+            'Coimbatore': {'murders': 45, 'theft': 890, 'accidents': 1245, 'total': 2180},
+            'Chennai': {'murders': 89, 'theft': 2340, 'accidents': 2890, 'total': 5319},
+            'Madurai': {'murders': 67, 'theft': 1120, 'accidents': 1567, 'total': 2754},
+            'Tiruchirappalli': {'murders': 34, 'theft': 670, 'accidents': 890, 'total': 1594},
+            'Salem': {'murders': 56, 'theft': 780, 'accidents': 1123, 'total': 1959},
+            'Tiruppur': {'murders': 23, 'theft': 450, 'accidents': 678, 'total': 1151},
+        }
+
+    def _get_lat_lng(self, point: any) -> Tuple[float, float]:
+        """Utility to convert various point formats to (lat, lng) tuple"""
+        if hasattr(point, 'latitude'):
+            return (point.latitude, point.longitude)
+        if isinstance(point, dict):
+            if 'lat' in point: return (point['lat'], point['lng'])
+            if 'latitude' in point: return (point['latitude'], point['longitude'])
+        return point
+
+    def get_directions(
+        self, 
+        origin: any, 
+        destination: any, 
+        waypoints: Optional[List[any]] = None,
+        alternatives: bool = True,
+        **kwargs
+    ) -> Optional[List[Dict]]:
+        """
+        Get driving directions with multiple alternatives and traffic data
+        """
+        if not self.gmaps:
+            return self._get_mock_directions(origin, destination, waypoints)
+            
+        try:
+            orig = self._get_lat_lng(origin)
+            dest = self._get_lat_lng(destination)
+            
+            # Prepare waypoints if multi-stop delivery
+            waypoint_list = None
+            if waypoints:
+                waypoint_list = [f"{self._get_lat_lng(wp)[0]},{self._get_lat_lng(wp)[1]}" for wp in waypoints]
+            
+            directions = self.gmaps.directions(
+                origin=orig,
+                destination=dest,
+                waypoints=waypoint_list,
+                mode="driving",
+                alternatives=alternatives,
+                departure_time=datetime.now(),
+                traffic_model="best_guess",
+                optimize_waypoints=True if waypoints else False
             )
             
-            if result['status'] == 'OK':
-                return result['rows']
-        except Exception as e:
-            logger.error(f"Distance matrix error: {e}")
-        
-        return None
-    
-    def get_directions(
-        self,
-        origin: Coordinate,
-        destination: Coordinate,
-        waypoints: Optional[List[Coordinate]] = None,
-        mode: str = "driving",
-        avoid: Optional[List[str]] = None,
-        departure_time: Optional[int] = None,
-        traffic_model: str = "best_guess"
-    ) -> Optional[Dict]:
-        """
-        Get directions between points with traffic-aware routing.
-        
-        Args:
-            origin: Starting point
-            destination: End point
-            waypoints: Intermediate waypoints
-            mode: Transportation mode (driving, walking, bicycling)
-            avoid: Things to avoid (tolls, highways, ferries, indoor)
-            departure_time: Unix timestamp for traffic prediction (None = current time)
-            traffic_model: Traffic model (best_guess, optimistic, pessimistic)
-        """
-        if not self.gmaps:
-            logger.warning("Directions without API key - returning mock data")
-            return self._mock_directions(origin, destination)
-        
-        try:
-            origin_str = f"{origin.latitude},{origin.longitude}"
-            dest_str = f"{destination.latitude},{destination.longitude}"
-            
-            waypoints_list = None
-            if waypoints:
-                waypoints_list = [
-                    f"{w.latitude},{w.longitude}" for w in waypoints
-                ]
-            
-            # Build directions request
-            directions_params = {
-                "origin": origin_str,
-                "destination": dest_str,
-                "mode": mode,
-                "avoid": avoid or [],
-                "units": "metric",
-                "alternatives": True  # Get multiple route options
-            }
-            
-            # Add traffic-aware parameters for driving mode
-            if mode == "driving" and departure_time:
-                directions_params["departure_time"] = departure_time
-                directions_params["traffic_model"] = traffic_model
-            
-            if waypoints_list:
-                directions_params["waypoints"] = waypoints_list
-            
-            directions = self.gmaps.directions(**directions_params)
-            
-            if directions:
-                # Return the best route (first one) with traffic info
-                route = directions[0]
-                
-                # Extract route geometry (polyline)
-                if 'overview_polyline' in route:
-                    polyline_points = route['overview_polyline'].get('points', '')
-                    
-                    # Decode polyline to get coordinates (simplified - in production use polyline library)
-                    # For now, extract from legs
-                    route_coords = []
-                    instructions = []
-                    for leg in route.get('legs', []):
-                        for step in leg.get('steps', []):
-                            start = step.get('start_location', {})
-                            route_coords.append({
-                                'lat': start.get('lat'),
-                                'lng': start.get('lng')
-                            })
-                            end = step.get('end_location', {})
-                            route_coords.append({
-                                'lat': end.get('lat'),
-                                'lng': end.get('lng')
-                            })
-                            
-                            # Extract instruction
-                            if 'html_instructions' in step:
-                                # Clean HTML tags if needed, or keep for frontend to render
-                                instructions.append(step['html_instructions'])
-                    
-                    route['route_coordinates'] = route_coords
-                    route['instructions'] = instructions
-                    route['polyline'] = polyline_points
-                
-                # Add traffic duration if available
-                for leg in route.get('legs', []):
-                    if 'duration_in_traffic' in leg:
-                        route['has_traffic_data'] = True
-                        break
-                
-                return route
-        except Exception as e:
-            logger.error(f"Directions error: {e}")
-        
-        return None
-    
-    def get_all_directions(
-        self,
-        origin: Coordinate,
-        destination: Coordinate,
-        mode: str = "driving",
-        avoid: Optional[List[str]] = None,
-        departure_time: Optional[int] = None,
-        traffic_model: str = "best_guess"
-    ) -> List[Dict]:
-        """
-        Get all available route options between points.
-        
-        Args:
-            origin: Starting point
-            destination: End point
-            mode: Transportation mode
-            avoid: Things to avoid
-            departure_time: Unix timestamp for traffic
-            traffic_model: Traffic model
-            
-        Returns:
-            List of route dictionaries
-        """
-        if not self.gmaps:
-            logger.warning("Directions without API key - returning mock data")
-            return self._generate_mock_alternatives(origin, destination)
-        
-        try:
-            origin_str = f"{origin.latitude},{origin.longitude}"
-            dest_str = f"{destination.latitude},{destination.longitude}"
-            
-            # Build directions request
-            directions_params = {
-                "origin": origin_str,
-                "destination": dest_str,
-                "mode": mode,
-                "avoid": avoid or [],
-                "units": "metric",
-                "alternatives": True  # Get multiple route options
-            }
-            
-            # Add traffic-aware parameters for driving mode
-            if mode == "driving" and departure_time:
-                directions_params["departure_time"] = departure_time
-                directions_params["traffic_model"] = traffic_model
-            
-            directions = self.gmaps.directions(**directions_params)
-            
-            routes = []
-            if directions:
-                for route in directions:
-                    # Extract route geometry (polyline)
-                    if 'overview_polyline' in route:
-                        polyline_points = route['overview_polyline'].get('points', '')
-                        
-                        # Extract coords from legs
-                        route_coords = []
-                        instructions = []
-                        for leg in route.get('legs', []):
-                            for step in leg.get('steps', []):
-                                start = step.get('start_location', {})
-                                route_coords.append({
-                                    'lat': start.get('lat'),
-                                    'lng': start.get('lng')
-                                })
-                                end = step.get('end_location', {})
-                                route_coords.append({
-                                    'lat': end.get('lat'),
-                                    'lng': end.get('lng')
-                                })
-                                
-                                if 'html_instructions' in step:
-                                    instructions.append(step['html_instructions'])
-                        
-                        route['route_coordinates'] = route_coords
-                        route['instructions'] = instructions
-                        route['polyline'] = polyline_points
-                    
-                    # Add traffic duration if available
-                    for leg in route.get('legs', []):
-                        if 'duration_in_traffic' in leg:
-                            route['has_traffic_data'] = True
-                            break
-                    
-                    routes.append(route)
-                
-                if routes:
-                    return routes
-                
-        except Exception as e:
-            logger.error(f"Directions error: {e}")
-        
-        # Fallback to mock if API fails or returns no routes
-        logger.warning(f"Falling back to mock directions for {origin} -> {destination}")
-        return self._generate_mock_alternatives(origin, destination)
+            if not directions:
+                return self._get_mock_directions(origin, destination, waypoints)
 
-    def _generate_mock_alternatives(self, origin: Coordinate, destination: Coordinate) -> List[Dict]:
-        """Generate multiple mock route alternatives with different characteristics."""
+            # Post-process for backward compatibility (adding route_coordinates)
+            for route in directions:
+                route_coords = []
+                for leg in route.get('legs', []):
+                    for step in leg.get('steps', []):
+                        start = step.get('start_location', {})
+                        route_coords.append({'lat': start.get('lat'), 'lng': start.get('lng')})
+                        end = step.get('end_location', {})
+                        route_coords.append({'lat': end.get('lat'), 'lng': end.get('lng')})
+                route['route_coordinates'] = route_coords
+            
+            return directions
+        except Exception as e:
+            logger.warning(f"Google Maps API error: {e}. Falling back to mock data.")
+            return self._get_mock_directions(origin, destination, waypoints)
+
+    def _get_mock_directions(self, origin, destination, waypoints=None) -> List[Dict]:
+        """Generate mock directions when API is unavailable"""
+        orig = self._get_lat_lng(origin)
+        dest = self._get_lat_lng(destination)
+        
+        # Simple straight line route
+        mock_route = {
+            'summary': 'Mock Route (Billing Required for Real Data)',
+            'legs': [{
+                'distance': {'text': '15.5 km', 'value': 15500},
+                'duration': {'text': '25 mins', 'value': 1500},
+                'start_address': f'{orig[0]}, {orig[1]}',
+                'end_address': f'{dest[0]}, {dest[1]}',
+                'steps': [{
+                    'distance': {'text': '15.5 km', 'value': 15500},
+                    'duration': {'text': '25 mins', 'value': 1500},
+                    'html_instructions': 'Head towards destination',
+                    'start_location': {'lat': orig[0], 'lng': orig[1]},
+                    'end_location': {'lat': dest[0], 'lng': dest[1]}
+                }]
+            }],
+            'overview_polyline': {'points': polyline.encode([orig, dest])},
+            'route_coordinates': [
+                {'lat': orig[0], 'lng': orig[1]},
+                {'lat': dest[0], 'lng': dest[1]}
+            ]
+        }
+        return [mock_route]
+    
+    def process_routes(
+        self, 
+        directions: List[Dict], 
+        origin: any
+    ) -> List[Dict]:
+        """Process and score multiple route alternatives"""
         routes = []
         
-        # 1. Standard/Fastest Route (Straight-ish)
-        routes.append(self._mock_directions(origin, destination, "fastest", 0))
-        
-        # 2. Safer Route (Slightly longer diversion)
-        routes.append(self._mock_directions(origin, destination, "safest", 0.012))
-        
-        # 3. Alternative Route (Larger diversion)
-        routes.append(self._mock_directions(origin, destination, "alternative", -0.018))
-        
-        return routes
-
-    def decode_polyline(self, encoded: str) -> List[Dict]:
-        """Decode Google polyline string to list of coordinates."""
-        try:
-            import polyline
-            coords = polyline.decode(encoded)
-            return [{'lat': lat, 'lng': lon} for lat, lon in coords]
-        except ImportError:
-            logger.warning("polyline library not installed, using fallback")
-            return []
-    
-    def _mock_distance_matrix(
-        self,
-        origins: List[Coordinate],
-        destinations: List[Coordinate]
-    ) -> List[List[Dict]]:
-        """Generate mock distance matrix using haversine distance."""
-        matrix = []
-        for origin in origins:
-            row = []
-            for dest in destinations:
-                dist = geopy_distance(
-                    (origin.latitude, origin.longitude),
-                    (dest.latitude, dest.longitude)
-                ).meters
-                
-                # Rough time estimate: 30 km/h average
-                duration = dist / 8.33  # 8.33 m/s
-                
-                row.append({
-                    'distance': {'value': int(dist), 'text': f"{dist/1000:.1f} km"},
-                    'duration': {'value': int(duration), 'text': f"{duration/60:.1f} mins"}
-                })
-            matrix.append(row)
-        
-        return matrix
-    
-    def _mock_directions(
-        self,
-        origin: Coordinate,
-        destination: Coordinate,
-        name: str = "standard",
-        offset: float = 0
-    ) -> Dict:
-        """Generate mock directions data with variability."""
-        # Calculate base metrics
-        base_dist = geopy_distance(
-            (origin.latitude, origin.longitude),
-            (destination.latitude, destination.longitude)
-        ).meters
-        
-        # Add variability based on offset
-        # Offset shifts the midpoint to create a 'curve'
-        dist_factor = 1.0 + abs(offset) * 10 
-        dist = base_dist * dist_factor
-        
-        # Slower speed for safer/alternative routes in mock
-        speed = 8.33 # ~30km/h
-        if offset != 0:
-            speed = 7.5 # ~27km/h
+        for idx, route in enumerate(directions):
+            leg = route['legs'][0]
             
-        duration = dist / speed
-        
-        # Mock route coordinates (curved path using offset)
-        num_points = 8
-        route_coords = []
-        for i in range(num_points + 1):
-            ratio = i / num_points
-            # Linear interpolation
-            lat = origin.latitude + (destination.latitude - origin.latitude) * ratio
-            lng = origin.longitude + (destination.longitude - origin.longitude) * ratio
-            
-            # Add 'bulge' in the middle based on offset
-            # bulge follows a simple parabola: offset * (1 - (2*ratio - 1)^2)
-            bulge = offset * (1.0 - (2.0 * ratio - 1.0)**2)
-            
-            # Apply bulge perpendicular to the general direction (simplified as adding to lat/lng)
-            route_coords.append({
-                'lat': lat + bulge,
-                'lng': lng + bulge * 0.5
-            })
-            
-        instructions = [
-            f'Head towards {name} route direction',
-            f'Continue on path with {abs(offset)*1000:.1f}m diversion',
-            'Arrive at destination'
-        ]
-        
-        return {
-            'legs': [{
-                'distance': {'value': int(dist), 'text': f"{dist/1000:.1f} km"},
-                'duration': {'value': int(duration), 'text': f"{duration/60:.1f} mins"},
-                'steps': [
-                    {
-                        'html_instructions': instructions[0],
-                        'start_location': {'lat': origin.latitude, 'lng': origin.longitude},
-                        'end_location': {'lat': route_coords[2]['lat'], 'lng': route_coords[2]['lng']}
-                    },
-                    {
-                        'html_instructions': instructions[1],
-                        'start_location': {'lat': route_coords[2]['lat'], 'lng': route_coords[2]['lng']},
-                        'end_location': {'lat': route_coords[6]['lat'], 'lng': route_coords[6]['lng']}
-                    },
-                    {
-                         'html_instructions': instructions[2],
-                         'start_location': {'lat': route_coords[6]['lat'], 'lng': route_coords[6]['lng']},
-                         'end_location': {'lat': destination.latitude, 'lng': destination.longitude}
-                    }
-                ]
-            }],
-            'route_coordinates': route_coords,
-            'instructions': instructions,
-            'overview_polyline': {'points': ''}
-        }
-    
-    def calculate_straight_distance(
-        self,
-        coord1: Coordinate,
-        coord2: Coordinate
-    ) -> float:
-        """Calculate straight-line distance between two points in meters."""
-        return geopy_distance(
-            (coord1.latitude, coord1.longitude),
-            (coord2.latitude, coord2.longitude)
-        ).meters
-
-    def find_nearby_places(
-            self,
-            location: Coordinate,
-            radius_meters: int = 2000,
-            place_type: str = "police"
-        ) -> List[Dict]:
-            """
-            Find nearby places using Google Places API.
-            
-            Args:
-                location: Search center
-                radius_meters: Search radius in meters
-                place_type: Type of place to search (police, hospital, store, etc.)
-            
-            Returns:
-                List of places with details
-            """
-            if not self.gmaps:
-                logger.warning("Places search without API key - returning empty list")
-                # Return mock data for development
-                return self._mock_nearby_places(location, place_type)
-            
-            try:
-                # Search nearby places
-                places_result = self.gmaps.places_nearby(
-                    location=(location.latitude, location.longitude),
-                    radius=radius_meters,
-                    type=place_type
-                )
-                
-                places = []
-                if 'results' in places_result:
-                    for result in places_result['results']:
-                        place = {
-                            "name": result.get('name'),
-                            "location": {
-                                "latitude": result['geometry']['location']['lat'],
-                                "longitude": result['geometry']['location']['lng']
-                            },
-                            "address": result.get('vicinity'),
-                            "place_id": result.get('place_id'),
-                            "rating": result.get('rating'),
-                            "types": result.get('types', []),
-                            "is_open": result.get('opening_hours', {}).get('open_now')
-                        }
-                        
-                        # Calculate distance from search center
-                        dist = self.calculate_straight_distance(
-                            location,
-                            Coordinate(
-                                latitude=place['location']['latitude'],
-                                longitude=place['location']['longitude']
-                            )
-                        )
-                        place['distance_meters'] = dist
-                        
-                        places.append(place)
-                
-                return places
-                
-            except Exception as e:
-                logger.error(f"Places search error: {e}")
-                return []
-
-    def _mock_nearby_places(self, location: Coordinate, place_type: str) -> List[Dict]:
-        """Generate mock nearby places."""
-        import random
-        
-        places = []
-        count = random.randint(1, 5)
-        
-        for i in range(count):
-            # Random offset from current location
-            lat_offset = (random.random() - 0.5) * 0.02
-            lng_offset = (random.random() - 0.5) * 0.02
-            
-            place_lat = location.latitude + lat_offset
-            place_lng = location.longitude + lng_offset
-            
-            dist = self.calculate_straight_distance(
-                location,
-                Coordinate(latitude=place_lat, longitude=place_lng)
+            # Extract route geometry
+            polyline_points = self.decode_polyline(
+                route['overview_polyline']['points']
             )
             
-            if place_type == "police":
-                name = f"Police Station {i+1}"
-            elif place_type == "hospital":
-                name = f"City Hospital {i+1}"
-            else:
-                name = f"Safe Store {i+1}"
+            # Calculate comprehensive scores
+            safety_score = self.calculate_safety_score(route, polyline_points)
+            weather_score = self.get_weather_impact(polyline_points[0])
             
-            places.append({
-                "name": name,
-                "location": {
-                    "latitude": place_lat,
-                    "longitude": place_lng
-                },
-                "address": f"Mock Address {i+1}",
-                "place_id": f"mock_place_{i}",
-                "rating": 4.5,
-                "types": [place_type, "establishment"],
-                "distance_meters": dist,
-                "is_open": True
-            })
+            # Extract turn-by-turn instructions
+            turn_by_turn = self.extract_turn_by_turn(leg['steps'])
             
-        return places
+            route_info = {
+                'index': idx,
+                'duration': leg['duration']['value'],  # seconds
+                'duration_in_traffic': leg.get('duration_in_traffic', {}).get('value', leg['duration']['value']),
+                'distance': leg['distance']['value'],  # meters
+                'summary': route['summary'],
+                'polyline': route['overview_polyline']['points'],
+                'polyline_decoded': [{'lat': p[0], 'lng': p[1]} for p in polyline_points],
+                'safety_score': safety_score,
+                'weather_score': weather_score,
+                'speed_score': self.calculate_speed_score(leg),
+                'distance_score': self.calculate_distance_score(leg),
+                'turn_by_turn': turn_by_turn,
+                'warnings': self.generate_warnings(safety_score, weather_score),
+                'waypoint_order': route.get('waypoint_order', []),
+                'route_coordinates': route.get('route_coordinates', [])
+            }
+            
+            # Calculate composite score
+            route_info['composite_score'] = self.calculate_composite_score(route_info)
+            
+            routes.append(route_info)
+        
+        # Sort by composite score
+        routes.sort(key=lambda x: x['composite_score'], reverse=True)
+        
+        return routes
+    
+    def decode_polyline(self, polyline_str: str) -> List[Tuple[float, float]]:
+        """Decode Google Maps polyline to list of coordinates"""
+        return polyline.decode(polyline_str)
+    
+    def calculate_safety_score(
+        self, 
+        route_data: Dict, 
+        polyline_points: Optional[List[Tuple[float, float]]] = None
+    ) -> int:
+        """Calculate comprehensive safety score"""
+        score = 70  # Base score
+        
+        # 1. Highway bonus (safer, faster)
+        summary = route_data.get('summary', '').lower()
+        if any(term in summary for term in ['highway', 'expressway', 'nh', 'sh']):
+            score += 15
+        
+        # 2. Route complexity penalty
+        leg = route_data['legs'][0]
+        turn_count = len(leg['steps'])
+        score -= min(10, turn_count / 5)
+        
+        # 3. Time-based adjustment
+        hour = datetime.now().hour
+        if hour >= 22 or hour <= 6:  # Night hours
+            score -= 15
+        elif 6 <= hour <= 9 or 17 <= hour <= 20:  # Peak hours
+            score -= 5
+        
+        # 4. District crime data
+        if polyline_points is None:
+            # Fallback for compatibility if polyline is not decoded yet
+            if 'overview_polyline' in route_data:
+                polyline_points = self.decode_polyline(route_data['overview_polyline']['points'])
+        
+        if polyline_points:
+            district = self.get_district_from_route(polyline_points)
+            if district and district in self.crime_data:
+                crime_rate = self.crime_data[district]['total']
+                # Normalize crime rate (lower is better)
+                crime_penalty = min(15, crime_rate / 200)
+                score -= crime_penalty
+        
+        # 5. Route length consideration (longer routes = more exposure)
+        distance_km = leg['distance']['value'] / 1000
+        if distance_km > 50:
+            score -= 10
+        elif distance_km > 30:
+            score -= 5
+        
+        return max(0, min(100, int(score)))
+    
+    def get_district_from_route(self, polyline_points: List[Tuple[float, float]]) -> Optional[str]:
+        """Determine district from route midpoint"""
+        if not polyline_points:
+            return None
+        
+        mid_point = polyline_points[len(polyline_points) // 2]
+        
+        # Approximate district boundaries (simplified)
+        lat, lng = mid_point
+        
+        # Coimbatore region
+        if 10.8 <= lat <= 11.2 and 76.8 <= lng <= 77.1:
+            return 'Coimbatore'
+        # Tiruppur region
+        elif 11.0 <= lat <= 11.2 and 77.2 <= lng <= 77.5:
+            return 'Tiruppur'
+        # Chennai region (Approximate)
+        elif 12.8 <= lat <= 13.2 and 80.1 <= lng <= 80.4:
+            return 'Chennai'
+        # Madurai region (Approximate)
+        elif 9.8 <= lat <= 10.0 and 78.0 <= lng <= 78.3:
+            return 'Madurai'
+        
+        return None
+    
+    def get_weather_impact(self, location: Tuple[float, float]) -> int:
+        """Get weather conditions and calculate impact score"""
+        if not self.weather_api_key or self.weather_api_key == "YOUR_OPENWEATHER_KEY":
+            return 85  # Default good weather score
+        
+        try:
+            url = f"http://api.openweathermap.org/data/2.5/weather"
+            params = {
+                'lat': location[0],
+                'lon': location[1],
+                'appid': self.weather_api_key,
+                'units': 'metric'
+            }
+            
+            response = requests.get(url, params=params, timeout=5)
+            data = response.json()
+            
+            if response.status_code != 200:
+                return 85
 
+            score = 100
+            
+            # Rain penalty
+            if 'rain' in data:
+                rain_mm = data['rain'].get('1h', 0)
+                score -= min(30, rain_mm * 3)
+            
+            # Visibility penalty
+            visibility = data.get('visibility', 10000)
+            if visibility < 1000:
+                score -= 20
+            elif visibility < 5000:
+                score -= 10
+            
+            # Wind penalty
+            wind_speed = data.get('wind', {}).get('speed', 0)
+            if wind_speed > 15:  # Strong wind
+                score -= 15
+            elif wind_speed > 10:
+                score -= 5
+            
+            return max(0, min(100, int(score)))
+            
+        except Exception as e:
+            print(f"Weather API error: {e}")
+            return 85
+    
+    def calculate_speed_score(self, leg: Dict) -> int:
+        """Calculate speed efficiency score"""
+        distance_m = leg['distance']['value']
+        duration_s = leg.get('duration_in_traffic', leg['duration'])['value']
+        
+        if duration_s == 0: return 100
+        
+        # Calculate average speed (km/h)
+        avg_speed = (distance_m / 1000) / (duration_s / 3600)
+        
+        # Score based on speed (optimal is 40-60 km/h in city)
+        if 40 <= avg_speed <= 60:
+            return 100
+        elif 30 <= avg_speed < 40 or 60 < avg_speed <= 70:
+            return 85
+        elif 20 <= avg_speed < 30 or 70 < avg_speed <= 80:
+            return 70
+        else:
+            return 50
+    
+    def calculate_distance_score(self, leg: Dict) -> int:
+        """Calculate distance efficiency score"""
+        distance_km = leg['distance']['value'] / 1000
+        
+        # Shorter is generally better, but normalize to 0-100
+        if distance_km <= 5:
+            return 100
+        elif distance_km <= 15:
+            return 90
+        elif distance_km <= 30:
+            return 75
+        elif distance_km <= 50:
+            return 60
+        else:
+            return max(40, 100 - int(distance_km))
+    
+    def extract_turn_by_turn(self, steps: List[Dict]) -> List[Dict]:
+        """Extract detailed turn-by-turn navigation instructions"""
+        instructions = []
+        
+        for idx, step in enumerate(steps):
+            instruction = {
+                'step_number': idx + 1,
+                'distance': step['distance']['text'],
+                'distance_value': step['distance']['value'],
+                'duration': step['duration']['text'],
+                'duration_value': step['duration']['value'],
+                'instruction': step['html_instructions'],
+                'maneuver': step.get('maneuver', 'straight'),
+                'start_location': step['start_location'],
+                'end_location': step['end_location']
+            }
+            instructions.append(instruction)
+        
+        return instructions
+    
+    def calculate_composite_score(self, route_info: Dict) -> float:
+        """Calculate weighted composite score for route ranking"""
+        weights = {
+            'safety': 0.40,
+            'speed': 0.25,
+            'distance': 0.20,
+            'weather': 0.15
+        }
+        
+        composite = (
+            route_info['safety_score'] * weights['safety'] +
+            route_info['speed_score'] * weights['speed'] +
+            route_info['distance_score'] * weights['distance'] +
+            route_info['weather_score'] * weights['weather']
+        )
+        
+        return round(composite, 2)
+    
+    def generate_warnings(self, safety_score: int, weather_score: int) -> List[str]:
+        """Generate route warnings based on conditions"""
+        warnings = []
+        
+        if safety_score < 50:
+            warnings.append("⚠️ Low safety score - Consider alternative route")
+        elif safety_score < 70:
+            warnings.append("⚡ Moderate safety - Stay alert")
+        
+        if weather_score < 60:
+            warnings.append("🌧️ Poor weather conditions - Drive carefully")
+        elif weather_score < 80:
+            warnings.append("☁️ Weather may affect travel time")
+        
+        hour = datetime.now().hour
+        if hour >= 22 or hour <= 6:
+            warnings.append("🌙 Night travel - Extra caution advised")
+        
+        return warnings
+    
+    def create_safety_heatmap_data(
+        self, 
+        bounds: Dict[str, Dict[str, float]]
+    ) -> List[Dict]:
+        """
+        Generate safety heatmap data for map overlay
+        """
+        heatmap_points = []
+        
+        # Create grid of points within bounds
+        lat_step = (bounds['northeast']['lat'] - bounds['southwest']['lat']) / 20
+        lng_step = (bounds['northeast']['lng'] - bounds['southwest']['lng']) / 20
+        
+        for i in range(21):
+            for j in range(21):
+                lat = bounds['southwest']['lat'] + (i * lat_step)
+                lng = bounds['southwest']['lng'] + (j * lng_step)
+                
+                # Calculate safety intensity for this point
+                district = self.get_district_from_route([(lat, lng)])
+                intensity = self.calculate_point_safety(lat, lng, district)
+                
+                heatmap_points.append({
+                    'lat': lat,
+                    'lng': lng,
+                    'intensity': intensity
+                })
+        
+        return heatmap_points
+    
+    def calculate_point_safety(
+        self, 
+        lat: float, 
+        lng: float, 
+        district: Optional[str]
+    ) -> float:
+        """Calculate safety intensity for a point (0-1, higher is safer)"""
+        base_safety = 0.7
+        
+        # District crime factor
+        if district and district in self.crime_data:
+            crime_rate = self.crime_data[district]['total']
+            crime_factor = max(0, 1 - (crime_rate / 5000))
+            base_safety = (base_safety + crime_factor) / 2
+        
+        # Time factor
+        hour = datetime.now().hour
+        if hour >= 22 or hour <= 6:
+            base_safety *= 0.7
+        elif 6 <= hour <= 9 or 17 <= hour <= 20:
+            base_safety *= 0.85
+        
+        return round(base_safety, 2)
+    
+    def optimize_multi_stop_route(
+        self, 
+        origin: any,
+        destination: any,
+        stops: List[any]
+    ) -> Dict:
+        """
+        Optimize route for multiple delivery stops
+        """
+        orig = self._get_lat_lng(origin)
+        dest = self._get_lat_lng(destination)
+        stop_list = [self._get_lat_lng(s) for s in stops]
+        
+        directions = self.get_directions(
+            origin=orig,
+            destination=dest,
+            waypoints=stop_list,
+            alternatives=False
+        )
+        
+        if not directions:
+            return None
+        
+        route = directions[0]
+        optimized_order = route.get('waypoint_order', [])
+        
+        # Calculate total metrics
+        total_distance = sum(leg['distance']['value'] for leg in route['legs'])
+        total_duration = sum(leg['duration']['value'] for leg in route['legs'])
+        
+        # Extract polyline for entire route
+        polyline_points = self.decode_polyline(route['overview_polyline']['points'])
+        
+        return {
+            'optimized_order': optimized_order,
+            'total_distance': total_distance,
+            'total_duration': total_duration,
+            'total_distance_text': f"{total_distance / 1000:.1f} km",
+            'total_duration_text': f"{total_duration // 60} min",
+            'polyline': route['overview_polyline']['points'],
+            'polyline_decoded': [{'lat': p[0], 'lng': p[1]} for p in polyline_points],
+            'legs': [
+                {
+                    'distance': leg['distance']['text'],
+                    'duration': leg['duration']['text'],
+                    'start_address': leg['start_address'],
+                    'end_address': leg['end_address']
+                }
+                for leg in route['legs']
+            ],
+            'safety_score': self.calculate_safety_score(route, polyline_points)
+        }
+    
+    # --- Compatibility Methods ---
+    
+    def calculate_straight_distance(self, coord1: Coordinate, coord2: Coordinate) -> float:
+        """Calculate straight-line distance in meters (Required by RouteOptimizer)"""
+        if geopy_distance:
+            return geopy_distance(
+                (coord1.latitude, coord1.longitude),
+                (coord2.latitude, coord2.longitude)
+            ).meters
+        # Simple Euclidean fallback if geopy is missing
+        return ((coord1.latitude - coord2.latitude)**2 + (coord1.longitude - coord2.longitude)**2)**0.5 * 111000
+
+    def geocode(self, address: str) -> Optional[Coordinate]:
+        """Geocode an address (Required by Auth/Registration)"""
+        res = self.geocode_address(address)
+        if res:
+            return Coordinate(latitude=res['lat'], longitude=res['lng'])
+        return None
+
+    def geocode_address(self, address: str) -> Optional[Dict[str, float]]:
+        """Convert address to coordinates"""
+        if not self.gmaps: return None
+        try:
+            result = self.gmaps.geocode(address)
+            if result:
+                location = result[0]['geometry']['location']
+                return {'lat': location['lat'], 'lng': location['lng']}
+        except Exception as e:
+            print(f"Geocoding error: {e}")
+        return None
+    
+    def reverse_geocode(self, lat_or_coord: any, lng: Optional[float] = None) -> Optional[str]:
+        """Convert coordinates to address (Supports both signatures)"""
+        if not self.gmaps: return "Unknown Address"
+        try:
+            if hasattr(lat_or_coord, 'latitude'):
+                lat, lng = lat_or_coord.latitude, lat_or_coord.longitude
+            elif isinstance(lat_or_coord, (int, float)) and lng is not None:
+                lat, lng = lat_or_coord, lng
+            else:
+                return "Unknown Address"
+                
+            result = self.gmaps.reverse_geocode((lat, lng))
+            if result:
+                return result[0]['formatted_address']
+        except Exception as e:
+            print(f"Reverse geocoding error: {e}")
+        return "Unknown Address"
+
+    def get_all_directions(self, origin: any, destination: any, **kwargs) -> List[Dict]:
+        """Get all route variations (Required by RouteOptimizer)"""
+        return self.get_directions(origin, destination, alternatives=True, **kwargs)
+
+    def find_nearby_places(self, location: Coordinate, radius_meters: int = 2000, place_type: str = "police") -> List[Dict]:
+        """Find nearby places (Required by SafetyService)"""
+        if not self.gmaps: return []
+        try:
+            places_result = self.gmaps.places_nearby(
+                location=(location.latitude, location.longitude),
+                radius=radius_meters,
+                type=place_type
+            )
+            places = []
+            if 'results' in places_result:
+                for result in places_result['results']:
+                    places.append({
+                        "name": result.get('name'),
+                        "location": {
+                            "latitude": result['geometry']['location']['lat'],
+                            "longitude": result['geometry']['location']['lng']
+                        },
+                        "address": result.get('vicinity'),
+                        "place_id": result.get('place_id'),
+                        "is_open": result.get('opening_hours', {}).get('open_now'),
+                        "distance_meters": self.calculate_straight_distance(
+                            location, 
+                            Coordinate(latitude=result['geometry']['location']['lat'], longitude=result['geometry']['location']['lng'])
+                        )
+                    })
+            return places
+        except Exception:
+            return []
+import os

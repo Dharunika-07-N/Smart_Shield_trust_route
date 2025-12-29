@@ -28,8 +28,9 @@ const RouteMap = () => {
   const [alternatives, setAlternatives] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [query, setQuery] = useState('');
-  const [searching, setSearching] = useState(false);
+  const [startQuery, setStartQuery] = useState('');
+  const [destQuery, setDestQuery] = useState('');
+  const [searching, setSearching] = useState(null); // 'start' or 'destination' or null
   const [results, setResults] = useState([]);
   const [safetyOverlay, setSafetyOverlay] = useState(null);
   const [showSafetyOverlay, setShowSafetyOverlay] = useState(true);
@@ -56,10 +57,11 @@ const RouteMap = () => {
 
   // Update current position when location changes
   useEffect(() => {
-    if (location) {
+    if (location && !startQuery) {
       setCurrentPos([location.latitude, location.longitude]);
+      setStartQuery('Current Location');
     }
-  }, [location]);
+  }, [location, startQuery]);
 
   // Mock route data with traffic relative to base location
   const routes = useMemo(() => [
@@ -123,10 +125,10 @@ const RouteMap = () => {
     }
   };
 
-  // Destination search via Nominatim
-  const searchPlaces = async (text) => {
+  // Search via Nominatim
+  const searchPlaces = async (text, type) => {
     if (!text || text.length < 3) { setResults([]); return; }
-    setSearching(true);
+    setSearching(type);
     try {
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(text)}`;
       const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
@@ -135,7 +137,8 @@ const RouteMap = () => {
     } catch (e) {
       // ignore
     } finally {
-      setSearching(false);
+      // Small delay to allow click to register before results disappear if needed,
+      // but usually not needed with React state.
     }
   };
 
@@ -158,7 +161,7 @@ const RouteMap = () => {
 
   const optimize = async () => {
     if (!currentPos || !destPos) {
-      setError('Please select a destination by searching or clicking on the map');
+      setError('Please select both a starting point and a destination by searching or clicking on the map');
       return;
     }
 
@@ -419,13 +422,14 @@ const RouteMap = () => {
         if (selectionMode === 'start') {
           console.log('Start point selected from map click:', coords);
           setCurrentPos(coords);
+          setStartQuery(`${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}`);
           // Auto-switch to destination mode after setting start
           setSelectionMode('destination');
         } else {
           console.log('Destination selected from map click:', coords);
           setDestPos(coords);
           // Clear search query when clicking on map
-          setQuery('');
+          setDestQuery(`${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}`);
           setResults([]);
         }
       }
@@ -450,27 +454,83 @@ const RouteMap = () => {
             <h3 className="font-semibold text-gray-900 mb-4">Route Planner</h3>
             <div className="space-y-3">
               <div>
+                <label className="block text-sm text-gray-600 mb-1">Starting Point</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={startQuery}
+                    onChange={(e) => {
+                      setStartQuery(e.target.value);
+                      searchPlaces(e.target.value, 'start');
+                    }}
+                    placeholder="Search start or click on map"
+                    className={`w-full border rounded-md px-3 py-2 text-sm ${selectionMode === 'start' ? 'border-primary-500 ring-1 ring-primary-200' : 'border-gray-300'}`}
+                    onFocus={() => setSelectionMode('start')}
+                  />
+                  {currentPos && (
+                    <button
+                      onClick={() => {
+                        if (location) {
+                          setCurrentPos([location.latitude, location.longitude]);
+                          setStartQuery('Current Location');
+                        }
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-primary-600 hover:text-primary-700 p-1"
+                      title="Use current location"
+                    >
+                      📍
+                    </button>
+                  )}
+                </div>
+                {searching === 'start' && <div className="text-xs text-gray-500 mt-1">Searching...</div>}
+                {searching === 'start' && !!results.length && (
+                  <div className="mt-2 border border-gray-200 rounded-md max-h-40 overflow-auto bg-white z-[1002] relative">
+                    {results.map((r) => (
+                      <button
+                        key={`${r.place_id}`}
+                        className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors"
+                        onClick={() => {
+                          const newStart = [parseFloat(r.lat), parseFloat(r.lon)];
+                          setCurrentPos(newStart);
+                          setStartQuery(r.display_name);
+                          setResults([]);
+                          setSearching(null);
+                          setSelectionMode('destination');
+                        }}
+                      >
+                        {r.display_name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
                 <label className="block text-sm text-gray-600 mb-1">Destination</label>
                 <input
                   type="text"
-                  value={query}
-                  onChange={(e) => { setQuery(e.target.value); searchPlaces(e.target.value); }}
-                  placeholder="Search place or click on map"
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  value={destQuery}
+                  onChange={(e) => {
+                    setDestQuery(e.target.value);
+                    searchPlaces(e.target.value, 'destination');
+                  }}
+                  placeholder="Search destination or click on map"
+                  className={`w-full border rounded-md px-3 py-2 text-sm ${selectionMode === 'destination' ? 'border-primary-500 ring-1 ring-primary-200' : 'border-gray-300'}`}
+                  onFocus={() => setSelectionMode('destination')}
                 />
-                {searching && <div className="text-xs text-gray-500 mt-1">Searching...</div>}
-                {!!results.length && (
-                  <div className="mt-2 border border-gray-200 rounded-md max-h-40 overflow-auto">
+                {searching === 'destination' && <div className="text-xs text-gray-500 mt-1">Searching...</div>}
+                {searching === 'destination' && !!results.length && (
+                  <div className="mt-2 border border-gray-200 rounded-md max-h-40 overflow-auto bg-white z-[1002] relative">
                     {results.map((r) => (
                       <button
                         key={`${r.place_id}`}
                         className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors"
                         onClick={() => {
                           const newDest = [parseFloat(r.lat), parseFloat(r.lon)];
-                          console.log('Destination selected from search:', newDest, r.display_name);
                           setDestPos(newDest);
-                          setQuery(r.display_name);
+                          setDestQuery(r.display_name);
                           setResults([]);
+                          setSearching(null);
                         }}
                       >
                         {r.display_name}
@@ -903,7 +963,7 @@ const RouteMap = () => {
                 {/* Current location */}
                 {currentPos && (
                   <Marker position={currentPos} icon={pulsingIcon}>
-                    <Popup>Your location</Popup>
+                    <Popup>{startQuery === 'Current Location' ? 'Your current location' : 'Starting Point'}</Popup>
                   </Marker>
                 )}
 
