@@ -368,3 +368,15 @@ class HistoricalDelivery(Base):
     completed_at = Column(DateTime)
     created_at = Column(DateTime, default=dt.datetime.utcnow)
 
+
+class CrowdsourcedAlert(Base):
+    __tablename__ = "crowdsourced_alerts"
+    
+    id = Column(Integer, primary_key=True)
+    rider_id = Column(String, index=True)
+    service_type = Column(String) # Swiggy, Zomato, Rapido, Red-Taxi
+    location = Column(JSON) # {lat: float, lng: float}
+    is_faster = Column(Boolean) # Answer to: is this route faster and less traffic
+    has_traffic_issues = Column(Boolean) # Answer to: is this route has traffic issues
+    created_at = Column(DateTime, default=datetime.utcnow)
+

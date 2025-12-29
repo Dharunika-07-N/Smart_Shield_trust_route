@@ -69,3 +69,89 @@ code {
 .route-label-tooltip .leaflet-tooltip-tip {
   display: none;
 }
+
+/* Delivery Service Themes */
+:root {
+  --swiggy-orange: #fc8019;
+  --zomato-red: #cb202d;
+  --rapido-yellow: #f9d923;
+  --redtaxi-maroon: #800000;
+  --premium-dark: #121212;
+  --glass-bg: rgba(255, 255, 255, 0.1);
+  --glass-border: rgba(255, 255, 255, 0.2);
+}
+
+.service-swiggy {
+  color: var(--swiggy-orange);
+}
+
+.service-zomato {
+  color: var(--zomato-red);
+}
+
+.service-rapido {
+  color: var(--rapido-yellow);
+}
+
+.service-redtaxi {
+  color: var(--redtaxi-maroon);
+}
+
+.bg-swiggy {
+  background-color: var(--swiggy-orange);
+}
+
+.bg-zomato {
+  background-color: var(--zomato-red);
+}
+
+.bg-rapido {
+  background-color: var(--rapido-yellow);
+}
+
+.bg-redtaxi {
+  background-color: var(--redtaxi-maroon);
+}
+
+/* Animation for pulsing alert */
+@keyframes alert-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+    box-shadow: 0 0 15px currentColor;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+}
+
+.alert-marker {
+  animation: alert-pulse 1.5s infinite ease-in-out;
+}
+
+.glass-morphism {
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+}
+
+.premium-card {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.premium-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.1);
+}

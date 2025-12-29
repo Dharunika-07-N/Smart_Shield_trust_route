@@ -157,6 +157,8 @@ export const api = {
   submitRouteFeedback: (data) => apiClient.post('/feedback/route', data),
   getFeedbackStats: () => apiClient.get('/feedback/stats'),
   getRouteFeedback: (routeId) => apiClient.get(`/feedback/route/${routeId}`),
+  submitAlert: (data) => apiClient.post('/feedback/alert', data),
+  getAlerts: (serviceType) => apiClient.get('/feedback/alerts', { params: { service_type: serviceType } }),
 
   // Traffic
   getTrafficSegment: (data) => apiClient.post('/traffic/segment', data),

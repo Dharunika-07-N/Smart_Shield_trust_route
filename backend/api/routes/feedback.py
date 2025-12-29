@@ -5,7 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from database.database import get_db
-from database.models import DeliveryFeedback, DeliveryRoute
+from database.models import DeliveryFeedback, DeliveryRoute, CrowdsourcedAlert
 from loguru import logger
 
 router = APIRouter()
@@ -52,4 +52,60 @@ async def submit_feedback(feedback: FeedbackSubmit, db: Session = Depends(get_db
         return {"status": "success", "message": "Feedback submitted successfully"}
     except Exception as e:
         logger.error(f"Error submitting feedback: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+class AlertSubmit(BaseModel):
+    rider_id: str
+    service_type: str
+    location: dict
+    is_faster: bool
+    has_traffic_issues: bool
+
+@router.post("/feedback/alert")
+async def submit_alert(alert: AlertSubmit, db: Session = Depends(get_db)):
+    """Submit a crowdsourced rider alert."""
+    try:
+        new_alert = CrowdsourcedAlert(
+            rider_id=alert.rider_id,
+            service_type=alert.service_type,
+            location=alert.location,
+            is_faster=alert.is_faster,
+            has_traffic_issues=alert.has_traffic_issues,
+            created_at=datetime.utcnow()
+        )
+        db.add(new_alert)
+        db.commit()
+        return {"status": "success", "message": "Alert submitted successfully"}
+    except Exception as e:
+        logger.error(f"Error submitting alert: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/feedback/alerts")
+async def get_alerts(service_type: Optional[str] = None, db: Session = Depends(get_db)):
+    """Retrieve crowdsourced alerts for visualization."""
+    try:
+        query = db.query(CrowdsourcedAlert)
+        if service_type:
+            query = query.filter(CrowdsourcedAlert.service_type == service_type)
+        
+        # Only get alerts from the last 4 hours for real-time relevance
+        from datetime import timedelta
+        cutoff = datetime.utcnow() - timedelta(hours=4)
+        alerts = query.filter(CrowdsourcedAlert.created_at >= cutoff).all()
+        
+        return {
+            "status": "success",
+            "data": [
+                {
+                    "id": a.id,
+                    "service_type": a.service_type,
+                    "location": a.location,
+                    "is_faster": a.is_faster,
+                    "has_traffic_issues": a.has_traffic_issues,
+                    "created_at": a.created_at
+                } for a in alerts
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Error fetching alerts: {e}")
         raise HTTPException(status_code=500, detail=str(e))

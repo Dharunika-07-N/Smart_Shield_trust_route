@@ -17,6 +17,13 @@ const MapUpdater = ({ center }) => {
   return null;
 };
 
+const serviceColors = {
+  swiggy: '#fc8019',
+  zomato: '#cb202d',
+  rapido: '#f9d923',
+  'red-taxi': '#800000'
+};
+
 const RouteMap = () => {
   const { location, loading: locationLoading, error: locationError } = useLocation();
   const [currentPos, setCurrentPos] = useState(null);
@@ -35,6 +42,13 @@ const RouteMap = () => {
   const [safetyOverlay, setSafetyOverlay] = useState(null);
   const [showSafetyOverlay, setShowSafetyOverlay] = useState(true);
 
+  // Delivery Service & Crowdsourcing
+  const [selectedService, setSelectedService] = useState('swiggy'); // swiggy, zomato, rapido, red-taxi
+  const [crowdsourcedAlerts, setCrowdsourcedAlerts] = useState([]);
+  const [quizOpen, setQuizOpen] = useState(false);
+  const [quizAnswers, setQuizAnswers] = useState({ isFaster: null, hasTraffic: null });
+  const [submittingQuiz, setSubmittingQuiz] = useState(false);
+
   // Navigation State
   const [navigationMode, setNavigationMode] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
@@ -49,11 +63,12 @@ const RouteMap = () => {
   // Animated pulsing dot icon for current location (Snapchat-like)
   const pulsingIcon = useMemo(() => {
     const size = 20;
+    const color = serviceColors[selectedService] || '#3b82f6';
     return L.divIcon({
       className: 'pulsing-marker',
-      html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#3b82f6;box-shadow:0 0 0 0 rgba(59,130,246,0.7);animation:pulse 2s infinite"></div>`
+      html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};box-shadow:0 0 0 0 ${color}77;animation:pulse 2s infinite"></div>`
     });
-  }, []);
+  }, [selectedService]);
 
   // Update current position when location changes
   useEffect(() => {
@@ -141,6 +156,50 @@ const RouteMap = () => {
       // but usually not needed with React state.
     }
   };
+
+  // Fetch alerts on mount and every 30s
+  useEffect(() => {
+    const fetchAlerts = async () => {
+      try {
+        const res = await api.getAlerts();
+        if (res.status === 'success') {
+          setCrowdsourcedAlerts(res.data);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch crowdsourced alerts');
+      }
+    };
+    fetchAlerts();
+    const interval = setInterval(fetchAlerts, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleQuizSubmit = async () => {
+    if (quizAnswers.isFaster === null || quizAnswers.hasTraffic === null) {
+      alert('Please answer both questions');
+      return;
+    }
+    setSubmittingQuiz(true);
+    try {
+      await api.submitAlert({
+        rider_id: 'RIDER_' + Math.floor(Math.random() * 1000),
+        service_type: selectedService,
+        location: { lat: currentPos[0], lng: currentPos[1] },
+        is_faster: quizAnswers.isFaster,
+        has_traffic_issues: quizAnswers.hasTraffic
+      });
+      setQuizOpen(false);
+      setQuizAnswers({ isFaster: null, hasTraffic: null });
+      // Refresh alerts
+      const res = await api.getAlerts();
+      if (res.status === 'success') setCrowdsourcedAlerts(res.data);
+    } catch (err) {
+      alert('Failed to submit report. Please try again.');
+    } finally {
+      setSubmittingQuiz(false);
+    }
+  };
+
 
   const buildRequest = (start, dest, optimizeFor) => ({
     starting_point: { latitude: start[0], longitude: start[1] },
@@ -439,11 +498,30 @@ const RouteMap = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Live Route Map</h2>
-        <div className="flex items-center space-x-2">
-          <span className="text-sm text-gray-600">Last updated:</span>
-          <span className="text-sm font-medium text-gray-900">2 min ago</span>
+      {/* Delivery Service Selector Header */}
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Delivery Route Optimizer</h2>
+          <p className="text-sm text-gray-500">Fast. Safe. Dynamic Optimization.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {[
+            { id: 'swiggy', label: 'Swiggy', color: 'bg-[#fc8019]' },
+            { id: 'zomato', label: 'Zomato', color: 'bg-[#cb202d]' },
+            { id: 'rapido', label: 'Rapido', color: 'bg-[#f9d923] text-black' },
+            { id: 'red-taxi', label: 'Red Taxi', color: 'bg-[#800000]' }
+          ].map(service => (
+            <button
+              key={service.id}
+              onClick={() => setSelectedService(service.id)}
+              className={`px-4 py-2 rounded-full font-bold text-sm transition-all transform hover:scale-105 shadow-md ${selectedService === service.id
+                ? `${service.color} text-white ring-2 ring-offset-2 ring-gray-400`
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                } ${service.id === 'rapido' && selectedService === 'rapido' ? 'text-black' : ''}`}
+            >
+              {service.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -580,6 +658,16 @@ const RouteMap = () => {
                     <span>Select destination above or click on map</span>
                   </div>
                 )}
+              </div>
+
+              <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4">
+                <p className="text-xs text-blue-800 font-medium mb-2">Crowdsourced Intelligence</p>
+                <button
+                  onClick={() => setQuizOpen(true)}
+                  className="w-full flex items-center justify-center gap-2 bg-white text-blue-600 py-2 rounded-md text-xs font-bold border border-blue-200 hover:bg-blue-50 transition-colors"
+                >
+                  📡 Report Live Conditions
+                </button>
               </div>
 
               <button
@@ -941,6 +1029,39 @@ const RouteMap = () => {
 
                 <ClickToSetLocation />
 
+                {/* Crowdsourced Alerts */}
+                {crowdsourcedAlerts.map((alert) => (
+                  <Marker
+                    key={alert.id}
+                    position={[alert.location.lat, alert.location.lng]}
+                    icon={L.divIcon({
+                      className: 'alert-marker',
+                      html: `<div style="color: ${alert.has_traffic_issues ? '#ef4444' : '#22c55e'}; font-size: 24px;">${alert.has_traffic_issues ? '⚠️' : '🚀'}</div>`,
+                      iconSize: [30, 30],
+                      iconAnchor: [15, 15]
+                    })}
+                  >
+                    <Popup>
+                      <div className="p-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold text-white bg-gray-800 uppercase`}>
+                            {alert.service_type}
+                          </span>
+                          <span className="text-[10px] text-gray-500">
+                            {new Date(alert.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <p className="text-sm font-bold">
+                          {alert.has_traffic_issues ? 'Traffic Reported' : 'Smooth Route'}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          {alert.is_faster ? 'Rider says: Much faster than regular.' : 'Rider says: Slower than expected.'}
+                        </p>
+                      </div>
+                    </Popup>
+                  </Marker>
+                ))}
+
                 <div className="leaflet-top leaflet-right" style={{ top: '80px', right: '10px', zIndex: 1000 }}>
                   <div className="bg-white rounded-md shadow-md p-1 flex flex-col space-y-1">
                     <button
@@ -1148,6 +1269,78 @@ const RouteMap = () => {
           </div>
         )}
       </div>
+
+      {/* Interactive Quiz Modal */}
+      {quizOpen && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform animate-in fade-in zoom-in duration-300">
+            <div className={`p-6 text-white ${selectedService === 'swiggy' ? 'bg-[#fc8019]' :
+              selectedService === 'zomato' ? 'bg-[#cb202d]' :
+                selectedService === 'rapido' ? 'bg-[#f9d923] text-black' : 'bg-[#800000]'
+              }`}>
+              <h3 className="text-xl font-bold flex items-center gap-2">
+                <span>⚡</span> Rider Pulse Check
+              </h3>
+              <p className="text-sm opacity-90 mt-1">Help other {selectedService} riders find better routes!</p>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div>
+                <p className="font-semibold text-gray-900 mb-3 text-sm">1. Is this route faster and has less traffic?</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setQuizAnswers({ ...quizAnswers, isFaster: true })}
+                    className={`flex-1 py-3 rounded-xl border-2 font-medium transition-all ${quizAnswers.isFaster === true ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-100 hover:border-gray-200'}`}
+                  >
+                    🚀 Yes, Smooth
+                  </button>
+                  <button
+                    onClick={() => setQuizAnswers({ ...quizAnswers, isFaster: false })}
+                    className={`flex-1 py-3 rounded-xl border-2 font-medium transition-all ${quizAnswers.isFaster === false ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-100 hover:border-gray-200'}`}
+                  >
+                    🚗 No, Slow
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <p className="font-semibold text-gray-900 mb-3 text-sm">2. Does this route have traffic issues (constructions/accidents)?</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setQuizAnswers({ ...quizAnswers, hasTraffic: true })}
+                    className={`flex-1 py-3 rounded-xl border-2 font-medium transition-all ${quizAnswers.hasTraffic === true ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-gray-100 hover:border-gray-200'}`}
+                  >
+                    ⚠️ Yes, Blocked
+                  </button>
+                  <button
+                    onClick={() => setQuizAnswers({ ...quizAnswers, hasTraffic: false })}
+                    className={`flex-1 py-3 rounded-xl border-2 font-medium transition-all ${quizAnswers.hasTraffic === false ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-100 hover:border-gray-200'}`}
+                  >
+                    ✅ No, Clear
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-4 pt-4">
+                <button
+                  onClick={() => setQuizOpen(false)}
+                  className="flex-1 py-3 text-gray-500 font-semibold hover:bg-gray-50 rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleQuizSubmit}
+                  disabled={submittingQuiz || quizAnswers.isFaster === null || quizAnswers.hasTraffic === null}
+                  className={`flex-[2] py-3 rounded-xl text-white font-bold shadow-lg transition-all transform active:scale-95 ${submittingQuiz ? 'bg-gray-400' : 'bg-gray-900 hover:bg-black'
+                    }`}
+                >
+                  {submittingQuiz ? 'Sending...' : 'Report Condition'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

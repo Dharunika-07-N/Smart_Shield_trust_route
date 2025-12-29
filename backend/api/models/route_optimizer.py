@@ -61,6 +61,9 @@ class RouteOptimizer:
             self.time_predictor.load_model()
             self.safety_classifier.load_model()
             self.rl_agent.load_model()
+        
+        from database.models import CrowdsourcedAlert
+        self.AlertModel = CrowdsourcedAlert
 
     
     async def optimize_route(
@@ -93,6 +96,17 @@ class RouteOptimizer:
         # Prepare data
         all_points = [starting_point] + [stop.coordinates for stop in stops]
         
+        # Fetch active crowdsourced alerts (last 4 hours)
+        active_alerts = []
+        try:
+            db = SessionLocal()
+            cutoff = datetime.utcnow() - timedelta(hours=4)
+            active_alerts = db.query(self.AlertModel).filter(self.AlertModel.created_at >= cutoff).all()
+            db.close()
+            logger.info(f"Fetched {len(active_alerts)} active crowdsourced alerts for optimization")
+        except Exception as e:
+            logger.warning(f"Could not fetch crowdsourced alerts: {e}")
+
         # Create distance matrix
         distance_matrix = self._create_distance_matrix(all_points)
         
@@ -103,7 +117,8 @@ class RouteOptimizer:
             optimize_for,
             rider_info,
             stops,
-            departure_time
+            departure_time,
+            active_alerts
         )
         
         # Optimize using multiple algorithms
@@ -184,7 +199,8 @@ class RouteOptimizer:
         objectives: List[str],
         rider_info: Optional[Dict],
         stops: List[DeliveryStop],
-        departure_time: Optional[datetime] = None
+        departure_time: Optional[datetime] = None,
+        active_alerts: List = []
     ) -> List[List[float]]:
         """Create weighted cost matrix based on objectives."""
         n = len(points)
@@ -284,6 +300,22 @@ class RouteOptimizer:
                         except Exception as e:
                             logger.warning(f"Could not get traffic data: {e}")
                     
+                    # Crowdsourced feedback adjustment
+                    if active_alerts:
+                        for alert in active_alerts:
+                            # Check if alert is near this segment
+                            # Simple check: distance to start or end points
+                            dist_to_start = self.maps_service.calculate_straight_distance(
+                                points[i], Coordinate(latitude=alert.location['lat'], longitude=alert.location['lng'])
+                            )
+                            if dist_to_start < 500: # 500 meters
+                                if alert.has_traffic_issues:
+                                    cost += 5.0 # Significant penalty for reported traffic
+                                    logger.info(f"Applying traffic penalty for alert near node {i}")
+                                if alert.is_faster:
+                                    cost -= 2.0 # Bonus for reputed fast route
+                                    logger.info(f"Applying speed bonus for alert near node {i}")
+
                     cost_matrix[i][j] = cost
         
         return cost_matrix

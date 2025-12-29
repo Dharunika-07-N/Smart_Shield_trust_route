@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FiShield, FiPackage, FiTrendingUp, FiMap,
-  FiActivity, FiAlertCircle, FiCheckCircle, FiAlertTriangle, FiCpu, FiNavigation
+  FiActivity, FiAlertCircle, FiCheckCircle, FiAlertTriangle, FiCpu, FiNavigation,
+  FiUser, FiLogOut, FiSettings, FiBarChart2, FiLayers, FiMessageSquare
 } from 'react-icons/fi';
 import Analytics from './Analytics';
 import RouteMap from './RouteMap';
@@ -12,418 +13,259 @@ import { api } from '../services/api';
 import useLocation from '../hooks/useLocation';
 
 const Dashboard = ({ setAuth }) => {
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('route-map');
   const [panicAlerting, setPanicAlerting] = useState(false);
-  const [riderId, setRiderId] = useState(localStorage.getItem('rider_id') || '');
-  const { location: currentLocation, loading: locationLoading } = useLocation();
+  const [riderId, setRiderId] = useState(localStorage.getItem('rider_id') || 'RIDER_402');
+  const { location: currentLocation } = useLocation();
   const [backendConnected, setBackendConnected] = useState(null);
+  const [liveAlerts, setLiveAlerts] = useState([]);
 
-  // Check backend connection on mount
-  React.useEffect(() => {
+  useEffect(() => {
     const checkBackendConnection = async () => {
       try {
         const response = await api.healthCheck();
-        if (response && (response.status === 'healthy' || response.status === 'running')) {
-          setBackendConnected(true);
-        } else {
-          setBackendConnected(false);
-        }
+        setBackendConnected(response && (response.status === 'healthy' || response.status === 'running'));
       } catch (error) {
         setBackendConnected(false);
       }
     };
-
     checkBackendConnection();
     const interval = setInterval(checkBackendConnection, 30000);
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const fetchAlerts = async () => {
+      try {
+        const res = await api.getAlerts();
+        if (res.status === 'success') {
+          setLiveAlerts(res.data.slice(0, 5));
+        }
+      } catch (err) {
+        console.warn('Failed to fetch alerts for dashboard');
+      }
+    };
+    fetchAlerts();
+    const interval = setInterval(fetchAlerts, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handlePanicButton = async () => {
     if (!currentLocation || !riderId) {
-      alert('Location or rider ID not available. Please ensure location services are enabled and rider ID is set.');
+      alert('Location or rider ID not available.');
       return;
     }
-
-    if (!window.confirm('Are you sure you want to trigger the emergency SOS alert? This will notify your company and emergency contacts immediately.')) {
-      return;
-    }
-
+    if (!window.confirm('Trigger Emergency SOS alert?')) return;
     setPanicAlerting(true);
     try {
       const response = await api.triggerPanicButton({
         rider_id: riderId,
         location: currentLocation,
-        delivery_id: undefined,
-        route_id: undefined
       });
-
-      if (response.success) {
-        alert('Emergency SOS alert sent successfully! Your company and emergency contacts have been notified.');
-      } else {
-        throw new Error(response.message || 'Failed to send alert');
-      }
+      if (response.success) alert('Emergency SOS alert sent successfully!');
     } catch (error) {
-      console.error('Panic button error:', error);
-
-      // Provide more helpful error messages
-      let errorMessage = error.message || 'Unknown error';
-
-      if (error.isNetworkError || errorMessage.includes('Unable to connect to server') || errorMessage.includes('Network error')) {
-        errorMessage = `Cannot connect to backend server.\n\n` +
-          `The backend server is not running. To start it:\n\n` +
-          `1. Open a terminal/command prompt\n` +
-          `2. Navigate to the backend directory:\n` +
-          `   cd backend\n` +
-          `3. Activate the virtual environment (if using one):\n` +
-          `   venv\\Scripts\\activate  (Windows)\n` +
-          `   source venv/bin/activate  (Mac/Linux)\n` +
-          `4. Start the server:\n` +
-          `   python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000\n\n` +
-          `Or if you have a startup script, use that instead.\n\n` +
-          `Once the server is running, try again.`;
-      }
-
-      alert(`Failed to send emergency alert: ${errorMessage}`);
+      alert('Failed to send alert.');
     } finally {
       setPanicAlerting(false);
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setAuth(false);
-  };
+  const navItems = [
+    { id: 'route-map', label: 'Route Optimizer', icon: FiNavigation },
+    { id: 'overview', label: 'Fleet Overview', icon: FiLayers },
+    { id: 'tracking', label: 'Live Tracking', icon: FiMap },
+    { id: 'analytics', label: 'Insights', icon: FiBarChart2 },
+    { id: 'training', label: 'AI Training', icon: FiCpu },
+  ];
 
   const stats = [
-    {
-      title: 'Total Routes',
-      value: '1,247',
-      change: '+12.5%',
-      icon: FiMap,
-      color: 'bg-primary-500',
-    },
-    {
-      title: 'Avg Safety Score',
-      value: '87/100',
-      change: '+3.2%',
-      icon: FiShield,
-      color: 'bg-success-500',
-    },
-    {
-      title: 'Fuel Saved',
-      value: '2.4k L',
-      change: '+18.1%',
-      icon: FiActivity,
-      color: 'bg-warning-500',
-    },
-    {
-      title: 'Delivery Time',
-      value: '32 min',
-      change: '-24.3%',
-      icon: FiTrendingUp,
-      color: 'bg-danger-500',
-    },
+    { title: 'Total Trips', value: '1,247', icon: FiPackage, color: 'text-blue-500' },
+    { title: 'Safety Score', value: '92/100', icon: FiShield, color: 'text-green-500' },
+    { title: 'Fuel Saved', value: '18%', icon: FiActivity, color: 'text-orange-500' },
+    { title: 'Avg Time', value: '24 min', icon: FiTrendingUp, color: 'text-red-500' },
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Backend Connection Status Banner */}
-      {backendConnected === false && (
-        <div className="bg-red-50 border-b border-red-200 px-4 py-3">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <FiAlertCircle className="text-red-600 text-xl" />
-              <div>
-                <p className="text-sm font-medium text-red-800">
-                  Backend server is not connected
-                </p>
-                <p className="text-xs text-red-600 mt-1">
-                  Please start the backend server. Check the console for instructions or run: <code className="bg-red-100 px-1 rounded">cd backend && python -m uvicorn api.main:app --reload</code>
-                </p>
-              </div>
+    <div className="flex h-screen bg-[#f8fafc] overflow-hidden">
+      {/* Sidebar */}
+      <aside className="w-64 bg-gray-900 flex-shrink-0 hidden lg:flex flex-col">
+        <div className="p-6">
+          <div className="flex items-center gap-3 text-white">
+            <div className="bg-blue-600 p-2 rounded-xl">
+              <FiShield className="text-2xl" />
             </div>
+            <div className="font-bold text-xl tracking-tight">SmartShield</div>
+          </div>
+        </div>
+
+        <nav className="flex-1 px-4 space-y-2 mt-4">
+          {navItems.map(item => (
             <button
-              onClick={() => window.location.reload()}
-              className="text-sm text-red-700 hover:text-red-900 underline"
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${activeTab === item.id
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
             >
-              Retry Connection
+              <item.icon className="text-lg" />
+              {item.label}
             </button>
-          </div>
-        </div>
-      )}
+          ))}
+        </nav>
 
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="bg-primary-500 p-2 rounded-lg">
-                <FiShield className="text-white text-2xl" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  AI Smart Shield Trust Route
-                </h1>
-                <p className="text-sm text-gray-600">
-                  Intelligent Delivery Route Optimization
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                {backendConnected === true ? (
-                  <>
-                    <FiCheckCircle className="text-green-500 text-xl" />
-                    <span className="text-sm font-medium text-gray-700">Backend Connected</span>
-                  </>
-                ) : backendConnected === false ? (
-                  <>
-                    <FiAlertTriangle className="text-red-500 text-xl" />
-                    <span className="text-sm font-medium text-red-700">Backend Disconnected</span>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-sm font-medium text-gray-700">Checking Connection...</span>
-                  </>
-                )}
-              </div>
-              <button
-                onClick={handleLogout}
-                className="flex items-center space-x-2 px-4 py-2 rounded-lg font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-all border border-gray-300"
-              >
-                <span>Logout</span>
-              </button>
-
-              {/* Emergency SOS Button */}
-              <button
-                onClick={handlePanicButton}
-                disabled={panicAlerting || !currentLocation || !riderId}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-semibold text-white transition-all ${panicAlerting
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-red-600 hover:bg-red-700 active:bg-red-800 shadow-lg hover:shadow-xl'
-                  }`}
-                title={!riderId ? 'Please set Rider ID to use SOS' : !currentLocation ? 'Location not available' : 'Emergency SOS Alert'}
-              >
-                <FiAlertTriangle className="text-xl" />
-                <span>{panicAlerting ? 'Sending...' : 'SOS'}</span>
-              </button>
+        <div className="p-4 mt-auto border-t border-white/10">
+          <div className="bg-white/5 rounded-xl p-4">
+            <p className="text-xs text-gray-500 font-medium uppercase mb-2">Crowdsourced Alerts</p>
+            <div className="space-y-3">
+              {liveAlerts.length > 0 ? liveAlerts.map(alert => (
+                <div key={alert.id} className="flex gap-2">
+                  <span className="text-sm">
+                    {alert.has_traffic_issues ? '⚠️' : '🚀'}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] text-gray-300 font-bold uppercase truncate">{alert.service_type}</p>
+                    <p className="text-[10px] text-gray-500 truncate">
+                      {alert.has_traffic_issues ? 'Traffic issues' : 'Smooth route'}
+                    </p>
+                  </div>
+                </div>
+              )) : (
+                <p className="text-[10px] text-gray-500 italic">No recent reports</p>
+              )}
             </div>
           </div>
         </div>
-      </header>
 
-      {/* Navigation Tabs */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex space-x-8">
-            {[
-              { id: 'overview', label: 'Overview' },
-              { id: 'snap-map', label: 'Live Map' },
-              { id: 'tracking', label: 'Live Tracking' },
-              { id: 'analytics', label: 'Analytics' },
-              { id: 'training', label: 'AI Training' },
-              { id: 'route-map', label: 'Route Map' },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
+        <div className="p-4">
+          <button
+            onClick={() => setAuth(false)}
+            className="w-full flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-red-400 hover:bg-red-400/5 rounded-xl transition-all"
+          >
+            <FiLogOut />
+            <span>Sign Out</span>
+          </button>
         </div>
-      </div>
+      </aside>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'overview' && (
-          <div className="space-y-8">
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {stats.map((stat, index) => (
-                <div
-                  key={index}
-                  className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 card-hover"
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <div className={`${stat.color} p-3 rounded-lg`}>
-                      <stat.icon className="text-white text-xl" />
-                    </div>
-                    <span className="text-sm font-medium text-success-600 bg-success-50 px-2 py-1 rounded">
-                      {stat.change}
-                    </span>
-                  </div>
-                  <h3 className="text-gray-600 text-sm font-medium mb-1">
-                    {stat.title}
-                  </h3>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {stat.value}
-                  </p>
-                </div>
-              ))}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Top Header */}
+        <header className="h-20 bg-white border-b border-gray-200 flex items-center justify-between px-8 flex-shrink-0 z-10">
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-bold text-gray-900 lg:hidden">SmartShield</h1>
+            <div className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${backendConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+              }`}>
+              <div className={`w-2 h-2 rounded-full ${backendConnected ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}></div>
+              {backendConnected ? 'Network Online' : 'Service Offline'}
             </div>
+          </div>
 
-            {/* Emergency SOS Section */}
-            <div className="bg-gradient-to-r from-red-50 to-red-100 border-2 border-red-300 rounded-xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="bg-red-600 p-3 rounded-lg">
-                    <FiAlertTriangle className="text-white text-2xl" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-red-900">Emergency SOS</h2>
-                    <p className="text-sm text-red-700">Quick access emergency alert system</p>
-                  </div>
-                </div>
-                <button
-                  onClick={handlePanicButton}
-                  disabled={panicAlerting || !currentLocation || !riderId}
-                  className={`px-6 py-3 rounded-lg font-bold text-white transition-all ${panicAlerting
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-red-600 hover:bg-red-700 active:bg-red-800 shadow-lg hover:shadow-xl transform hover:scale-105'
-                    }`}
-                >
-                  {panicAlerting ? 'Sending Alert...' : 'TRIGGER SOS'}
-                </button>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2 text-sm">
-                  <input
-                    type="text"
-                    value={riderId}
-                    onChange={(e) => {
-                      const id = e.target.value;
-                      setRiderId(id);
-                      localStorage.setItem('rider_id', id);
-                    }}
-                    placeholder="Enter Rider ID (required for SOS)"
-                    className="flex-1 border border-red-300 rounded-md px-3 py-2 text-sm"
-                  />
-                </div>
-                <div className="text-xs text-red-700">
-                  {!currentLocation && '⚠️ Location not available. '}
-                  {!riderId && '⚠️ Please enter your Rider ID to use the SOS feature. '}
-                  {currentLocation && riderId && '✓ Ready to send emergency alerts'}
-                </div>
-                <p className="text-xs text-red-600 mt-2">
-                  <strong>Note:</strong> This will immediately notify your delivery company and emergency contacts with your current location.
-                </p>
-              </div>
-            </div>
+          <div className="flex items-center gap-6">
+            <button
+              onClick={handlePanicButton}
+              disabled={panicAlerting}
+              className={`hidden sm:flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold shadow-lg transition-all ${panicAlerting ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 text-white hover:bg-red-700 active:scale-95'
+                }`}
+            >
+              <FiAlertTriangle className="animate-pulse" />
+              SOS EMERGENY
+            </button>
 
-            {/* Recent Activity & Quick Actions */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Recent Activity */}
-              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                  Recent Deliveries
-                </h2>
-                <div className="space-y-4">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <FiPackage className="text-primary-500" />
-                        <div>
-                          <p className="font-medium text-gray-900">Route #{1000 + i}</p>
-                          <p className="text-sm text-gray-600">5 stops • 12.5 km</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <FiShield className="text-success-500" />
-                        <span className="text-sm font-medium text-gray-700">85%</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            <div className="flex items-center gap-3 pl-6 border-l border-gray-200">
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-bold text-gray-900">{riderId}</p>
+                <p className="text-xs text-gray-500">Fleet Operations</p>
               </div>
-
-              {/* Safety Alerts */}
-              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                  <FiAlertCircle className="mr-2 text-warning-500" />
-                  Safety Alerts
-                </h2>
-                <div className="space-y-4">
-                  <div className="flex items-start space-x-3 p-3 bg-warning-50 rounded-lg border border-warning-200">
-                    <FiAlertCircle className="text-warning-500 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="font-medium text-warning-800">
-                        Night Route Adjustment
-                      </p>
-                      <p className="text-sm text-warning-700 mt-1">
-                        3 routes modified for better lighting conditions
-                      </p>
-                      <span className="text-xs text-warning-600 mt-1 block">
-                        Updated 2 hours ago
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
-                    <FiCheckCircle className="text-success-500 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-800">
-                        All Systems Normal
-                      </p>
-                      <p className="text-sm text-gray-600 mt-1">
-                        No safety issues detected in the last 24 hours
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Performance Metrics */}
-            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900 mb-6">
-                Performance Metrics
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center p-4 bg-gradient-to-br from-primary-50 to-primary-100 rounded-lg">
-                  <div className="text-4xl font-bold text-primary-600">27%</div>
-                  <div className="text-sm text-gray-600 mt-2">Time Reduction</div>
-                  <div className="text-xs text-success-600 mt-1">✓ Target Achieved</div>
-                </div>
-                <div className="text-center p-4 bg-gradient-to-br from-success-50 to-success-100 rounded-lg">
-                  <div className="text-4xl font-bold text-success-600">21%</div>
-                  <div className="text-sm text-gray-600 mt-2">Fuel Savings</div>
-                  <div className="text-xs text-success-600 mt-1">✓ Target Achieved</div>
-                </div>
-                <div className="text-center p-4 bg-gradient-to-br from-warning-50 to-warning-100 rounded-lg">
-                  <div className="text-4xl font-bold text-warning-600">13%</div>
-                  <div className="text-sm text-gray-600 mt-2">Success Rate Increase</div>
-                  <div className="text-xs text-success-600 mt-1">✓ Target Achieved</div>
-                </div>
+              <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 border border-gray-200">
+                <FiUser />
               </div>
             </div>
           </div>
-        )}
+        </header>
 
-        {activeTab === 'snap-map' && <SnapMap />}
-        {activeTab === 'tracking' && <LiveTracking />}
-        {activeTab === 'analytics' && <Analytics />}
-        {activeTab === 'training' && <TrainingCenter />}
-        {activeTab === 'route-map' && <RouteMap />}
-      </main>
-
-      {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 mt-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <p className="text-center text-sm text-gray-600">
-            © 2024 AI Smart Shield Trust Route. All rights reserved.
-          </p>
+        {/* Dynamic Toolbar for Mobile Menu */}
+        <div className="lg:hidden bg-gray-900 p-2 overflow-x-auto">
+          <div className="flex gap-2 min-w-max">
+            {navItems.map(item => (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold ${activeTab === item.id ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-white/5'
+                  }`}
+              >
+                <item.icon />
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </footer>
+
+        <main className="flex-1 overflow-y-auto p-4 md:p-8">
+          {activeTab === 'overview' && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {stats.map((s, i) => (
+                  <div key={i} className="premium-card p-6 border-l-4 border-l-transparent hover:border-l-blue-600">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className={`p-3 rounded-2xl bg-gray-50 ${s.color}`}>
+                        <s.icon className="text-xl" />
+                      </div>
+                      <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full">+12%</span>
+                    </div>
+                    <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">{s.title}</p>
+                    <p className="text-2xl font-black text-gray-900 mt-1">{s.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 premium-card p-6 h-[400px]">
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">Real-time Performance</h3>
+                  <Analytics compact />
+                </div>
+                <div className="premium-card p-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+                    <FiMessageSquare className="text-blue-600" />
+                    Rider Pulse Feed
+                  </h3>
+                  <div className="space-y-6">
+                    {liveAlerts.length > 0 ? liveAlerts.map(alert => (
+                      <div key={alert.id} className="flex gap-4 p-3 rounded-xl bg-gray-50 border border-gray-100 hover:shadow-md transition-all">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl shadow-sm ${alert.has_traffic_issues ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'
+                          }`}>
+                          {alert.has_traffic_issues ? '⚠️' : '🚀'}
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-gray-400 uppercase">{alert.service_type}</p>
+                          <p className="text-sm font-bold text-gray-800">
+                            {alert.has_traffic_issues ? 'Heavy Traffic Detected' : 'Smooth Route Verified'}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {new Date(alert.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                      </div>
+                    )) : (
+                      <div className="text-center py-12">
+                        <FiMessageSquare className="text-4xl text-gray-200 mx-auto mb-4" />
+                        <p className="text-sm text-gray-500">Wait for rider reports...</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'route-map' && <RouteMap />}
+          {activeTab === 'tracking' && <LiveTracking />}
+          {activeTab === 'analytics' && <Analytics />}
+          {activeTab === 'training' && <TrainingCenter />}
+        </main>
+      </div>
     </div>
   );
 };
 
 export default Dashboard;
-
