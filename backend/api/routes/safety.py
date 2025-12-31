@@ -1,7 +1,7 @@
 """Safety endpoints."""
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Dict
 from pydantic import BaseModel, Field
 from datetime import datetime
 import sys
@@ -15,15 +15,24 @@ from api.schemas.safety import (
     LocationSafetyScore,
     SafetyFactor,
     SafetyConditionsRequest,
-    SafetyConditionsResponse
+    SafetyConditionsResponse,
+    PanicButtonRequest,
+    PanicButtonResponse,
+    CheckInRequest,
+    CheckInResponse,
+    SafeZonesRequest,
+    RideAlongRequest,
+    RideAlongResponse
 )
 from api.schemas.delivery import Coordinate
 from api.models.safety_scorer import SafetyScorer
+from api.services.safety import SafetyService
 from database.database import get_db
 from loguru import logger
 
 router = APIRouter()
 safety_scorer = SafetyScorer()
+safety_service = SafetyService()
 
 @router.post("/safety/score", response_model=SafetyScoreResponse)
 async def calculate_safety_score(
@@ -50,3 +59,95 @@ async def calculate_safety_score(
 @router.get("/safety/heatmap")
 async def get_safety_heatmap(min_lat: float, min_lng: float, max_lat: float, max_lng: float):
     return {"points": []}
+
+
+@router.post("/safety/panic-button", response_model=PanicButtonResponse)
+async def trigger_panic_button(
+    request: PanicButtonRequest,
+    db: Session = Depends(get_db)
+):
+    """Trigger emergency SOS alert."""
+    try:
+        result = safety_service.trigger_panic_button(
+            db=db,
+            rider_id=request.rider_id,
+            location=request.location,
+            route_id=request.route_id,
+            delivery_id=request.delivery_id
+        )
+        return PanicButtonResponse(**result)
+    except Exception as e:
+        logger.error(f"Error triggering panic button: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/safety/check-in", response_model=CheckInResponse)
+async def rider_check_in(
+    request: CheckInRequest,
+    db: Session = Depends(get_db)
+):
+    """Record rider check-in."""
+    try:
+        result = safety_service.check_in(
+            db=db,
+            rider_id=request.rider_id,
+            location=request.location,
+            route_id=request.route_id,
+            delivery_id=request.delivery_id,
+            is_night_shift=request.is_night_shift
+        )
+        return CheckInResponse(**result)
+    except Exception as e:
+        logger.error(f"Error during check-in: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/safety/safe-zones", response_model=List[Dict])
+async def get_safe_zones(
+    request: SafeZonesRequest
+):
+    """Get nearby safe zones."""
+    try:
+        return safety_service.get_safe_zones(
+            location=request.location,
+            radius_meters=request.radius_meters,
+            zone_types=request.zone_types
+        )
+    except Exception as e:
+        logger.error(f"Error getting safe zones: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/safety/ride-along", response_model=RideAlongResponse)
+async def create_ride_along(
+    request: RideAlongRequest,
+    db: Session = Depends(get_db)
+):
+    """Create a ride-along tracking link."""
+    try:
+        result = safety_service.create_ride_along(
+            db=db,
+            rider_id=request.rider_id,
+            tracker_name=request.tracker_name,
+            tracker_phone=request.tracker_phone,
+            tracker_email=request.tracker_email,
+            route_id=request.route_id,
+            delivery_id=request.delivery_id,
+            expires_hours=request.expires_hours
+        )
+        return RideAlongResponse(**result)
+    except Exception as e:
+        logger.error(f"Error creating ride-along: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/safety/ride-along/{share_token}")
+async def get_ride_along_status(
+    share_token: str,
+    db: Session = Depends(get_db)
+):
+    """Get ride-along tracking status."""
+    result = safety_service.get_ride_along_status(db, share_token)
+    if not result:
+        raise HTTPException(status_code=404, detail="Ride-along link invalid or expired")
+    return result

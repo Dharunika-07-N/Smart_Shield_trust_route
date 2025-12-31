@@ -63,26 +63,31 @@ class SafetyService:
             db.commit()
             db.refresh(alert)
             
-            # Send email alert to emergency contact
-            email_sent = self._send_sos_email(rider, alert)
+            # Notify emergency contacts
+            emergency_contacts = rider.emergency_contacts or []
+            alerted_contacts = []
+            emails_sent = 0
+            
+            for contact in emergency_contacts:
+                success = self._notify_emergency_contact(contact, rider, alert)
+                if success:
+                    alerted_contacts.append({
+                        "name": contact.get("name"),
+                        "phone": contact.get("phone"),
+                        "email": contact.get("email"),
+                        "notified": True
+                    })
+                    if contact.get("email"):
+                        emails_sent += 1
+            
+            alert.alerted_contacts = alerted_contacts
+            
+            # Send email to the system emergency email as a backup
+            system_email_sent = self._send_sos_email(rider, alert)
             
             # Notify company
             company_notified = self._notify_company(db, rider, alert)
             alert.company_notified = company_notified
-            
-            # Notify emergency contacts
-            emergency_contacts = rider.emergency_contacts or []
-            alerted_contacts = []
-            for contact in emergency_contacts:
-                notified = self._notify_emergency_contact(contact, rider, alert)
-                if notified:
-                    alerted_contacts.append({
-                        "name": contact.get("name"),
-                        "phone": contact.get("phone"),
-                        "notified": True
-                    })
-            
-            alert.alerted_contacts = alerted_contacts
             
             # Optionally notify emergency services (can be configured)
             # In production, integrate with emergency services API
@@ -98,7 +103,7 @@ class SafetyService:
             return {
                 "alert_id": alert.id,
                 "status": "active",
-                "email_sent": email_sent,
+                "email_sent": emails_sent > 0 or system_email_sent,
                 "company_notified": company_notified,
                 "emergency_contacts_notified": len(alerted_contacts),
                 "location": {
@@ -113,7 +118,7 @@ class SafetyService:
             db.rollback()
             raise
     
-    def _send_sos_email(self, rider: Rider, alert: PanicAlert) -> bool:
+    def _send_sos_email(self, rider: Rider, alert: PanicAlert, to_email: Optional[str] = None) -> bool:
         """Send SOS alert email to emergency contact."""
         try:
             # Get location from alert
@@ -123,7 +128,8 @@ class SafetyService:
             email_sent = self.email_service.send_sos_alert(
                 rider_name=rider.name or "Unknown Rider",
                 rider_id=rider.id,
-                location=location
+                location=location,
+                to_email=to_email
             )
             
             if email_sent:
@@ -164,17 +170,35 @@ class SafetyService:
         rider: Rider,
         alert: PanicAlert
     ) -> bool:
-        """Notify emergency contact about panic alert."""
+        """Notify emergency contact about panic alert via email/SMS."""
         try:
-            # In production, send SMS/email/push notification
-            logger.warning(
-                f"PANIC ALERT for rider {rider.name} - "
-                f"Emergency contact {contact.get('name')} ({contact.get('phone')}) should be notified"
-            )
-            # TODO: Implement actual notification (SMS, email, push)
-            return True
+            contact_name = contact.get("name", "Emergency Contact")
+            contact_email = contact.get("email")
+            contact_phone = contact.get("phone")
+            
+            success = False
+            
+            # Send Email if available
+            if contact_email:
+                logger.info(f"Sending SOS email to {contact_name} at {contact_email}")
+                email_success = self._send_sos_email(rider, alert, to_email=contact_email)
+                if email_success:
+                    success = True
+            
+            # Log SMS notification (Placeholder for actual SMS service like Twilio)
+            if contact_phone:
+                logger.warning(
+                    f"SMS NOTIFICATION (MOCK): Sending SOS to {contact_name} ({contact_phone}) "
+                    f"for rider {rider.name}. Location: {alert.location}"
+                )
+                success = True # Consider SMS notification "sent" in mock mode
+                
+            if not contact_email and not contact_phone:
+                logger.warning(f"No contact info (email/phone) for emergency contact: {contact_name}")
+                
+            return success
         except Exception as e:
-            logger.error(f"Error notifying emergency contact: {e}")
+            logger.error(f"Error notifying emergency contact {contact.get('name')}: {e}")
             return False
     
     def check_in(

@@ -70,3 +70,69 @@ class SafetyConditionsResponse(BaseModel):
     user_safety_rating: Optional[float] = Field(None, ge=0, le=5)
     overall_score: float = Field(..., ge=0, le=100)
     recommendations: List[str] = Field(default_factory=list)
+
+
+class PanicButtonRequest(BaseModel):
+    """Request for emergency SOS alert."""
+    rider_id: str
+    location: Coordinate
+    route_id: Optional[str] = None
+    delivery_id: Optional[str] = None
+
+
+class PanicButtonResponse(BaseModel):
+    """Response for emergency SOS alert."""
+    success: bool = True
+    alert_id: Optional[str] = None
+    status: str
+    email_sent: bool
+    company_notified: bool
+    emergency_contacts_notified: int
+    location: Dict[str, float]
+    timestamp: str
+
+
+class CheckInRequest(BaseModel):
+    """Request for rider check-in."""
+    rider_id: str
+    location: Coordinate
+    route_id: Optional[str] = None
+    delivery_id: Optional[str] = None
+    is_night_shift: bool = False
+
+
+class CheckInResponse(BaseModel):
+    """Response for rider check-in."""
+    success: bool = True
+    checkin_id: str
+    timestamp: str
+    is_night_shift: bool
+    next_checkin_due: Optional[str] = None
+    missed_checkin: bool
+
+
+class SafeZonesRequest(BaseModel):
+    """Request for nearby safe zones."""
+    location: Coordinate
+    radius_meters: int = 2000
+    zone_types: Optional[List[str]] = None
+
+
+class RideAlongRequest(BaseModel):
+    """Request to create a ride-along link."""
+    rider_id: str
+    tracker_name: str
+    tracker_phone: Optional[str] = None
+    tracker_email: Optional[str] = None
+    route_id: Optional[str] = None
+    delivery_id: Optional[str] = None
+    expires_hours: int = 24
+
+
+class RideAlongResponse(BaseModel):
+    """Response for ride-along link creation."""
+    success: bool = True
+    ride_along_id: str
+    share_token: str
+    tracking_url: str
+    expires_at: str
