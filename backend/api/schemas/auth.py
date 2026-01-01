@@ -11,6 +11,8 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
+    # Admin verification
+    admin_code: Optional[str] = None
     # Delivery Info
     license_number: Optional[str] = None
     vehicle_type: Optional[str] = None

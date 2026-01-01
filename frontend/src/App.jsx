@@ -5,11 +5,11 @@ import Auth from './components/Auth';
 import './App.css';
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
+  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('auth_token'));
 
   useEffect(() => {
     // Check for token existence periodically or on mount
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('auth_token');
     if (token) {
       setIsAuthenticated(true);
     }

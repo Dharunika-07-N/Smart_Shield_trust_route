@@ -22,6 +22,16 @@ def signup(user_in: UserCreate, db: Session = Depends(get_db)):
                 detail="Username already registered"
             )
         
+        # Verify admin code for admin role
+        ADMIN_CODE = "Grunt123"
+        if user_in.role == "admin":
+            if not user_in.admin_code or user_in.admin_code != ADMIN_CODE:
+                logger.warning(f"Signup failed: Invalid admin code for {user_in.username}")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Invalid admin access code"
+                )
+        
         # Create new user
         new_user = User(
             username=user_in.username,
@@ -30,19 +40,19 @@ def signup(user_in: UserCreate, db: Session = Depends(get_db)):
             full_name=user_in.full_name,
             phone=user_in.phone,
             email=user_in.email,
-            license_number=user_in.license_number,
-            vehicle_type=user_in.vehicle_type,
+            license_number=user_in.license_number if user_in.role == "delivery_person" else None,
+            vehicle_type=user_in.vehicle_type if user_in.role == "delivery_person" else None,
             company_name=user_in.company_name,
-            gender=user_in.gender,
-            emergency_contact_name=user_in.emergency_contact_name,
-            emergency_contact_phone=user_in.emergency_contact_phone,
+            gender=user_in.gender if user_in.role in ["rider", "customer"] else None,
+            emergency_contact_name=user_in.emergency_contact_name if user_in.role in ["rider", "customer"] else None,
+            emergency_contact_phone=user_in.emergency_contact_phone if user_in.role in ["rider", "customer"] else None,
             emergency_contact_email=user_in.emergency_contact_email
         )
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
         
-        logger.info(f"New user signed up: {new_user.username}")
+        logger.info(f"New user signed up: {new_user.username} (role: {new_user.role})")
         return new_user
     except Exception as e:
         logger.error(f"Error during signup: {str(e)}")

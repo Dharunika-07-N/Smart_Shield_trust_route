@@ -66,8 +66,7 @@ class RouteOptimizer:
         
         # Initialize Renovation ML components
         if HAS_RENOVATION_ML:
-            self.db = SessionLocal()
-            self.feature_engineer = FeatureEngineer(self.db)
+            self.feature_engineer = FeatureEngineer(None)
             self.time_predictor = DeliveryTimePredictor()
             self.safety_classifier = SafetyClassifier()
             self.rl_agent = SARSARouteAgent()

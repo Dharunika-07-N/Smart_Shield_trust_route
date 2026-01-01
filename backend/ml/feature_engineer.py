@@ -75,54 +75,64 @@ class FeatureEngineer:
         
         return pd.DataFrame(features)
     
+    def _get_db(self):
+        if self.db:
+            return self.db
+        from database.database import SessionLocal
+        return SessionLocal()
+
     def _get_safety_scores(self, start_lat, start_lng, end_lat, end_lng):
         """Get safety scores from crime data"""
         midpoint_lat = (start_lat + end_lat) / 2
         midpoint_lng = (start_lng + end_lng) / 2
         
-        # Simple distance check for SQLite-friendly query
-        # Fetch all for now and calculate distance in Python (fine for few districts)
-        all_crimes = self.db.query(CrimeData).all()
-        
-        nearby_crimes = []
-        for crime in all_crimes:
-            loc = crime.location
-            if not loc: continue
+        db = self._get_db()
+        try:
+            # Simple distance check for SQLite-friendly query
+            all_crimes = db.query(CrimeData).all()
             
-            # Simple Euclidean distance approximation
-            dist = ((loc['latitude'] - midpoint_lat)**2 + (loc['longitude'] - midpoint_lng)**2)**0.5
-            if dist < 0.1: # Roughly 10km
-                nearby_crimes.append((crime, dist))
-        
-        if not nearby_crimes:
+            nearby_crimes = []
+            for crime in all_crimes:
+                loc = crime.location
+                if not loc: continue
+                
+                # Simple Euclidean distance approximation
+                dist = ((loc['latitude'] - midpoint_lat)**2 + (loc['longitude'] - midpoint_lng)**2)**0.5
+                if dist < 0.1: # Roughly 10km
+                    nearby_crimes.append((crime, dist))
+            
+            if not nearby_crimes:
+                return {
+                    'crime_score': 50.0,
+                    'murder_risk': 0.0,
+                    'sexual_harassment_risk': 0.0,
+                    'accident_risk': 0.0
+                }
+            
+            # Weighted average
+            total_crime_score = 0
+            murder_risk = 0
+            harassment_risk = 0
+            accident_risk = 0
+            total_weight = 0
+            
+            for crime, dist in nearby_crimes:
+                weight = 1.0 / (1.0 + dist * 10)
+                total_crime_score += crime.crime_risk_score * weight
+                murder_risk += crime.murder_count * weight
+                harassment_risk += crime.sexual_harassment_count * weight
+                accident_risk += crime.road_accident_count * weight
+                total_weight += weight
+            
             return {
-                'crime_score': 50.0,
-                'murder_risk': 0.0,
-                'sexual_harassment_risk': 0.0,
-                'accident_risk': 0.0
+                'crime_score': total_crime_score / total_weight if total_weight > 0 else 50.0,
+                'murder_risk': murder_risk / total_weight if total_weight > 0 else 0.0,
+                'sexual_harassment_risk': harassment_risk / total_weight if total_weight > 0 else 0.0,
+                'accident_risk': accident_risk / total_weight if total_weight > 0 else 0.0
             }
-        
-        # Weighted average
-        total_crime_score = 0
-        murder_risk = 0
-        harassment_risk = 0
-        accident_risk = 0
-        total_weight = 0
-        
-        for crime, dist in nearby_crimes:
-            weight = 1.0 / (1.0 + dist * 10)
-            total_crime_score += crime.crime_risk_score * weight
-            murder_risk += crime.murder_count * weight
-            harassment_risk += crime.sexual_harassment_count * weight
-            accident_risk += crime.road_accident_count * weight
-            total_weight += weight
-        
-        return {
-            'crime_score': total_crime_score / total_weight if total_weight > 0 else 50.0,
-            'murder_risk': murder_risk / total_weight if total_weight > 0 else 0.0,
-            'sexual_harassment_risk': harassment_risk / total_weight if total_weight > 0 else 0.0,
-            'accident_risk': accident_risk / total_weight if total_weight > 0 else 0.0
-        }
+        finally:
+            if not self.db:
+                db.close()
     
     def _get_traffic_features(self, segment, delivery_time):
         """Extract traffic-related features"""
@@ -157,24 +167,29 @@ class FeatureEngineer:
         start_lat = segment.get('start_lat', 0)
         start_lng = segment.get('start_lng', 0)
         
-        nearby_deliveries = self.db.query(HistoricalDelivery).filter(
-            HistoricalDelivery.origin_lat.between(start_lat - 0.1, start_lat + 0.1),
-            HistoricalDelivery.origin_lng.between(start_lng - 0.1, start_lng + 0.1)
-        ).limit(50).all()
-        
-        if not nearby_deliveries:
+        db = self._get_db()
+        try:
+            nearby_deliveries = db.query(HistoricalDelivery).filter(
+                HistoricalDelivery.origin_lat.between(start_lat - 0.1, start_lat + 0.1),
+                HistoricalDelivery.origin_lng.between(start_lng - 0.1, start_lng + 0.1)
+            ).limit(50).all()
+            
+            if not nearby_deliveries:
+                return {
+                    'avg_delivery_time': segment.get('distance', 0) * 3,  # 3 min per km
+                    'success_rate': 0.95,
+                    'avg_fuel_consumption': segment.get('distance', 0) * 0.05
+                }
+            
+            avg_time = np.mean([d.delivery_time_minutes for d in nearby_deliveries])
+            success_rate = np.mean([d.success for d in nearby_deliveries])
+            avg_fuel = np.mean([d.fuel_consumed for d in nearby_deliveries if d.fuel_consumed])
+            
             return {
-                'avg_delivery_time': segment.get('distance', 0) * 3,  # 3 min per km
-                'success_rate': 0.95,
-                'avg_fuel_consumption': segment.get('distance', 0) * 0.05
+                'avg_delivery_time': float(avg_time),
+                'success_rate': float(success_rate),
+                'avg_fuel_consumption': float(avg_fuel)
             }
-        
-        avg_time = np.mean([d.delivery_time_minutes for d in nearby_deliveries])
-        success_rate = np.mean([d.success for d in nearby_deliveries])
-        avg_fuel = np.mean([d.fuel_consumed for d in nearby_deliveries if d.fuel_consumed])
-        
-        return {
-            'avg_delivery_time': float(avg_time),
-            'success_rate': float(success_rate),
-            'avg_fuel_consumption': float(avg_fuel)
-        }
+        finally:
+            if not self.db:
+                db.close()

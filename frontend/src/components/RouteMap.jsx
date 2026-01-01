@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents, useMap, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
 import { api } from '../services/api';
+import { FiNavigation, FiClock, FiShield, FiMapPin, FiChevronRight } from 'react-icons/fi';
 import useLocation from '../hooks/useLocation';
 import SafetyHeatmap from './SafetyHeatmap';
 
@@ -22,6 +23,49 @@ const serviceColors = {
   zomato: '#cb202d',
   rapido: '#f9d923',
   'red-taxi': '#800000'
+};
+
+const SafetyGauge = ({ score }) => {
+  const radius = 24;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (score / 100) * circumference;
+
+  const getColor = (s) => {
+    if (s >= 80) return '#10b981';
+    if (s >= 60) return '#f59e0b';
+    return '#ef4444';
+  };
+
+  return (
+    <div className="relative flex items-center justify-center w-20 h-20">
+      <svg className="w-full h-full transform -rotate-90">
+        <circle
+          cx="40"
+          cy="40"
+          r={radius}
+          stroke="#e5e7eb"
+          strokeWidth="6"
+          fill="transparent"
+        />
+        <circle
+          cx="40"
+          cy="40"
+          r={radius}
+          stroke={getColor(score)}
+          strokeWidth="6"
+          fill="transparent"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-gray-900 font-bold text-lg leading-none">{score}</span>
+        <span className="text-gray-500 text-[10px]">Safety</span>
+      </div>
+    </div>
+  );
 };
 
 const RouteMap = () => {
@@ -154,6 +198,17 @@ const RouteMap = () => {
     } finally {
       // Small delay to allow click to register before results disappear if needed,
       // but usually not needed with React state.
+    }
+  };
+
+  const reverseGeocode = async (lat, lon) => {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`;
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      const data = await res.json();
+      return data.display_name;
+    } catch (e) {
+      return `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
     }
   };
 
@@ -412,10 +467,10 @@ const RouteMap = () => {
   };
 
   const getSafetyColor = (score) => {
-    if (score >= 85) return '#16a34a'; // green
-    if (score >= 70) return '#ea580c'; // orange
-    if (score >= 50) return '#dc2626'; // red
-    return '#991b1b'; // dark red
+    if (score >= 85) return '#39FF14'; // Neon Green
+    if (score >= 70) return '#ea580c'; // Orange
+    if (score >= 50) return '#ef4444'; // Red
+    return '#991b1b'; // Dark Red
   };
 
   const getSafetyColorOpacity = (score) => {
@@ -454,9 +509,9 @@ const RouteMap = () => {
           (recommended === 'safest' && routeData === safest);
         polylines.push({
           positions: coords,
-          color: getSafetyColor(safetyScore),
-          weight: isRecommended ? 5 : 3,
-          opacity: getSafetyColorOpacity(safetyScore),
+          color: '#39FF14', // Neon Green as requested
+          weight: isRecommended ? 6 : 4,
+          opacity: isRecommended ? 0.9 : 0.6,
           safetyScore: safetyScore
         });
       }
@@ -476,19 +531,19 @@ const RouteMap = () => {
 
   const ClickToSetLocation = () => {
     useMapEvents({
-      click(e) {
+      async click(e) {
         const coords = [e.latlng.lat, e.latlng.lng];
         if (selectionMode === 'start') {
           console.log('Start point selected from map click:', coords);
           setCurrentPos(coords);
-          setStartQuery(`${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}`);
-          // Auto-switch to destination mode after setting start
+          const address = await reverseGeocode(coords[0], coords[1]);
+          setStartQuery(address);
           setSelectionMode('destination');
         } else {
           console.log('Destination selected from map click:', coords);
           setDestPos(coords);
-          // Clear search query when clicking on map
-          setDestQuery(`${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}`);
+          const address = await reverseGeocode(coords[0], coords[1]);
+          setDestQuery(address);
           setResults([]);
         }
       }
@@ -712,20 +767,14 @@ const RouteMap = () => {
           </div>
 
           {(fastest || safest || shortest) && (
-            <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-200">
-              <h3 className="font-semibold text-gray-900 mb-4">Results</h3>
-              <div className="space-y-3 text-sm">
+            <div className="space-y-4">
+              <h3 className="font-bold text-gray-900 text-lg px-1">Route Options</h3>
+              <div className="space-y-4">
                 {(() => {
-                  // Consolidate unique routes
                   const allRoutes = [];
-                  const seenIds = new Set();
-
                   const addRoute = (route, type) => {
                     if (!route) return;
-                    // Use a rough signature if IDs are not stable across calls (though they should be unique per optimization)
-                    // For now, assuming route objects are distinct references but might have same content
                     const sig = route.route_id || `${route.total_duration_seconds}-${route.total_distance_meters}`;
-
                     let existing = allRoutes.find(r => r.sig === sig);
                     if (!existing) {
                       existing = { ...route, sig, types: [] };
@@ -740,100 +789,94 @@ const RouteMap = () => {
                   addRoute(safest, 'Safest');
                   addRoute(shortest, 'Shortest');
 
-                  // Calculate ranges for normalization
-                  const maxDuration = Math.max(...allRoutes.map(r => r.total_duration_seconds));
-                  const minDuration = Math.min(...allRoutes.map(r => r.total_duration_seconds));
-                  const maxDistance = Math.max(...allRoutes.map(r => r.total_distance_meters));
-                  const minDistance = Math.min(...allRoutes.map(r => r.total_distance_meters));
+                  // Add alternative routes as well
+                  if (alternatives && alternatives.length > 0) {
+                    alternatives.forEach((alt, idx) => {
+                      addRoute(alt, `Alt ${idx + 1}`);
+                    });
+                  }
 
-                  return allRoutes.map((route, idx) => {
-                    // Normalize scores (0-100), higher is better
-                    // Speed Score: Lower duration is better
-                    const speedScore = maxDuration === minDuration ? 100 :
-                      Math.round(100 * (1 - (route.total_duration_seconds - minDuration) / (maxDuration - minDuration + 1))); // +1 to avoid div by zero if equal
-
-                    // Distance Score: Lower distance is better
-                    const distScore = maxDistance === minDistance ? 100 :
-                      Math.round(100 * (1 - (route.total_distance_meters - minDistance) / (maxDistance - minDistance + 1)));
-
-                    // Safety Score: Already 0-100
-                    const safeScore = Math.round(route.average_safety_score);
-
-                    // Check if this route is currently 'recommended' (active)
-                    // matched by simple reference or type
+                  return allRoutes.map((route) => {
                     const isActive =
                       (recommended === 'fastest' && route.types.includes('Fastest')) ||
                       (recommended === 'safest' && route.types.includes('Safest')) ||
                       (recommended === 'shortest' && route.types.includes('Shortest'));
 
-                    // If multiple match (e.g. fastest is also safest), isActive might default to one.
-                    // Better logic: if we clicked this specific CARD, it sets the mode.
-                    // But we just want to highlight the *Active Navigation Route*.
+                    const duration = Math.round(route.total_duration_seconds / 60);
+                    const distanceKm = (route.total_distance_meters / 1000).toFixed(1);
+                    const distanceMi = (route.total_distance_meters / 1609.34).toFixed(1);
+                    const safetyScore = Math.round(route.average_safety_score);
 
                     return (
                       <div
                         key={route.sig}
-                        className={`p-3 rounded-lg cursor-pointer border-2 transition-all ${isActive ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500' : 'border-gray-200 hover:border-gray-300'
+                        className={`p-5 rounded-2xl border-2 transition-all cursor-pointer ${isActive
+                          ? 'border-blue-500 bg-blue-50/50 shadow-md ring-1 ring-blue-500/20'
+                          : 'border-gray-100 bg-white hover:border-gray-200 shadow-sm'
                           }`}
                         onClick={() => {
-                          // Set recommended based on the primary type or 'fastest' if multiple
                           if (route.types.includes('Fastest')) setRecommended('fastest');
                           else if (route.types.includes('Safest')) setRecommended('safest');
                           else if (route.types.includes('Shortest')) setRecommended('shortest');
                         }}
                       >
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex flex-wrap gap-1">
-                            {route.types.map(t => (
-                              <span key={t} className={`text-xs px-2 py-0.5 rounded-full font-bold ${t === 'Fastest' ? 'bg-blue-100 text-blue-700' :
-                                t === 'Safest' ? 'bg-green-100 text-green-700' :
-                                  'bg-purple-100 text-purple-700'
-                                }`}>
-                                {t}
-                              </span>
-                            ))}
+                        <div className="flex justify-between items-start">
+                          <div className="flex gap-4">
+                            {/* Vertical Timeline */}
+                            <div className="flex flex-col items-center py-1">
+                              <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                              <div className="w-0.5 flex-1 bg-blue-200 my-1 min-h-[40px]"></div>
+                              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                            </div>
+
+                            <div className="space-y-4">
+                              <div className="flex flex-wrap gap-1 mb-1">
+                                {route.types.map(t => (
+                                  <span key={t} className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${t === 'Fastest' ? 'bg-blue-100 text-blue-700' :
+                                    t === 'Safest' ? 'bg-green-100 text-green-700' :
+                                      t === 'Shortest' ? 'bg-purple-100 text-purple-700' :
+                                        'bg-gray-100 text-gray-700'
+                                    }`}>
+                                    {t}
+                                  </span>
+                                ))}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2 text-gray-500 text-xs">
+                                  <FiMapPin className="text-[10px]" />
+                                  <span className="truncate max-w-[120px]">{startQuery || 'Current Location'}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-gray-900 font-bold text-sm mt-2">
+                                  <FiMapPin className="text-[10px]" />
+                                  <span className="truncate max-w-[120px]">{destQuery || 'Destination'}</span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-4 text-gray-600">
+                                <div className="flex items-center gap-1.5 text-sm">
+                                  <FiNavigation className="text-gray-400 rotate-45" />
+                                  <span>{distanceMi} mi</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-sm">
+                                  <FiClock className="text-gray-400" />
+                                  <span>{duration} min</span>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <div className="font-bold text-gray-900">{Math.round(route.total_duration_seconds / 60)} min</div>
-                            <div className="text-xs text-gray-500">{(route.total_distance_meters / 1000).toFixed(1)} km</div>
-                          </div>
+
+                          {/* Safety Gauge */}
+                          <SafetyGauge score={safetyScore} />
                         </div>
 
-                        {/* Level Scores */}
-                        <div className="space-y-2">
-                          {/* Safety */}
-                          <div>
-                            <div className="flex justify-between text-xs mb-1">
-                              <span className="text-gray-600">Safety Score</span>
-                              <span className="font-medium text-gray-900">{safeScore}/100</span>
-                            </div>
-                            <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
-                              <div className="h-full bg-green-500 rounded-full" style={{ width: `${safeScore}%` }}></div>
-                            </div>
-                          </div>
-
-                          {/* Speed/Time Efficiency */}
-                          <div>
-                            <div className="flex justify-between text-xs mb-1">
-                              <span className="text-gray-600">Speed Score</span>
-                              <span className="font-medium text-gray-900">{speedScore}/100</span>
-                            </div>
-                            <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
-                              <div className="h-full bg-blue-500 rounded-full" style={{ width: `${speedScore}%` }}></div>
-                            </div>
-                          </div>
-
-                          {/* Distance Efficiency */}
-                          <div>
-                            <div className="flex justify-between text-xs mb-1">
-                              <span className="text-gray-600">Distance Score</span>
-                              <span className="font-medium text-gray-900">{distScore}/100</span>
-                            </div>
-                            <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
-                              <div className="h-full bg-purple-500 rounded-full" style={{ width: `${distScore}%` }}></div>
-                            </div>
-                          </div>
-                        </div>
+                        <button
+                          className={`w-full mt-5 py-3 rounded-xl font-bold text-sm transition-all transform active:scale-[0.98] ${isActive
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
+                            : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+                            }`}
+                        >
+                          {isActive ? 'Selected' : 'Select Route'}
+                        </button>
                       </div>
                     );
                   });
@@ -841,9 +884,9 @@ const RouteMap = () => {
 
                 <button
                   onClick={() => setNavigationMode(true)}
-                  className="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
+                  className="w-full mt-2 bg-gray-900 hover:bg-black text-white py-4 rounded-2xl font-bold text-base flex items-center justify-center space-x-3 transition-all shadow-xl hover:translate-y-[-2px] active:translate-y-[0px]"
                 >
-                  <span>🚀</span>
+                  <span className="text-xl">🚀</span>
                   <span>Start Navigation</span>
                 </button>
               </div>
@@ -957,9 +1000,9 @@ const RouteMap = () => {
                     key={`nav-poly-${idx}`}
                     positions={poly.positions}
                     pathOptions={{
-                      color: poly.color, // Keep safety colors
-                      weight: 8, // Thicker line for navigation
-                      opacity: 0.8,
+                      color: poly.safetyScore >= 80 ? '#39FF14' : poly.color,
+                      weight: 10,
+                      opacity: 0.9,
                     }}
                   />
                 ))}
@@ -1231,9 +1274,9 @@ const RouteMap = () => {
                   <Polyline
                     positions={[currentPos, destPos]}
                     pathOptions={{
-                      color: recommended === 'safest' ? '#16a34a' : '#9ca3af',
-                      weight: recommended === 'safest' ? 5 : 3,
-                      opacity: 0.8
+                      color: recommended === 'safest' ? '#39FF14' : '#9ca3af',
+                      weight: recommended === 'safest' ? 6 : 4,
+                      opacity: 0.9
                     }}
                   />
                 )}

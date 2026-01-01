@@ -1,5 +1,6 @@
 """Delivery route endpoints."""
 from fastapi import APIRouter, HTTPException, Depends, WebSocket, WebSocketDisconnect
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 from typing import List, Dict, Set, Optional
 from pydantic import BaseModel
@@ -22,6 +23,8 @@ from api.schemas.delivery import (
 from api.models.route_optimizer import RouteOptimizer
 from api.services.database import DatabaseService
 from api.services.route_monitor import RouteMonitor
+from database.database import get_db
+from loguru import logger
 
 # Use FREE OSRM service (no API key needed!)
 try:
@@ -32,9 +35,6 @@ except ImportError:
     from api.services.maps import MapsService
     maps_service_instance = MapsService()
     logger.warning("Using MapsService (requires Google API key)")
-
-from database.database import get_db
-from loguru import logger
 
 router = APIRouter()
 route_optimizer = RouteOptimizer()
@@ -138,14 +138,11 @@ async def optimize_route(
     request: RouteOptimizationRequest,
     db: Session = Depends(get_db)
 ):
-    """Optimize a delivery route based on multiple objectives.
-    
-    Optimizes routes considering time, distance, fuel efficiency, and safety.
-    """
+    """Optimize a delivery route based on multiple objectives."""
     try:
-        logger.info(f"Optimizing route for {len(request.stops)} stops")
+        logger.info(f"Optimizing route for {len(request.stops)} stops (Origin: {request.starting_point})")
         
-        # Optimize route
+        # Optimize route using the optimizer service
         optimized_data = await route_optimizer.optimize_route(
             starting_point=request.starting_point,
             stops=request.stops,
@@ -155,31 +152,37 @@ async def optimize_route(
             departure_time=request.departure_time
         )
         
-        # Save to database
+        # Save to database - use jsonable_encoder to handle datetime/pydantic objects
         db_service = DatabaseService(db)
-        route_id = db_service.save_route({
+        route_data_to_save = {
             "id": optimized_data["route_id"],
-            "starting_point": {"lat": request.starting_point.latitude, "lng": request.starting_point.longitude},
-            "stops": [stop.dict() for stop in request.stops],
+            "starting_point": jsonable_encoder(request.starting_point),
+            "stops": jsonable_encoder(request.stops),
             "optimized_sequence": optimized_data["sequence"],
             "total_distance_meters": optimized_data["total_distance_meters"],
             "total_duration_seconds": optimized_data["total_duration_seconds"],
             "average_safety_score": optimized_data["average_safety_score"],
             "total_fuel_liters": optimized_data["total_fuel_liters"],
             "optimizations_applied": optimized_data["optimizations_applied"]
-        })
+        }
+        
+        route_id = db_service.save_route(route_data_to_save)
+        logger.info(f"Route saved to DB with ID: {route_id}")
+        
+        # Create response data - ensure it matches OptimizedRoute schema exactly
+        response_data = OptimizedRoute(**jsonable_encoder(optimized_data))
         
         return RouteResponse(
             success=True,
             message=f"Route optimized successfully with {len(request.stops)} stops",
-            data=OptimizedRoute(**optimized_data)
+            data=response_data
         )
     
     except ValueError as e:
         logger.error(f"Validation error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Optimization error: {e}")
+        logger.exception(f"Optimization error: {e}")
         raise HTTPException(status_code=500, detail=f"Route optimization failed: {str(e)}")
 
 
