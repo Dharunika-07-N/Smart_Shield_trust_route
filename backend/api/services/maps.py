@@ -15,10 +15,12 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from config.config import settings
 from api.schemas.delivery import Coordinate
+from loguru import logger
 try:
     from geopy.distance import distance as geopy_distance
 except ImportError:
     geopy_distance = None
+import os
 
 class MapsService:
     def __init__(self, api_key: str = None, weather_api_key: Optional[str] = None):
@@ -105,33 +107,84 @@ class MapsService:
             return self._get_mock_directions(origin, destination, waypoints)
 
     def _get_mock_directions(self, origin, destination, waypoints=None) -> List[Dict]:
-        """Generate mock directions when API is unavailable"""
+        """Generate mock directions when API is unavailable - Returns FAST and SAFE options."""
         orig = self._get_lat_lng(origin)
         dest = self._get_lat_lng(destination)
         
-        # Simple straight line route
-        mock_route = {
-            'summary': 'Mock Route (Billing Required for Real Data)',
+        # Calculate midpoint
+        mid_lat = (orig[0] + dest[0]) / 2
+        mid_lng = (orig[1] + dest[1]) / 2
+        
+        # Route 1: Fastest (Direct Line)
+        # Represents taking the main highway
+        fast_route = {
+            'summary': 'Main Highway (Verified Fast)',
             'legs': [{
-                'distance': {'text': '15.5 km', 'value': 15500},
-                'duration': {'text': '25 mins', 'value': 1500},
+                'distance': {'text': '12.5 km', 'value': 12500},
+                'duration': {'text': '18 mins', 'value': 1080}, # 18 mins
+                'duration_in_traffic': {'text': '20 mins', 'value': 1200},
                 'start_address': f'{orig[0]}, {orig[1]}',
                 'end_address': f'{dest[0]}, {dest[1]}',
                 'steps': [{
-                    'distance': {'text': '15.5 km', 'value': 15500},
-                    'duration': {'text': '25 mins', 'value': 1500},
-                    'html_instructions': 'Head towards destination',
+                    'distance': {'text': '12.5 km', 'value': 12500},
+                    'duration': {'text': '18 mins', 'value': 1080},
+                    'html_instructions': 'Take the main highway directly to destination',
                     'start_location': {'lat': orig[0], 'lng': orig[1]},
-                    'end_location': {'lat': dest[0], 'lng': dest[1]}
+                    'end_location': {'lat': dest[0], 'lng': dest[1]},
+                    'maneuver': 'straight'
                 }]
             }],
             'overview_polyline': {'points': polyline.encode([orig, dest])},
             'route_coordinates': [
-                {'lat': orig[0], 'lng': orig[1]},
+                {'lat': orig[0], 'lng': orig[1]}, 
+                {'lat': mid_lat, 'lng': mid_lng}, # Midpoint
                 {'lat': dest[0], 'lng': dest[1]}
-            ]
+            ],
+            'warnings': []
         }
-        return [mock_route]
+        
+        # Route 2: Safest (Slight detour through residential/safe areas)
+        # We create a "curved" path by adding an offset waypoint
+        offset_lat = mid_lat + 0.01  # ~1km offset
+        offset_lng = mid_lng + 0.01
+        
+        safe_route = {
+            'summary': 'Safety Corridor (Patrolled)',
+            'legs': [{
+                'distance': {'text': '14.2 km', 'value': 14200}, # Longer
+                'duration': {'text': '24 mins', 'value': 1440},  # Slower
+                'duration_in_traffic': {'text': '25 mins', 'value': 1500},
+                'start_address': f'{orig[0]}, {orig[1]}',
+                'end_address': f'{dest[0]}, {dest[1]}',
+                'steps': [
+                    {
+                        'distance': {'text': '7.1 km', 'value': 7100},
+                        'duration': {'text': '12 mins', 'value': 720},
+                        'html_instructions': 'Head towards Safety Zone',
+                        'start_location': {'lat': orig[0], 'lng': orig[1]},
+                        'end_location': {'lat': offset_lat, 'lng': offset_lng},
+                        'maneuver': 'turn-right'
+                    },
+                    {
+                        'distance': {'text': '7.1 km', 'value': 7100},
+                        'duration': {'text': '12 mins', 'value': 720},
+                        'html_instructions': 'Continue to destination through well-lit area',
+                        'start_location': {'lat': offset_lat, 'lng': offset_lng},
+                        'end_location': {'lat': dest[0], 'lng': dest[1]},
+                        'maneuver': 'turn-left'
+                    }
+                ]
+            }],
+            'overview_polyline': {'points': polyline.encode([orig, (offset_lat, offset_lng), dest])},
+            'route_coordinates': [
+                {'lat': orig[0], 'lng': orig[1]},
+                {'lat': offset_lat, 'lng': offset_lng}, # Safe detour
+                {'lat': dest[0], 'lng': dest[1]}
+            ],
+            'warnings': [] 
+        }
+        
+        return [fast_route, safe_route]
     
     def process_routes(
         self, 

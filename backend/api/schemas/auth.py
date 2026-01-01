@@ -19,6 +19,7 @@ class UserCreate(UserBase):
     gender: Optional[str] = None
     emergency_contact_name: Optional[str] = None
     emergency_contact_phone: Optional[str] = None
+    emergency_contact_email: Optional[str] = None
 
 class UserLogin(BaseModel):
     username: str
@@ -35,6 +36,7 @@ class UserResponse(UserBase):
     gender: Optional[str] = None
     emergency_contact_name: Optional[str] = None
     emergency_contact_phone: Optional[str] = None
+    emergency_contact_email: Optional[str] = None
 
     class Config:
         from_attributes = True

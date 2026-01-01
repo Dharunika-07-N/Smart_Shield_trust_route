@@ -1,8 +1,13 @@
 """Traffic service for fetching and processing traffic data."""
 from typing import List, Dict, Optional, Tuple
-from geopy.distance import distance as geopy_distance
+try:
+    from geopy.distance import distance as geopy_distance
+except ImportError:
+    geopy_distance = None
+
 import random
 import sys
+import math
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent.parent.parent))
@@ -18,6 +23,25 @@ class TrafficService:
     def __init__(self):
         self.base_speed_ms = 8.33  # 30 km/h average
         logger.info("TrafficService initialized")
+
+    def _calculate_distance(self, start: Coordinate, end: Coordinate) -> float:
+        """Calculate distance in meters (using geopy or fallback)."""
+        if geopy_distance:
+            return geopy_distance(
+                (start.latitude, start.longitude),
+                (end.latitude, end.longitude)
+            ).meters
+        
+        # Haversine fallback
+        R = 6371000  # Earth radius in meters
+        phi1 = start.latitude * math.pi / 180
+        phi2 = end.latitude * math.pi / 180
+        dphi = (end.latitude - start.latitude) * math.pi / 180
+        dlambda = (end.longitude - start.longitude) * math.pi / 180
+        
+        a = math.sin(dphi/2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda/2)**2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+        return R * c
     
     def get_traffic_level(
         self,
@@ -52,10 +76,7 @@ class TrafficService:
         traffic = random.choices(traffic_levels, weights=weights)[0]
         
         # Calculate distance
-        dist = geopy_distance(
-            (start.latitude, start.longitude),
-            (end.latitude, end.longitude)
-        ).meters
+        dist = self._calculate_distance(start, end)
         
         # Calculate speed based on traffic
         speed = self._get_speed_for_traffic(traffic)

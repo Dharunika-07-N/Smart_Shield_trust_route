@@ -35,7 +35,8 @@ def signup(user_in: UserCreate, db: Session = Depends(get_db)):
             company_name=user_in.company_name,
             gender=user_in.gender,
             emergency_contact_name=user_in.emergency_contact_name,
-            emergency_contact_phone=user_in.emergency_contact_phone
+            emergency_contact_phone=user_in.emergency_contact_phone,
+            emergency_contact_email=user_in.emergency_contact_email
         )
         db.add(new_user)
         db.commit()

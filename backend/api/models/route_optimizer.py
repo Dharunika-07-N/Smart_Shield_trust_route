@@ -19,7 +19,18 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from config.config import settings
 from api.schemas.delivery import Coordinate, DeliveryStop
-from api.services.maps import MapsService
+from loguru import logger
+
+# Use FREE OSRM service instead of Google Maps (no API key needed!)
+try:
+    from api.services.osrm_service import OSRMService
+    USE_OSRM = True
+    logger.info("Using FREE OSRM service (no API key required)")
+except ImportError:
+    from api.services.maps import MapsService
+    USE_OSRM = False
+    logger.warning("OSRM not available, falling back to MapsService")
+
 from api.models.safety_scorer import SafetyScorer
 from api.services.weather import WeatherService
 from api.services.traffic import TrafficService
@@ -43,11 +54,14 @@ class RouteOptimizer:
     """Multi-objective route optimization engine."""
     
     def __init__(self):
-        self.maps_service = MapsService()
+        # Use FREE OSRM service (no API key, no billing!)
+        if USE_OSRM:
+            self.maps_service = OSRMService()
+        else:
+            self.maps_service = MapsService()
+        
         self.safety_scorer = SafetyScorer()
-
         self.weather_service = WeatherService()
-
         self.traffic_service = TrafficService()
         
         # Initialize Renovation ML components

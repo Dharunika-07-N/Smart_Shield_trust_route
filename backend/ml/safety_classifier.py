@@ -48,10 +48,16 @@ class SafetyClassifier:
         """
         if self.model is None:
             if not self.load_model():
-                # Fallback score
-                return np.array([75.0] * len(X))
+                # Train with synthetic data if no model exists
+                print("⚠️ No trained model found, creating initial model with synthetic data...")
+                self._train_synthetic_model()
         
         try:
+            # Ensure scaler is fitted
+            if not hasattr(self.scaler, 'mean_'):
+                print("⚠️ Scaler not fitted, refitting...")
+                self.scaler.fit(X)
+            
             X_scaled = self.scaler.transform(X)
             # Get probability of safe class (index 1)
             safety_proba = self.model.predict_proba(X_scaled)[:, 1]
@@ -59,7 +65,35 @@ class SafetyClassifier:
             return safety_proba * 100
         except Exception as e:
             print(f"❌ Error in safety prediction: {e}")
+            # Return fallback scores
             return np.array([70.0] * len(X))
+    
+    def _train_synthetic_model(self):
+        """Train model with synthetic data if no real data available"""
+        print("🔧 Training SafetyClassifier with synthetic data...")
+        
+        # Generate synthetic training data
+        n_samples = 500
+        np.random.seed(42)
+        
+        # Features: [crime_rate, lighting, patrol, traffic, hour, police_proximity]
+        X = pd.DataFrame({
+            'crime_rate': np.random.rand(n_samples) * 10,
+            'lighting': np.random.rand(n_samples) * 100,
+            'patrol': np.random.rand(n_samples) * 100,
+            'traffic': np.random.rand(n_samples) * 100,
+            'hour': np.random.randint(0, 24, n_samples),
+            'police_proximity': np.random.rand(n_samples) * 100
+        })
+        
+        # Target: 1 = safe, 0 = unsafe
+        # Safe if: low crime, high lighting, high patrol, close to police
+        y = ((X['crime_rate'] < 5) & 
+             (X['lighting'] > 50) & 
+             (X['patrol'] > 40) & 
+             (X['police_proximity'] > 30)).astype(int)
+        
+        self.train(X, y)
     
     def save_model(self):
         """Save trained model"""

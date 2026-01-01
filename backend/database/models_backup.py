@@ -215,7 +215,6 @@ class User(Base):
     gender = Column(String, nullable=True)
     emergency_contact_name = Column(String, nullable=True)
     emergency_contact_phone = Column(String, nullable=True)
-    emergency_contact_email = Column(String, nullable=True)
     
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)

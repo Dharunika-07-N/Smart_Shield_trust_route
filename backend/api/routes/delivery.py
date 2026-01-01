@@ -22,14 +22,23 @@ from api.schemas.delivery import (
 from api.models.route_optimizer import RouteOptimizer
 from api.services.database import DatabaseService
 from api.services.route_monitor import RouteMonitor
-from api.services.maps import MapsService
+
+# Use FREE OSRM service (no API key needed!)
+try:
+    from api.services.osrm_service import OSRMService
+    maps_service_instance = OSRMService()
+    logger.info("Using FREE OSRM service for routing")
+except ImportError:
+    from api.services.maps import MapsService
+    maps_service_instance = MapsService()
+    logger.warning("Using MapsService (requires Google API key)")
+
 from database.database import get_db
 from loguru import logger
 
 router = APIRouter()
 route_optimizer = RouteOptimizer()
 route_monitor = RouteMonitor()
-maps_service_instance = MapsService()
 
 @router.post("/optimize-route")
 async def optimize_route_simple(
@@ -37,15 +46,10 @@ async def optimize_route_simple(
     destination: dict
 ):
     """Simple route optimization with safety scores for multiple alternatives."""
-    maps_service = MapsService() # Instantiate here to ensure env vars are loaded
     logger.info(f"Optimize route request: origin={origin}, destination={destination}")
     
-    if not maps_service.gmaps:
-        logger.error("MapsService gmaps not initialized! check API key.")
-        raise HTTPException(status_code=500, detail="Maps service not configured")
-        
-    # Get multiple route alternatives
-    directions = maps_service.get_directions(origin, destination, alternatives=True)
+    # Get multiple route alternatives using OSRM (FREE!)
+    directions = maps_service_instance.get_directions(origin, destination, alternatives=True)
     
     if not directions:
         logger.error(f"Failed to get directions for {origin} to {destination}")
@@ -58,13 +62,31 @@ async def optimize_route_simple(
             
         leg = route['legs'][0]
         
+        # Calculate safety score using the route coordinates
+        from api.models.safety_scorer import SafetyScorer
+        safety_scorer = SafetyScorer()
+        
+        # Get route coordinates for safety scoring
+        route_coords_list = route.get('route_coordinates', [])
+        if route_coords_list:
+            # Convert to Coordinate objects
+            from api.schemas.delivery import Coordinate
+            coords = [
+                Coordinate(latitude=c['lat'], longitude=c['lng'])
+                for c in route_coords_list[::max(1, len(route_coords_list)//10)]  # Sample every 10th point
+            ]
+            safety_data = safety_scorer.score_route(coords, time_of_day="day")
+            safety_score = safety_data['route_safety_score']
+        else:
+            safety_score = 75.0  # Default
+        
         route_info = {
             'index': idx,
             'duration': leg['duration']['value'],
             'distance': leg['distance']['value'],
             'summary': route.get('summary', f'Route {idx+1}'),
             'polyline': route.get('overview_polyline', {}).get('points', ''),
-            'safety_score': maps_service.calculate_safety_score(route),
+            'safety_score': safety_score,
             'steps': leg.get('steps', [])
         }
         routes.append(route_info)

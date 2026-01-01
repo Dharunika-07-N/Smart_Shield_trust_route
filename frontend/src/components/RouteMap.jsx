@@ -43,7 +43,7 @@ const RouteMap = () => {
   const [showSafetyOverlay, setShowSafetyOverlay] = useState(true);
 
   // Delivery Service & Crowdsourcing
-  const [selectedService, setSelectedService] = useState('swiggy'); // swiggy, zomato, rapido, red-taxi
+  // const [selectedService, setSelectedService] = useState('swiggy'); // Removed branding
   const [crowdsourcedAlerts, setCrowdsourcedAlerts] = useState([]);
   const [quizOpen, setQuizOpen] = useState(false);
   const [quizAnswers, setQuizAnswers] = useState({ isFaster: null, hasTraffic: null });
@@ -63,12 +63,12 @@ const RouteMap = () => {
   // Animated pulsing dot icon for current location (Snapchat-like)
   const pulsingIcon = useMemo(() => {
     const size = 20;
-    const color = serviceColors[selectedService] || '#3b82f6';
+    const color = '#3b82f6'; // Default Blue
     return L.divIcon({
       className: 'pulsing-marker',
       html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};box-shadow:0 0 0 0 ${color}77;animation:pulse 2s infinite"></div>`
     });
-  }, [selectedService]);
+  }, []);
 
   // Update current position when location changes
   useEffect(() => {
@@ -183,7 +183,7 @@ const RouteMap = () => {
     try {
       await api.submitAlert({
         rider_id: 'RIDER_' + Math.floor(Math.random() * 1000),
-        service_type: selectedService,
+        service_type: 'generic',
         location: { lat: currentPos[0], lng: currentPos[1] },
         is_faster: quizAnswers.isFaster,
         has_traffic_issues: quizAnswers.hasTraffic
@@ -498,32 +498,7 @@ const RouteMap = () => {
 
   return (
     <div className="space-y-6">
-      {/* Delivery Service Selector Header */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Delivery Route Optimizer</h2>
-          <p className="text-sm text-gray-500">Fast. Safe. Dynamic Optimization.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {[
-            { id: 'swiggy', label: 'Swiggy', color: 'bg-[#fc8019]' },
-            { id: 'zomato', label: 'Zomato', color: 'bg-[#cb202d]' },
-            { id: 'rapido', label: 'Rapido', color: 'bg-[#f9d923] text-black' },
-            { id: 'red-taxi', label: 'Red Taxi', color: 'bg-[#800000]' }
-          ].map(service => (
-            <button
-              key={service.id}
-              onClick={() => setSelectedService(service.id)}
-              className={`px-4 py-2 rounded-full font-bold text-sm transition-all transform hover:scale-105 shadow-md ${selectedService === service.id
-                ? `${service.color} text-white ring-2 ring-offset-2 ring-gray-400`
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                } ${service.id === 'rapido' && selectedService === 'rapido' ? 'text-black' : ''}`}
-            >
-              {service.label}
-            </button>
-          ))}
-        </div>
-      </div>
+
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Controls */}
@@ -1274,14 +1249,11 @@ const RouteMap = () => {
       {quizOpen && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform animate-in fade-in zoom-in duration-300">
-            <div className={`p-6 text-white ${selectedService === 'swiggy' ? 'bg-[#fc8019]' :
-              selectedService === 'zomato' ? 'bg-[#cb202d]' :
-                selectedService === 'rapido' ? 'bg-[#f9d923] text-black' : 'bg-[#800000]'
-              }`}>
+            <div className="p-6 text-white bg-blue-600">
               <h3 className="text-xl font-bold flex items-center gap-2">
                 <span>⚡</span> Rider Pulse Check
               </h3>
-              <p className="text-sm opacity-90 mt-1">Help other {selectedService} riders find better routes!</p>
+              <p className="text-sm opacity-90 mt-1">Help other riders find better routes!</p>
             </div>
 
             <div className="p-6 space-y-6">

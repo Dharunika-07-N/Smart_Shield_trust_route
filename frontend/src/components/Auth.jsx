@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
     FiUser, FiLock, FiMail, FiCheckCircle, FiShield,
-    FiTruck, FiNavigation, FiPhone, FiCreditCard, FiList
+    FiTruck, FiNavigation, FiPhone, FiCreditCard, FiList,
+    FiBriefcase, FiShoppingBag
 } from 'react-icons/fi';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
@@ -22,7 +23,8 @@ const Auth = ({ setAuth }) => {
         company_name: '',
         gender: 'female',
         emergency_contact_name: '',
-        emergency_contact_phone: ''
+        emergency_contact_phone: '',
+        emergency_contact_email: ''
     });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -109,28 +111,50 @@ const Auth = ({ setAuth }) => {
                     {!isLogin && (
                         <div className="mb-8">
                             <label className="block text-sm font-medium text-gray-400 mb-4 text-center">I am a...</label>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 gap-3">
                                 <button
                                     type="button"
                                     onClick={() => setRole('rider')}
-                                    className={`flex flex-col items-center gap-3 p-4 rounded-2xl border-2 transition-all ${role === 'rider'
-                                            ? 'border-blue-500 bg-blue-500/10 text-white'
-                                            : 'border-gray-700 bg-gray-900/30 text-gray-500 hover:border-gray-600'
+                                    className={`flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all ${role === 'rider'
+                                        ? 'border-blue-500 bg-blue-500/10 text-white'
+                                        : 'border-gray-700 bg-gray-900/30 text-gray-500 hover:border-gray-600'
                                         }`}
                                 >
-                                    <FiUser size={24} />
-                                    <span className="font-semibold text-sm">Regular Rider</span>
+                                    <FiUser size={20} />
+                                    <span className="font-semibold text-xs">Rider</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setRole('delivery_person')}
-                                    className={`flex flex-col items-center gap-3 p-4 rounded-2xl border-2 transition-all ${role === 'delivery_person'
-                                            ? 'border-blue-500 bg-blue-500/10 text-white'
-                                            : 'border-gray-700 bg-gray-900/30 text-gray-500 hover:border-gray-600'
+                                    className={`flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all ${role === 'delivery_person'
+                                        ? 'border-blue-500 bg-blue-500/10 text-white'
+                                        : 'border-gray-700 bg-gray-900/30 text-gray-500 hover:border-gray-600'
                                         }`}
                                 >
-                                    <FiTruck size={24} />
-                                    <span className="font-semibold text-sm">Delivery Partner</span>
+                                    <FiTruck size={20} />
+                                    <span className="font-semibold text-xs">Delivery Partner</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setRole('customer')}
+                                    className={`flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all ${role === 'customer'
+                                        ? 'border-purple-500 bg-purple-500/10 text-white'
+                                        : 'border-gray-700 bg-gray-900/30 text-gray-500 hover:border-gray-600'
+                                        }`}
+                                >
+                                    <FiShoppingBag size={20} />
+                                    <span className="font-semibold text-xs">Customer</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setRole('admin')}
+                                    className={`flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all ${role === 'admin'
+                                        ? 'border-red-500 bg-red-500/10 text-white'
+                                        : 'border-gray-700 bg-gray-900/30 text-gray-500 hover:border-gray-600'
+                                        }`}
+                                >
+                                    <FiBriefcase size={20} />
+                                    <span className="font-semibold text-xs">Admin</span>
                                 </button>
                             </div>
                         </div>
@@ -255,6 +279,20 @@ const Auth = ({ setAuth }) => {
                                                     </select>
                                                 </div>
                                             </div>
+                                            <div className="md:col-span-1">
+                                                <label className="block text-sm font-medium text-gray-400 mb-2">Emergency Email (Optional)</label>
+                                                <div className="relative">
+                                                    <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                                                    <input
+                                                        type="email"
+                                                        name="emergency_contact_email"
+                                                        value={formData.emergency_contact_email}
+                                                        onChange={handleInputChange}
+                                                        placeholder="sos@example.com"
+                                                        className="w-full bg-gray-900/50 border border-gray-700 rounded-xl py-2.5 pl-10 pr-4 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all placeholder:text-gray-600"
+                                                    />
+                                                </div>
+                                            </div>
                                         </>
                                     ) : (
                                         <>
@@ -285,6 +323,20 @@ const Auth = ({ setAuth }) => {
                                                         onChange={handleInputChange}
                                                         required
                                                         placeholder="Emergency Phone"
+                                                        className="w-full bg-gray-900/50 border border-gray-700 rounded-xl py-2.5 pl-10 pr-4 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all placeholder:text-gray-600"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="md:col-span-1">
+                                                <label className="block text-sm font-medium text-gray-400 mb-2">Emergency Email (Optional)</label>
+                                                <div className="relative">
+                                                    <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                                                    <input
+                                                        type="email"
+                                                        name="emergency_contact_email"
+                                                        value={formData.emergency_contact_email}
+                                                        onChange={handleInputChange}
+                                                        placeholder="sos@example.com"
                                                         className="w-full bg-gray-900/50 border border-gray-700 rounded-xl py-2.5 pl-10 pr-4 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all placeholder:text-gray-600"
                                                     />
                                                 </div>
