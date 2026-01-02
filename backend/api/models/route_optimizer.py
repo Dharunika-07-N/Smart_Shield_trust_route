@@ -528,10 +528,19 @@ class RouteOptimizer:
             # Get safety score with weather data
             segment_coords = [current_point, next_point]
             if route_coords:
-                # Use actual route coordinates for more accurate safety scoring
+                # Sample coordinates to avoid scoring every single point (slow)
+                max_points = 15
+                if len(route_coords) > max_points:
+                    step = len(route_coords) // max_points
+                    sampled_coords = [route_coords[i] for i in range(0, len(route_coords), step)]
+                    if (len(route_coords) - 1) % step != 0:
+                        sampled_coords.append(route_coords[-1])
+                else:
+                    sampled_coords = route_coords
+                    
                 segment_coords = [
                     Coordinate(latitude=c['lat'], longitude=c['lng'])
-                    for c in route_coords
+                    for c in sampled_coords
                 ]
             
             # Determine time of day
@@ -781,9 +790,21 @@ class RouteOptimizer:
         # Safety
         segment_coords = [start_point, end_point]
         if route_coords:
+            # Sample coordinates to avoid scoring every single point (slow)
+            # We take at most 15 points uniformly distributed
+            max_points = 15
+            if len(route_coords) > max_points:
+                step = len(route_coords) // max_points
+                sampled_coords = [route_coords[i] for i in range(0, len(route_coords), step)]
+                # Ensure the last point is included
+                if (len(route_coords) - 1) % step != 0:
+                    sampled_coords.append(route_coords[-1])
+            else:
+                sampled_coords = route_coords
+                
             segment_coords = [
                 Coordinate(latitude=c['lat'], longitude=c['lng'])
-                for c in route_coords
+                for c in sampled_coords
             ]
             
         time_of_day = "day"

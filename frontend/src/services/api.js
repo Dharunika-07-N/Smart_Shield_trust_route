@@ -140,7 +140,7 @@ apiClient.interceptors.response.use(
 // API Methods
 export const api = {
   // Health Check
-  healthCheck: () => apiClient.get('/health', { baseURL: '/' }),
+  healthCheck: () => apiClient.get('/health', { baseURL: API_BASE_URL.split('/api/v1')[0] }),
 
   // Delivery Routes
   optimizeRoute: (data) => apiClient.post('/delivery/optimize', data),
