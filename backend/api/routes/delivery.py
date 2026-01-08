@@ -75,7 +75,16 @@ async def optimize_route_simple(
                 Coordinate(latitude=c['lat'], longitude=c['lng'])
                 for c in route_coords_list[::max(1, len(route_coords_list)//10)]  # Sample every 10th point
             ]
-            safety_data = safety_scorer.score_route(coords, time_of_day="day")
+            # Determine time of day
+            from datetime import datetime
+            hour = datetime.now().hour
+            time_of_day = "day"
+            if hour < 6 or hour >= 22:
+                time_of_day = "night"
+            elif hour < 8 or hour >= 18:
+                time_of_day = "evening"
+                
+            safety_data = safety_scorer.score_route(coords, time_of_day=time_of_day)
             safety_score = safety_data['route_safety_score']
         else:
             safety_score = 75.0  # Default

@@ -1,0 +1,119 @@
+[
+    {
+        "name": "Ganga Hospital",
+        "address": "313, Mettupalayam Road, Saibaba Colony, Coimbatore - 641043",
+        "latitude": 11.016586,
+        "longitude": 76.989762,
+        "type": "hospital",
+        "services": "24/7 emergency care, NABH accredited",
+        "phone": "+91-422-2207200, +91-9894318909"
+    },
+    {
+        "name": "KMCH (Kovai Medical Center & Hospital)",
+        "address": "99, Avinashi Road, Coimbatore - 641014",
+        "latitude": 11.042105,
+        "longitude": 77.04081,
+        "type": "hospital",
+        "services": "24-hour accident, emergency & ambulance services",
+        "phone": "+91-422-4323999, +91-95665 95665"
+    },
+    {
+        "name": "PSG Hospitals",
+        "address": "Avinashi Road, Peelamedu, Coimbatore - 641004",
+        "latitude": 11.023449,
+        "longitude": 77.001603,
+        "type": "hospital",
+        "services": "24x7 emergency and ambulance services, NABH accredited",
+        "phone": "+91-422-2570170"
+    },
+    {
+        "name": "G. Kuppuswamy Naidu Memorial Hospital (GKNM)",
+        "address": "P.B. No. 6327, Netaji Road, Pappanaickenpalayam, Coimbatore - 641037",
+        "latitude": 11.011539,
+        "longitude": 76.980582,
+        "type": "hospital",
+        "services": "24/7 emergency care",
+        "phone": "0422-2245000"
+    },
+    {
+        "name": "Sri Ramakrishna Hospital",
+        "address": "395, Sarojini Naidu Road, Sidhapudur, Coimbatore - 641044",
+        "latitude": 11.015,
+        "longitude": 76.961,
+        "type": "hospital",
+        "services": "24/7 emergency, Mobile ICU ambulance services",
+        "phone": "+91-422-4500000"
+    },
+    {
+        "name": "Kumaran Medical Center",
+        "address": "Sathy Road, near Kurumbapalayam, Coimbatore - 641107",
+        "latitude": 11.1073,
+        "longitude": 77.024,
+        "type": "hospital",
+        "services": "24/7 ambulance and emergency services",
+        "phone": ""
+    },
+    {
+        "name": "K.G. Hospital",
+        "address": "Coimbatore",
+        "latitude": 11.075,
+        "longitude": 77.058,
+        "type": "hospital",
+        "services": "24/7 emergency care",
+        "phone": ""
+    },
+    {
+        "name": "Karpagam Hospital",
+        "address": "Coimbatore",
+        "latitude": 10.97,
+        "longitude": 76.99,
+        "type": "hospital",
+        "services": "24/7 emergency services",
+        "phone": ""
+    },
+    {
+        "name": "Coimbatore Medical College Hospital (Government)",
+        "address": "Trichy Road, Coimbatore - 641018",
+        "latitude": 11.0287,
+        "longitude": 76.9738,
+        "type": "hospital",
+        "services": "24-hour emergency and trauma care",
+        "phone": "0422-2301393"
+    },
+    {
+        "name": "Government Hospital, Mettupalayam",
+        "address": "Mettupalayam",
+        "latitude": 11.304358,
+        "longitude": 76.936461,
+        "type": "hospital",
+        "services": "24-hour emergency services",
+        "phone": "04254-222027"
+    },
+    {
+        "name": "Government Headquarters Hospital, Pollachi",
+        "address": "Pollachi",
+        "latitude": 10.657,
+        "longitude": 77.011,
+        "type": "hospital",
+        "services": "24-hour emergency services",
+        "phone": "04259-229322"
+    },
+    {
+        "name": "Government Hospital, Valparai",
+        "address": "Valparai",
+        "latitude": 10.33,
+        "longitude": 76.958,
+        "type": "hospital",
+        "services": "24-hour CEmONC and emergency services",
+        "phone": ""
+    },
+    {
+        "name": "Singanallur Government Hospital",
+        "address": "Coimbatore - 641005",
+        "latitude": 11.0011,
+        "longitude": 77.0337,
+        "type": "hospital",
+        "services": "24-hour emergency services",
+        "phone": ""
+    }
+]

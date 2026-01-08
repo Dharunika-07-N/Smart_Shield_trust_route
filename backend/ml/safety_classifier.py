@@ -76,22 +76,23 @@ class SafetyClassifier:
         n_samples = 500
         np.random.seed(42)
         
-        # Features: [crime_rate, lighting, patrol, traffic, hour, police_proximity]
+        # Features: [crime_rate, lighting, patrol, traffic, hour, police_proximity, hospital_proximity]
         X = pd.DataFrame({
             'crime_rate': np.random.rand(n_samples) * 10,
             'lighting': np.random.rand(n_samples) * 100,
             'patrol': np.random.rand(n_samples) * 100,
             'traffic': np.random.rand(n_samples) * 100,
             'hour': np.random.randint(0, 24, n_samples),
-            'police_proximity': np.random.rand(n_samples) * 100
+            'police_proximity': np.random.rand(n_samples) * 100,
+            'hospital_proximity': np.random.rand(n_samples) * 100
         })
         
         # Target: 1 = safe, 0 = unsafe
-        # Safe if: low crime, high lighting, high patrol, close to police
+        # Safe if: low crime, high lighting, high patrol, close to police/hospital
         y = ((X['crime_rate'] < 5) & 
-             (X['lighting'] > 50) & 
+             ((X['lighting'] > 50) | (X['hospital_proximity'] > 60)) & 
              (X['patrol'] > 40) & 
-             (X['police_proximity'] > 30)).astype(int)
+             ((X['police_proximity'] > 30) | (X['hospital_proximity'] > 40))).astype(int)
         
         self.train(X, y)
     

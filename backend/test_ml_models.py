@@ -71,7 +71,8 @@ try:
         'patrol': [70, 30, 85],
         'traffic': [50, 80, 40],
         'hour': [14, 22, 10],
-        'police_proximity': [75, 30, 90]
+        'police_proximity': [75, 30, 90],
+        'hospital_proximity': [80, 20, 95]
     })
     
     safety_scores = classifier.predict_safety_score(X_test)

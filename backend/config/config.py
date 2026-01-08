@@ -77,6 +77,7 @@ class Settings(BaseSettings):
     MODEL_CACHE_DIR: Path = Path("models/cache")
     SAFETY_MODEL_PATH: str = "models/safety_scorer.h5"
     SAFETY_SCALER_PATH: str = "models/safety_scaler.pkl"
+    HOSPITALS_DATA_PATH: str = "data/hospitals.json"
     
     # Feedback System
     MIN_FEEDBACK_SAMPLES: int = 5  # Minimum samples before retraining

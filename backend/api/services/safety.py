@@ -27,6 +27,21 @@ class SafetyService:
     def __init__(self):
         self.maps_service = MapsService()
         self.email_service = EmailService()
+        self.hospitals = self._load_hospitals()
+    
+    def _load_hospitals(self) -> List[Dict]:
+        """Load hospitals from JSON file."""
+        from config.config import settings
+        import json
+        try:
+            base_dir = Path(__file__).parent.parent.parent
+            data_path = base_dir / "data" / "hospitals.json"
+            if data_path.exists():
+                with open(data_path, 'r') as f:
+                    return json.load(f)
+        except Exception as e:
+            logger.error(f"Error loading hospitals in SafetyService: {e}")
+        return []
     
     def trigger_panic_button(
         self,
@@ -340,6 +355,27 @@ class SafetyService:
             else:
                 # Default search
                 types_to_search = ["police", "convenience_store"]
+
+            # Add local hospitals as safe zones if "hospital" is requested or by default
+            if not zone_types or "hospital" in zone_types:
+                for hospital in self.hospitals:
+                    dist = self.maps_service.calculate_straight_distance(
+                        location, 
+                        Coordinate(latitude=hospital['latitude'], longitude=hospital['longitude'])
+                    )
+                    if dist <= radius_meters:
+                        safe_zones.append({
+                            "id": f"hosp_{hospital['name'].lower().replace(' ', '_')}",
+                            "name": hospital['name'],
+                            "zone_type": "hospital",
+                            "location": {"lat": hospital['latitude'], "lng": hospital['longitude']},
+                            "address": hospital.get('address', ''),
+                            "rating": 5.0,
+                            "distance_meters": dist,
+                            "is_open": True,
+                            "phone": hospital.get('phone', ''),
+                            "services": hospital.get('services', '')
+                        })
             
             # Search for each type
             for place_type in types_to_search:

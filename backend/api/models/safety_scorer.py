@@ -27,17 +27,32 @@ class SafetyScorer:
         self.weights = settings.SAFETY_WEIGHTS
         self.crime_service = crime_service or CrimeDataService()
         self.police_stations = self._load_police_stations()
+        self.hospitals = self._load_hospitals()
         self._initialize_model()
 
     def _load_police_stations(self) -> List[Dict]:
         """Load police stations from JSON file."""
         try:
-            data_path = Path(settings.SAFETY_MODEL_PATH).parent.parent / "data" / "police_stations.json"
+            # Try absolute path first, then relative to this file
+            base_dir = Path(__file__).parent.parent.parent
+            data_path = base_dir / "data" / "police_stations.json"
             if data_path.exists():
                 with open(data_path, 'r') as f:
                     return json.load(f)
         except Exception as e:
             logger.error(f"Error loading police stations: {e}")
+        return []
+
+    def _load_hospitals(self) -> List[Dict]:
+        """Load hospitals from JSON file."""
+        try:
+            base_dir = Path(__file__).parent.parent.parent
+            data_path = base_dir / "data" / "hospitals.json"
+            if data_path.exists():
+                with open(data_path, 'r') as f:
+                    return json.load(f)
+        except Exception as e:
+            logger.error(f"Error loading hospitals: {e}")
         return []
 
     
@@ -55,9 +70,9 @@ class SafetyScorer:
                 self.model = joblib.load(model_path)
                 self.scaler = joblib.load(settings.SAFETY_SCALER_PATH)
                 
-                # Check for feature mismatch (we now have 6 features)
-                if hasattr(self.model, "n_features_in_") and self.model.n_features_in_ != 6:
-                    raise ValueError(f"Model expects {self.model.n_features_in_} features, but we need 6")
+                # Check for feature mismatch (we now have 7 features)
+                if hasattr(self.model, "n_features_in_") and self.model.n_features_in_ != 7:
+                    raise ValueError(f"Model expects {self.model.n_features_in_} features, but we need 7")
                     
                 logger.info("Loaded existing safety scoring model and scaler")
             except Exception as e:
@@ -72,25 +87,27 @@ class SafetyScorer:
         n_samples = 1000
         np.random.seed(42)
         
-        # Feature: [crime_rate, lighting_score, patrol_density, traffic_density, hour_of_day, police_proximity]
-        X = np.random.rand(n_samples, 6)
+        # Feature: [crime_rate, lighting_score, patrol_density, traffic_density, hour_of_day, police_proximity, hospital_proximity]
+        X = np.random.rand(n_samples, 7)
         # Normalize features to realistic ranges
         X[:, 0] = X[:, 0] * 10  # crime incidents (0-10)
         X[:, 1] = X[:, 1] * 100  # lighting score (0-100)
         X[:, 2] = X[:, 2] * 100  # patrol density (0-100)
         X[:, 3] = X[:, 3] * 100  # traffic density (0-100)
         X[:, 4] = X[:, 4] * 24  # hour (0-24)
-        X[:, 5] = X[:, 5] * 100 # police proximity score (0-100, higher is closer/safer)
+        X[:, 5] = X[:, 5] * 100 # police proximity score (0-100)
+        X[:, 6] = X[:, 6] * 100 # hospital proximity score (0-100)
         
         # Target: safety score (0-100)
-        # Lower crime, higher lighting, higher patrol, closer police = higher safety
+        # Lower crime, higher lighting, higher patrol, closer police/hospital = higher safety
         y = (
             50 - X[:, 0] * 2.5 +  # crime impact
             X[:, 1] * 0.15 +  # lighting contribution
             X[:, 2] * 0.15 +  # patrol contribution
             (50 - X[:, 3]) * 0.1 +  # lower traffic is safer
             np.sin(X[:, 4] * np.pi / 12) * 10 + # time of day effect
-            X[:, 5] * 0.2 # police proximity contribution
+            X[:, 5] * 0.15 + # police proximity contribution
+            X[:, 6] * 0.10 # hospital proximity contribution
         )
         y = np.clip(y, 0, 100)
         
@@ -150,6 +167,14 @@ class SafetyScorer:
             
         # Police Proximity
         police_proximity = self._calculate_police_proximity(coord)
+
+        # Hospital Proximity
+        hospital_proximity = self._calculate_hospital_proximity(coord)
+        
+        # Increase importance of hospitals at night
+        if hour < 6 or hour > 20:
+            hospital_proximity *= 1.2
+            hospital_proximity = min(100.0, hospital_proximity)
         
         return np.array([
             crime_rate,
@@ -157,9 +182,35 @@ class SafetyScorer:
             patrol_density,
             traffic_density,
             hour,
-            police_proximity, # Feature 5 (0-100)
+            police_proximity,  # Feature 5 (0-100)
+            hospital_proximity, # Feature 6 (0-100)
             weather_hazard    # Extra feature, not in main model X
         ])
+
+    def _calculate_hospital_proximity(self, coord: Coordinate) -> float:
+        """Calculate proximity score to nearest 24/7 hospital (0-100)."""
+        if not self.hospitals:
+            return 50.0 # Default if no data
+            
+        min_dist_km = float('inf')
+        
+        for hospital in self.hospitals:
+            try:
+                dist = distance(
+                    (coord.latitude, coord.longitude),
+                    (hospital['latitude'], hospital['longitude'])
+                ).km
+                if dist < min_dist_km:
+                    min_dist_km = dist
+            except Exception:
+                continue
+                
+        # Proximity score: 100 if < 500m, decays to 0 at 10km
+        if min_dist_km == float('inf'):
+            return 0.0
+            
+        score = 100 * np.exp(-0.4 * min_dist_km) # Slightly slower decay than police
+        return min(100.0, max(0.0, score))
 
     def _calculate_police_proximity(self, coord: Coordinate) -> float:
         """Calculate proximity score to nearest police station (0-100)."""
@@ -201,15 +252,14 @@ class SafetyScorer:
             Tuple of (overall_score, factors_list)
         """
         features = self._get_location_features(coord, time_of_day, weather_data)
-        # Handle different feature sizes (with/without weather)
-        # Handle different feature sizes (with/without weather)
-        # Expected model features: 6
-        if features.shape[0] >= 6:
-            # Taking first 6 features for the model
-             features_for_model = features[:6].reshape(1, -1)
+        # Expected model features: 7
+        if features.shape[0] >= 7:
+            # Taking first 7 features for the model
+             features_for_model = features[:7].reshape(1, -1)
         else:
-             # Fallback (shouldn't happen with new logic)
-             features_for_model = features.reshape(1, -1)
+             # Fallback
+             features_for_model = np.zeros((1, 7))
+             features_for_model[0, :min(len(features), 7)] = features[:7]
         
         features_scaled = self.scaler.transform(features_for_model)
         
@@ -259,8 +309,14 @@ class SafetyScorer:
             {
                 "factor": "police_proximity",
                 "score": features[5],
-                "weight": 0.20, # Higher weight for police proximity
+                "weight": 0.15,
                 "description": "Proximity to Police Station"
+            },
+            {
+                "factor": "hospital_proximity",
+                "score": features[6],
+                "weight": 0.15,
+                "description": "Proximity to 24/7 Medical Services"
             }
         ]
         
