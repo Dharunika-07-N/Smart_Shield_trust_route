@@ -213,6 +213,37 @@ npm start
 - ✅ 10-15% increase in delivery success rate
 - ✅ Positive rider safety feedback, especially from women riders
 
+## 🚀 Deployment
+
+### 1. Docker Deployment (Recommended)
+The easiest way to deploy the entire stack is using Docker Compose.
+
+**Development:**
+```bash
+docker-compose up --build
+```
+
+**Production (includes PostgreSQL):**
+```bash
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+### 2. Render Deployment
+Smart Shield is designed to work seamlessly with [Render](https://render.com).
+
+1. **Blueprint Deployment**: Connect your repo and Render will automatically detect the `render.yaml` file and set up:
+   - Managed PostgreSQL database
+   - FastAPI Backend (Web Service)
+   - React Frontend (Static Site)
+
+2. **Manual Setup**: See [RENDER_DEPLOY_GUIDE.md](./RENDER_DEPLOY_GUIDE.md) for step-by-step manual instructions.
+
+### 3. CI/CD
+GitHub Actions is configured to:
+- Run backend tests on PRs
+- Build frontend production bundles
+- Deploy to production on merge to `main` (if configured)
+
 ## 🔐 Environment Variables
 
 Create a `.env` file in the `backend/` directory with the following variables:

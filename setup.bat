@@ -61,16 +61,14 @@ echo ⚙️  Checking configuration files...
 
 if not exist "backend\.env" (
     echo Creating backend\.env...
-    copy .env.example backend\.env
+    copy backend\.env.example backend\.env
     echo ⚠️  Please edit backend\.env with your API keys
 )
 
 if not exist "frontend\.env" (
     echo Creating frontend\.env...
-    (
-        echo REACT_APP_API_URL=http://localhost:8000
-        echo REACT_APP_MAPBOX_TOKEN=your_mapbox_token_here
-    ) > frontend\.env
+    copy frontend\.env.example frontend\.env
+    echo ⚠️  Please edit frontend\.env with your API URL
 )
 
 echo ✅ Configuration files created

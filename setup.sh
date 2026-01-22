@@ -62,16 +62,14 @@ echo "⚙️  Checking configuration files..."
 
 if [ ! -f "backend/.env" ]; then
     echo "Creating backend/.env..."
-    cp .env.example backend/.env
+    cp backend/.env.example backend/.env
     echo "⚠️  Please edit backend/.env with your API keys"
 fi
 
 if [ ! -f "frontend/.env" ]; then
     echo "Creating frontend/.env..."
-    cat > frontend/.env << EOL
-REACT_APP_API_URL=http://localhost:8000
-REACT_APP_MAPBOX_TOKEN=your_mapbox_token_here
-EOL
+    cp frontend/.env.example frontend/.env
+    echo "⚠️  Please edit frontend/.env with your API URL"
 fi
 
 echo "✅ Configuration files created"
