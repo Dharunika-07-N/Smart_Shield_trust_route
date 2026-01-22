@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     
     # Route Optimization
     MAX_DELIVERY_STOPS: int = 50
-    OPTIMIZATION_ALGORITHM: str = os.getenv("OPTIMIZATION_ALGORITHM", "nearest_neighbor")  # hybrid, genetic, nearest_neighbor
+    OPTIMIZATION_ALGORITHM: str = os.getenv("OPTIMIZATION_ALGORITHM", "astar")  # astar, hybrid, genetic, nearest_neighbor
     
     # Safety Scoring
     SAFETY_WEIGHTS: dict = {

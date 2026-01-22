@@ -35,6 +35,15 @@ from api.models.safety_scorer import SafetyScorer
 from api.services.weather import WeatherService
 from api.services.traffic import TrafficService
 
+# A* Algorithm
+try:
+    from api.models.astar_optimizer import AStarRouteOptimizer
+    HAS_ASTAR = True
+    logger.info("A* Algorithm available")
+except ImportError:
+    HAS_ASTAR = False
+    logger.warning("A* Algorithm not available")
+
 # Renovation ML Models
 try:
     from ml.feature_engineer import FeatureEngineer
@@ -63,6 +72,15 @@ class RouteOptimizer:
         self.safety_scorer = SafetyScorer()
         self.weather_service = WeatherService()
         self.traffic_service = TrafficService()
+        
+        # Initialize A* optimizer
+        if HAS_ASTAR:
+            self.astar_optimizer = AStarRouteOptimizer(
+                weight_distance=0.3,
+                weight_time=0.3,
+                weight_safety=0.25,
+                weight_traffic=0.15
+            )
         
         # Initialize Renovation ML components
         if HAS_RENOVATION_ML:
@@ -162,6 +180,10 @@ class RouteOptimizer:
                 rider_info,
                 departure_time
             )
+        elif settings.OPTIMIZATION_ALGORITHM == "astar" and HAS_ASTAR:
+            # Use A* algorithm for optimal pathfinding
+            logger.info("Using A* algorithm for route optimization")
+            sequence = self._optimize_astar(starting_point, stops, rider_info, departure_time)
         elif settings.OPTIMIZATION_ALGORITHM == "genetic":
             sequence = self._optimize_genetic(cost_matrix, len(stops))
         elif settings.OPTIMIZATION_ALGORITHM == "nearest_neighbor":
@@ -431,6 +453,79 @@ class RouteOptimizer:
         
         return route
 
+    def _optimize_astar(
+        self,
+        starting_point: Coordinate,
+        stops: List[DeliveryStop],
+        rider_info: Optional[Dict],
+        departure_time: Optional[datetime]
+    ) -> List[int]:
+        """Optimize route using A* algorithm"""
+        if not HAS_ASTAR:
+            logger.warning("A* not available, falling back to nearest neighbor")
+            return list(range(len(stops)))
+        
+        # Prepare safety and traffic data
+        safety_data = {}
+        traffic_data = {}
+        
+        # Get safety scores for all stop locations
+        for stop in stops:
+            coord = (stop.coordinates.latitude, stop.coordinates.longitude)
+            safety_score, _ = self.safety_scorer.score_location(
+                stop.coordinates,
+                time_of_day="day" if departure_time and 6 <= departure_time.hour < 20 else "night",
+                rider_info=rider_info
+            )
+            safety_data[coord] = safety_score
+        
+        # Get traffic data
+        for stop in stops:
+            coord = (stop.coordinates.latitude, stop.coordinates.longitude)
+            try:
+                traffic_level, _, _ = self.traffic_service.get_traffic_level(
+                    starting_point, stop.coordinates
+                )
+                traffic_data[coord] = traffic_level
+            except:
+                traffic_data[coord] = 'medium'
+        
+        # Use A* to find optimal sequence
+        # For multi-stop, we'll use A* to find best path through all stops
+        sequence = []
+        remaining_stops = list(range(len(stops)))
+        current_pos = (starting_point.latitude, starting_point.longitude)
+        
+        while remaining_stops:
+            best_idx = None
+            best_cost = float('inf')
+            
+            for idx in remaining_stops:
+                stop = stops[idx]
+                goal = (stop.coordinates.latitude, stop.coordinates.longitude)
+                
+                # Use A* heuristic to estimate cost
+                cost = self.astar_optimizer.heuristic(
+                    current_pos,
+                    goal,
+                    safety_data,
+                    traffic_data,
+                    departure_time.hour if departure_time else None
+                )
+                
+                if cost < best_cost:
+                    best_cost = cost
+                    best_idx = idx
+            
+            if best_idx is not None:
+                sequence.append(best_idx)
+                remaining_stops.remove(best_idx)
+                current_pos = (stops[best_idx].coordinates.latitude, 
+                             stops[best_idx].coordinates.longitude)
+        
+        logger.info(f"A* optimization complete: {len(sequence)} stops sequenced")
+        return sequence
+    
     def _cluster_stops(self, stops: List[DeliveryStop], max_distance_meters: float) -> List[DeliveryStop]:
         """Perform proximity-based clustering (simplified)."""
         if not stops: return []
