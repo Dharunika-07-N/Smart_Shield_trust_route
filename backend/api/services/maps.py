@@ -398,10 +398,15 @@ class MapsService:
             return max(40, 100 - int(distance_km))
     
     def extract_turn_by_turn(self, steps: List[Dict]) -> List[Dict]:
-        """Extract detailed turn-by-turn navigation instructions"""
+        """Extract detailed turn-by-turn navigation instructions with enhanced formatting"""
         instructions = []
         
         for idx, step in enumerate(steps):
+            # Extract polyline for this step if available
+            step_polyline = None
+            if 'polyline' in step and 'points' in step['polyline']:
+                step_polyline = step['polyline']['points']
+            
             instruction = {
                 'step_number': idx + 1,
                 'distance': step['distance']['text'],
@@ -411,11 +416,27 @@ class MapsService:
                 'instruction': step['html_instructions'],
                 'maneuver': step.get('maneuver', 'straight'),
                 'start_location': step['start_location'],
-                'end_location': step['end_location']
+                'end_location': step['end_location'],
+                'polyline': step_polyline,
+                # Add traffic data if available
+                'has_traffic_data': 'duration_in_traffic' in step,
+                'traffic_duration': step.get('duration_in_traffic', {}).get('value'),
+                'traffic_delay': self._calculate_traffic_delay(step)
             }
             instructions.append(instruction)
         
         return instructions
+    
+    def _calculate_traffic_delay(self, step: Dict) -> Optional[int]:
+        """Calculate traffic delay for a step in seconds"""
+        if 'duration_in_traffic' not in step:
+            return None
+        
+        normal_duration = step['duration']['value']
+        traffic_duration = step['duration_in_traffic']['value']
+        delay = traffic_duration - normal_duration
+        
+        return max(0, delay)
     
     def calculate_composite_score(self, route_info: Dict) -> float:
         """Calculate weighted composite score for route ranking"""
