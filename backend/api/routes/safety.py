@@ -22,7 +22,8 @@ from api.schemas.safety import (
     CheckInResponse,
     SafeZonesRequest,
     RideAlongRequest,
-    RideAlongResponse
+    RideAlongResponse,
+    BuddyRequest
 )
 from api.schemas.delivery import Coordinate
 from api.models.safety_scorer import SafetyScorer
@@ -151,3 +152,23 @@ async def get_ride_along_status(
     if not result:
         raise HTTPException(status_code=404, detail="Ride-along link invalid or expired")
     return result
+
+@router.post("/safety/buddy-request")
+async def request_buddy(
+    request: BuddyRequest,
+    db: Session = Depends(get_db)
+):
+    """Request a buddy for a shift."""
+    return safety_service.request_buddy(db, request.rider_id, request.route_id)
+
+@router.get("/safety/buddy-status/{rider_id}")
+async def get_buddy_status(
+    rider_id: str,
+    db: Session = Depends(get_db)
+):
+    """Get current buddy pair status."""
+    result = safety_service.get_buddy_pair(db, rider_id)
+    if not result:
+        return {"status": "none"}
+    return result
+

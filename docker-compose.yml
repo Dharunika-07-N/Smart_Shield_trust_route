@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/data:/app/data
+      - ./backend/smartshield.db:/app/smartshield.db
+    environment:
+      - DATABASE_URL=sqlite:///./smartshield.db
+      - JWT_SECRET_KEY=yoursecretkey
+      - DEBUG=True
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000/api/v1
+    restart: always

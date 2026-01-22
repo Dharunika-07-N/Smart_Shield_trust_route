@@ -77,6 +77,9 @@ class RouteOptimizationRequest(BaseModel):
     avoid_highways: bool = Field(False, description="Avoid highways")
     avoid_tolls: bool = Field(False, description="Avoid tolls")
     departure_time: Optional[datetime] = Field(None, description="Departure time")
+    max_capacity: Optional[int] = Field(None, description="Maximum package capacity")
+    max_weight: Optional[float] = Field(None, description="Maximum total weight in kg")
+
 
     @validator('stops')
     def validate_stops(cls, v):

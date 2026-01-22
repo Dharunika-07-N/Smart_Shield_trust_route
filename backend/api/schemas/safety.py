@@ -136,3 +136,8 @@ class RideAlongResponse(BaseModel):
     share_token: str
     tracking_url: str
     expires_at: str
+
+class BuddyRequest(BaseModel):
+    rider_id: str
+    route_id: Optional[str] = None
+

@@ -140,6 +140,66 @@ class PanicAlert(Base):
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     resolved_at = Column(DateTime, nullable=True)
 
+class Delivery(Base):
+    """Core delivery/order model."""
+    __tablename__ = "deliveries"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    order_id = Column(String, unique=True, index=True)
+    customer_id = Column(String, ForeignKey("customers.id"))
+    pickup_location = Column(JSON, nullable=False) # {lat, lng, address}
+    dropoff_location = Column(JSON, nullable=False) # {lat, lng, address}
+    status = Column(String, default="pending") # pending, assigned, picked_up, in_transit, delivered, failed
+    assigned_rider_id = Column(String, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    delivered_at = Column(DateTime, nullable=True)
+
+class DeliveryBatch(Base):
+    """Batched deliveries for optimization."""
+    __tablename__ = "delivery_batches"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    rider_id = Column(String, ForeignKey("users.id"))
+    delivery_ids = Column(JSON, nullable=False) # List of delivery IDs
+    route_geometry = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class DeliveryProof(Base):
+    """Proof of delivery (photo, signature)."""
+    __tablename__ = "delivery_proofs"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    delivery_id = Column(String, ForeignKey("deliveries.id"), unique=True)
+    photo_url = Column(String, nullable=True)
+    signature_url = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+
+class Customer(Base):
+    """Customer model."""
+    __tablename__ = "customers"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False)
+    phone = Column(String, nullable=True)
+    email = Column(String, nullable=True)
+    addresses = Column(JSON, default=list)
+    preferences = Column(JSON, default=dict)
+
+class BuddyPair(Base):
+    """Buddy system for night deliveries."""
+    __tablename__ = "buddy_pairs"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    rider1_id = Column(String, ForeignKey("users.id"))
+    rider2_id = Column(String, ForeignKey("users.id"))
+    shift_date = Column(DateTime, default=datetime.utcnow)
+    status = Column(String, default="matched") # matching, matched, dissolved
+    route_id = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+
 
 class RiderCheckIn(Base):
     """Rider check-in system for night shifts."""
@@ -199,26 +259,44 @@ class User(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     username = Column(String, unique=True, nullable=False, index=True)
     hashed_password = Column(String, nullable=False)
-    role = Column(String, default="rider")  # delivery_person, rider
+    role = Column(String, default="rider")  # admin, dispatcher, rider
+    status = Column(String, default="active") # active, inactive, suspended
     
     # Common Profile Info
     full_name = Column(String, nullable=True)
     phone = Column(String, nullable=True)
     email = Column(String, nullable=True)
     
-    # Delivery Person Specific
-    license_number = Column(String, nullable=True)
-    vehicle_type = Column(String, nullable=True)
-    company_name = Column(String, nullable=True)
-    
-    # Rider Specific
-    gender = Column(String, nullable=True)
-    emergency_contact_name = Column(String, nullable=True)
-    emergency_contact_phone = Column(String, nullable=True)
-    emergency_contact_email = Column(String, nullable=True)
+    # Relationship to RiderProfile
+    rider_profile = relationship("RiderProfile", back_populates="user", uselist=False)
     
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class RiderProfile(Base):
+    """Specific profile for riders."""
+    __tablename__ = "rider_profiles"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), unique=True)
+    vehicle_type = Column(String, nullable=True)
+    license_number = Column(String, nullable=True)
+    gender = Column(String, nullable=True)
+    preferences = Column(JSON, default=dict) # Route preferences
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    user = relationship("User", back_populates="rider_profile")
+
+class UserSession(Base):
+    """User sessions for authentication tracking."""
+    __tablename__ = "user_sessions"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"))
+    token = Column(String, unique=True, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 
 class DeliveryRoute(Base):
     __tablename__ = "delivery_routes"

@@ -14,8 +14,9 @@ from api.services.maps import MapsService
 from api.services.email import EmailService
 from database.models import (
     Rider, PanicAlert, RiderCheckIn, SafeZone, RideAlong,
-    DeliveryCompany, DeliveryStatus
+    DeliveryCompany, DeliveryStatus, BuddyPair, User
 )
+
 from api.services.database import DatabaseService
 
 
@@ -517,4 +518,48 @@ class SafetyService:
         except Exception as e:
             logger.error(f"Error getting ride-along status: {e}")
             return None
+
+    def request_buddy(self, db: Session, rider_id: str, route_id: Optional[str] = None) -> Dict:
+        """Request a buddy for a delivery shift."""
+        # Find another rider searching for a buddy
+        other_request = db.query(BuddyPair).filter(
+            BuddyPair.status == "matching",
+            BuddyPair.rider1_id != rider_id
+        ).first()
+        
+        if other_request:
+            other_request.rider2_id = rider_id
+            other_request.status = "matched"
+            if route_id: other_request.route_id = route_id
+            db.commit()
+            return {"status": "matched", "buddy_id": other_request.rider1_id, "pair_id": other_request.id}
+        else:
+            new_request = BuddyPair(
+                rider1_id=rider_id,
+                status="matching",
+                route_id=route_id
+            )
+            db.add(new_request)
+            db.commit()
+            return {"status": "matching", "pair_id": new_request.id}
+
+    def get_buddy_pair(self, db: Session, rider_id: str) -> Optional[Dict]:
+        """Get current buddy pair for a rider."""
+        pair = db.query(BuddyPair).filter(
+            ((BuddyPair.rider1_id == rider_id) | (BuddyPair.rider2_id == rider_id)),
+            BuddyPair.status == "matched"
+        ).order_by(BuddyPair.created_at.desc()).first()
+        
+        if pair:
+            buddy_id = pair.rider2_id if pair.rider1_id == rider_id else pair.rider1_id
+            buddy = db.query(User).filter(User.id == buddy_id).first()
+            return {
+                "pair_id": pair.id,
+                "buddy_id": buddy_id,
+                "buddy_name": buddy.full_name if buddy else "Unknown",
+                "buddy_phone": buddy.phone if buddy else None,
+                "status": pair.status
+            }
+        return None
+
 

@@ -11,7 +11,8 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
 
 const Auth = ({ setAuth }) => {
     const [isLogin, setIsLogin] = useState(true);
-    const [role, setRole] = useState('user');
+    const [role, setRole] = useState('rider');
+
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
@@ -112,10 +113,12 @@ const Auth = ({ setAuth }) => {
         }
 
         try {
-            const endpoint = isLogin ? '/auth/login' : '/auth/signup';
+            const endpoint = isLogin ? '/auth/login' : '/auth/register';
+
 
             // Map frontend roles to backend roles
-            const backendRole = role === 'user' ? 'rider' : role === 'driver' ? 'delivery_person' : role;
+            const backendRole = role; // Using actual role values now
+
 
             const payload = isLogin
                 ? {
@@ -141,9 +144,10 @@ const Auth = ({ setAuth }) => {
                 }
 
                 // Auto-set rider_id for SOS system
-                if (response.data.role === 'rider' || response.data.role === 'delivery_person') {
+                if (response.data.role === 'rider') {
                     localStorage.setItem('rider_id', response.data.user_id);
                 }
+
 
                 setAuth(true);
                 navigate('/dashboard');
@@ -159,10 +163,11 @@ const Auth = ({ setAuth }) => {
     };
 
     const roleOptions = [
-        { value: 'user', label: 'User', icon: FiUser, color: '#2563EB', gradient: 'from-blue-600 to-blue-500' },
-        { value: 'driver', label: 'Driver', icon: FiTruck, color: '#10B981', gradient: 'from-green-600 to-emerald-500' },
+        { value: 'rider', label: 'Rider', icon: FiUser, color: '#2563EB', gradient: 'from-blue-600 to-blue-500' },
+        { value: 'dispatcher', label: 'Dispatcher', icon: FiTruck, color: '#10B981', gradient: 'from-green-600 to-emerald-500' },
         { value: 'admin', label: 'Admin', icon: FiBriefcase, color: '#EF4444', gradient: 'from-red-600 to-red-500' }
     ];
+
 
     const selectedRole = roleOptions.find(r => r.value === role);
 
@@ -430,9 +435,10 @@ const Auth = ({ setAuth }) => {
                                     )}
 
                                     {/* User/Driver Emergency Contacts */}
-                                    {(role === 'user' || role === 'driver') && (
+                                    {(role === 'rider' || role === 'dispatcher') && (
                                         <>
-                                            {role === 'user' && (
+                                            {role === 'rider' && (
+
                                                 <div className="md:col-span-1">
                                                     <label className="block text-sm font-medium text-gray-300 mb-2">Gender</label>
                                                     <div className="relative group">

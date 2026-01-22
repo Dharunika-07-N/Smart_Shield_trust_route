@@ -1,0 +1,802 @@
+Product Requirements Document (PRD)
+AI Smart Shield Trust Route - Route Optimization and Safety System
+
+1. Executive Summary
+Product Vision
+AI Smart Shield Trust Route is an intelligent delivery routing system that optimizes for delivery time, fuel efficiency, multi-delivery scheduling, and rider safety—with particular emphasis on protecting women riders during vulnerable night hours in urban areas, starting with Tamil Nadu, India.
+Business Objectives
+
+Reduce delivery times by 20-30% through AI-powered route optimization
+Decrease fuel costs by 15-25% via traffic-aware efficient routing
+Improve rider safety metrics, targeting 10-15% increase in delivery success rate
+Increase rider retention, particularly among women riders, through safety-first routing
+Enable handling more deliveries per rider through smart batching and real-time optimization
+
+Target Users
+
+Primary: Delivery companies in Tamil Nadu (logistics firms, food delivery, e-commerce, courier services)
+Secondary: Individual delivery riders (gig workers, employees), especially women riders
+Tertiary: Fleet managers and operations teams
+
+Current Implementation Status
+BUILT: FastAPI backend with route optimization, safety scoring, feedback system, and React dashboard with interactive maps and analytics.
+
+2. Problem Statement
+Current Pain Points
+
+Inefficient Routing: Manual or basic routing leads to wasted time and fuel
+Safety Concerns: Women riders face heightened risks during night deliveries in Tamil Nadu urban areas
+Poor Multi-Delivery Planning: Suboptimal batching of deliveries reduces efficiency
+Static Routes: Systems don't adapt to real-time conditions (traffic, weather, crime hotspots)
+Limited Safety Intelligence: No proactive safety monitoring or localized threat detection
+
+Market Opportunity
+
+India's delivery market growing at 25% CAGR through 2027
+Tamil Nadu has 15+ major cities with active delivery operations
+Women represent only 8-12% of delivery riders in India due to safety concerns
+Average delivery operation wastes 25-30% of time on suboptimal routing
+
+
+3. Product Overview - Current Implementation
+3.1 Built Features ✅
+Route Optimization Engine
+
+AI-powered route planning using NetworkX graph algorithms + ML
+Traffic-aware routing via Google Maps Directions API
+Multi-delivery handling with dynamic route updates
+Real-time ETA calculations based on current traffic conditions
+Route geometry visualization with turn-by-turn waypoints
+
+Safety Intelligence System
+
+Crime data integration - Tamil Nadu 2022 district-wise crime statistics
+Color-coded safety overlay - Route segments scored and visualized on map
+Safety heatmap visualization - Geographic crime hotspot mapping
+Weather hazard integration - Real-time weather conditions affecting safety
+Safety scoring algorithm - Combines crime data, weather, time-of-day factors
+
+Interactive Mapping
+
+Snapchat-style location tracking - Animated real-time rider locations
+Route visualization - Interactive Leaflet-based maps
+Multi-layer display - Safety overlay, traffic layer, weather conditions
+Waypoint markers - Delivery stops with status indicators
+
+Company Dashboard
+
+Delivery analytics - Performance metrics and KPIs
+Safety heatmaps - Visual crime and incident mapping
+Route visualization - Live tracking and historical routes
+Fuel metrics - Efficiency calculations and cost tracking
+
+Feedback System
+
+Rider feedback submission - Safety and route quality ratings
+Feedback statistics - Aggregated insights for route improvement
+Learning system - Feedback improves future safety scoring
+
+Backend Architecture
+
+FastAPI - RESTful API with automatic documentation
+PostgreSQL/PostGIS - Geospatial database (with SQLite fallback)
+TensorFlow - ML model framework
+Pydantic schemas - Data validation and serialization
+
+Frontend Architecture
+
+React - Component-based UI
+Tailwind CSS - Responsive styling
+Chart.js - Analytics visualization
+Leaflet - Map rendering and interaction
+
+
+4. Gap Analysis - Missing Features
+4.1 Critical Missing Features 🔴
+Real-Time Rider Tracking & Communication
+Current State: Map visualization exists but no live GPS tracking
+Missing:
+
+Mobile app for riders with GPS tracking
+Live location streaming from rider devices
+Two-way communication (rider ↔ dispatcher)
+Push notifications for route changes
+WebSocket/SSE for real-time updates
+
+Panic Button & Emergency Response
+Current State: Safety scoring exists but no active incident response
+Missing:
+
+One-tap emergency alert button
+Automatic emergency contact notification
+Location sharing with emergency services
+Emergency response protocol triggers
+Incident logging and follow-up system
+Integration with local police/emergency numbers (100, 112 in India)
+
+Authentication & User Management
+Current State: No authentication system
+Missing:
+
+User login/registration (riders, dispatchers, admins)
+Role-based access control (RBAC)
+JWT token authentication
+Session management
+Rider profile management
+Company/fleet organization structure
+
+Night-Hour Safety Features for Women Riders
+Current State: Safety scoring exists but no gender-specific features
+Missing:
+
+Time-of-day safety adjustments (enhanced 8 PM - 6 AM)
+Women-rider-specific route preferences
+Well-lit route prioritization
+Buddy system pairing for night deliveries
+Mandatory check-ins during night hours
+Safe zone recommendations for breaks
+Option to decline high-risk night deliveries
+
+Mobile Application
+Current State: Web dashboard only
+Missing:
+
+Native iOS/Android rider app
+Offline mode with cached routes
+Voice-guided navigation
+Proof of delivery (photo, signature)
+Earnings tracker
+In-app customer contact
+Battery optimization for background GPS
+
+4.2 Important Missing Features 🟡
+Advanced Multi-Delivery Batching
+Current State: Basic multi-delivery routing
+Missing:
+
+AI-powered delivery clustering by proximity
+Vehicle capacity planning (weight, volume limits)
+Priority-based sequencing
+Dynamic rebatching when new orders arrive
+Load balancing across fleet
+
+Predictive Analytics
+Current State: Historical data storage only
+Missing:
+
+Delivery time prediction models (ML-based)
+Demand forecasting for resource allocation
+Traffic pattern prediction
+Weather impact prediction
+Seasonal/event-based adjustments
+
+Fuel/Energy Efficiency Optimization
+Current State: Basic fuel metrics tracking
+Missing:
+
+Eco-routing algorithms (minimize elevation, stops)
+Vehicle-specific optimization (bike, scooter, car, EV)
+EV charging station integration
+Idling time reduction
+Carbon footprint calculation and reporting
+
+Enhanced Safety Intelligence
+Current State: Static crime data from 2022
+Missing:
+
+Real-time crime incident feeds
+User-reported incident integration
+Time-of-day crime pattern analysis
+Street lighting database integration
+Population density overlay
+CCTV coverage mapping
+Historical rider incident data
+
+Company Management Features
+Current State: Basic dashboard
+Missing:
+
+Fleet management (rider onboarding, vehicle assignment)
+Shift scheduling and roster management
+Performance-based rider rankings
+Automated dispatch system
+Customer management (delivery addresses, contact history)
+Invoice and billing system
+Multi-company/multi-region support
+
+4.3 Nice-to-Have Features 🟢
+Advanced Analytics & Reporting
+Missing:
+
+Custom report builder
+Automated weekly/monthly reports
+Comparative analytics (rider vs rider, period vs period)
+Export to Excel/PDF
+API access for third-party BI tools
+
+Integration Ecosystem
+Missing:
+
+Third-party delivery platform integration (Swiggy, Zomato, Dunzo APIs)
+Payment gateway integration
+SMS gateway for notifications
+Email service integration
+Accounting software integration (Tally, QuickBooks)
+CRM integration
+
+Gamification & Incentives
+Missing:
+
+Rider achievement badges
+Leaderboards (safety, efficiency, ratings)
+Incentive tracking and rewards
+Streak tracking (accident-free days)
+Peer recognition system
+
+Advanced Map Features
+Missing:
+
+3D terrain visualization
+AR navigation overlay
+Indoor navigation (malls, apartment complexes)
+Custom landmark database
+Favorite location saving
+Historical route playback
+
+
+5. Revised User Stories (Based on Current Implementation)
+For Delivery Riders (Requires Mobile App)
+
+❌ As a rider, I want a mobile app with GPS tracking so my company knows my location
+❌ As a rider, I want voice-guided navigation so I can focus on driving safely
+✅ As a rider, I want to see my route on a map with safety scores
+❌ As a rider, I want to submit delivery proof (photo/signature) so I can confirm completion
+❌ As a woman rider, I want a panic button accessible within 1 tap during emergencies
+❌ As a rider, I want to opt out of high-risk night deliveries if I feel unsafe
+
+For Delivery Companies
+
+✅ As a fleet manager, I want to see optimized routes on a dashboard
+✅ As an operations lead, I want to view safety heatmaps of my service area
+❌ As a dispatcher, I want to track live rider locations on a map
+❌ As a manager, I want to receive alerts when riders trigger panic buttons
+❌ As a business owner, I want to assign deliveries automatically to available riders
+✅ As an analyst, I want to view fuel efficiency metrics and cost savings
+
+For System Administrators
+
+❌ As an admin, I want to manage user accounts and permissions
+❌ As an admin, I want to onboard new delivery companies
+✅ As an admin, I want to update crime data periodically
+❌ As an admin, I want to monitor system performance and API usage
+
+
+6. Technical Requirements - Current vs Required
+6.1 Current Backend Stack ✅
+
+FastAPI with automatic OpenAPI docs
+PostgreSQL/PostGIS (production) or SQLite (development)
+NetworkX for graph algorithms
+TensorFlow for ML models
+Google Maps API integration
+OpenWeatherMap API integration
+Tamil Nadu crime data (2022 static dataset)
+
+6.2 Missing Backend Components ❌
+
+Authentication service (JWT, OAuth2, session management)
+WebSocket server for real-time tracking
+Message queue (Redis/RabbitMQ) for async tasks
+File storage (AWS S3/MinIO) for delivery photos
+Email service (SendGrid, AWS SES)
+SMS gateway (Twilio, MSG91)
+Background job processor (Celery, Dramatiq)
+Caching layer (Redis) for performance
+Rate limiting for API protection
+
+6.3 Current Frontend Stack ✅
+
+React with component architecture
+Tailwind CSS for styling
+Chart.js for data visualization
+Leaflet for interactive maps
+
+6.4 Missing Frontend Components ❌
+
+Authentication UI (login, registration, password reset)
+Role-based routing and protected pages
+Real-time data subscriptions (WebSocket client)
+Offline mode with service workers
+Progressive Web App (PWA) capabilities
+Mobile-responsive optimization for rider app
+Form validation and error handling
+Loading states and skeleton screens
+
+6.5 Missing Mobile Application ❌
+
+Native iOS app (Swift/SwiftUI or React Native)
+Native Android app (Kotlin or React Native)
+GPS background tracking with battery optimization
+Push notification handling
+Offline map caching for navigation
+Camera integration for proof of delivery
+Voice navigation integration
+Haptic feedback for alerts
+
+6.6 Database Schema Additions Needed ❌
+Users & Authentication:
+sql- users (id, email, password_hash, role, status, created_at)
+- rider_profiles (user_id, vehicle_type, license, gender, preferences)
+- companies (id, name, contact, subscription_tier)
+- user_sessions (user_id, token, expires_at)
+Safety & Incidents:
+sql- safety_incidents (id, rider_id, location, type, severity, timestamp)
+- panic_alerts (id, rider_id, location, status, response_time)
+- check_ins (id, rider_id, route_id, location, timestamp)
+- buddy_pairs (id, rider1_id, rider2_id, shift_date, status)
+Deliveries & Orders:
+sql- deliveries (id, order_id, customer, pickup, dropoff, status, assigned_rider)
+- delivery_batches (id, rider_id, delivery_ids, route_geometry, created_at)
+- delivery_proof (id, delivery_id, photo_url, signature_url, timestamp)
+- customers (id, name, phone, addresses, preferences)
+Performance & Analytics:
+sql- rider_performance (rider_id, date, deliveries_count, on_time_rate, fuel_used)
+- route_analytics (route_id, actual_duration, predicted_duration, fuel_used)
+- safety_ratings (route_id, rider_id, rating, comments)
+
+7. API Endpoints - Current vs Required
+7.1 Implemented Endpoints ✅
+Route Optimization:
+
+POST /api/v1/delivery/optimize - Optimize delivery route
+GET /api/v1/delivery/routes/{route_id} - Get route details
+PUT /api/v1/delivery/routes/{route_id} - Update route
+
+Safety Scoring:
+
+POST /api/v1/safety/score - Calculate safety score
+GET /api/v1/safety/heatmap - Get safety heatmap data
+GET /api/v1/safety/conditions/{location} - Get safety conditions
+
+Feedback:
+
+POST /api/v1/feedback/submit - Submit rider feedback
+GET /api/v1/feedback/stats - Get feedback statistics
+
+7.2 Missing Critical Endpoints ❌
+Authentication & Users:
+
+POST /api/v1/auth/register - Register new user
+POST /api/v1/auth/login - Login and get JWT token
+POST /api/v1/auth/refresh - Refresh access token
+POST /api/v1/auth/logout - Invalidate session
+GET /api/v1/users/profile - Get user profile
+PUT /api/v1/users/profile - Update profile
+GET /api/v1/riders - List riders (admin/dispatcher)
+POST /api/v1/riders - Onboard new rider
+
+Real-Time Tracking:
+
+WS /api/v1/tracking/live - WebSocket for live location
+POST /api/v1/tracking/location - Update rider location
+GET /api/v1/tracking/riders/{rider_id} - Get rider's current location
+
+Emergency & Safety:
+
+POST /api/v1/emergency/panic - Trigger panic alert
+GET /api/v1/emergency/alerts - Get active alerts
+PUT /api/v1/emergency/alerts/{alert_id} - Update alert status
+POST /api/v1/safety/check-in - Submit safety check-in
+GET /api/v1/safety/incidents - Get incident history
+
+Delivery Management:
+
+POST /api/v1/deliveries - Create new delivery
+GET /api/v1/deliveries - List deliveries (with filters)
+GET /api/v1/deliveries/{delivery_id} - Get delivery details
+PUT /api/v1/deliveries/{delivery_id}/status - Update status
+POST /api/v1/deliveries/{delivery_id}/proof - Upload proof
+POST /api/v1/deliveries/batch - Create delivery batch
+
+Company/Fleet Management:
+
+GET /api/v1/companies/{company_id}/riders - List company riders
+GET /api/v1/companies/{company_id}/analytics - Company analytics
+POST /api/v1/dispatch/assign - Auto-assign deliveries
+GET /api/v1/fleet/availability - Get available riders
+
+Analytics & Reporting:
+
+GET /api/v1/analytics/performance - Performance metrics
+GET /api/v1/analytics/fuel-efficiency - Fuel analytics
+GET /api/v1/analytics/safety-trends - Safety trends over time
+POST /api/v1/reports/generate - Generate custom report
+
+
+8. Deployment & Infrastructure - Current vs Required
+8.1 Current Setup (Development) ✅
+
+Local development with uvicorn and npm start
+SQLite for development database
+.env file for configuration
+Git version control
+
+8.2 Missing for Production ❌
+Infrastructure:
+
+Cloud hosting (AWS, Google Cloud, Azure, or DigitalOcean)
+Container orchestration (Docker, Kubernetes)
+Load balancer for high availability
+CDN for static assets
+Database backup and replication
+Monitoring and logging (ELK stack, Datadog, New Relic)
+
+Security:
+
+SSL/TLS certificates (Let's Encrypt)
+Firewall and DDoS protection
+Secrets management (AWS Secrets Manager, HashiCorp Vault)
+API rate limiting and throttling
+Security headers (CORS, CSP, HSTS)
+Penetration testing
+
+DevOps:
+
+CI/CD pipeline (GitHub Actions, GitLab CI, Jenkins)
+Automated testing (unit, integration, e2e)
+Staging environment
+Blue-green deployment
+Database migration automation
+
+Scalability:
+
+Horizontal scaling for API servers
+Database connection pooling
+Caching strategy (Redis)
+Message queue for async jobs
+CDN for map tiles and static assets
+
+
+9. Data Requirements - Current vs Required
+9.1 Current Data Sources ✅
+
+Tamil Nadu Crime Data 2022 - Static CSV from OpenCity.in
+Google Maps API - Traffic and routing
+OpenWeatherMap API - Weather conditions
+Coimbatore traffic research - Methodology reference
+
+9.2 Missing Data Sources ❌
+Real-Time Crime & Safety:
+
+Tamil Nadu Police incident feeds (if available via API)
+User-reported safety incidents
+Street lighting database (municipal data)
+CCTV coverage maps
+Population density data (Census 2021)
+
+Traffic & Infrastructure:
+
+Real-time traffic cameras
+Road closure/construction data
+Parking availability
+EV charging station locations
+Fuel station locations
+
+Updated Crime Data:
+
+Tamil Nadu Crime Data 2023-2025 (when available)
+City-specific crime heatmaps
+Time-of-day crime patterns
+Crime type classification (violent vs non-violent)
+
+Business Data:
+
+Customer delivery addresses
+Historical delivery times
+Rider performance metrics
+Fuel consumption logs
+Incident reports
+
+
+10. Compliance & Legal - Missing Requirements ❌
+Privacy & Data Protection
+
+GDPR compliance (if serving EU users)
+DPDP Act 2023 compliance (India's data protection law)
+Privacy policy and terms of service
+Cookie consent management
+Data retention and deletion policies
+Right to access/export user data
+Consent management for location tracking
+
+Security Standards
+
+ISO 27001 certification (information security)
+SOC 2 compliance (service organization controls)
+Encryption at rest and in transit
+Regular security audits
+Incident response plan
+Data breach notification procedures
+
+Industry Regulations
+
+Motor Vehicles Act compliance (India)
+IT Act 2000 compliance (India)
+Insurance requirements for riders
+Labor law compliance (gig worker classification)
+Tax compliance (GST, TDS)
+
+Safety & Liability
+
+Emergency response protocols
+Incident reporting procedures
+Liability insurance for riders
+Background verification for riders
+Safety training certification
+
+
+11. Revised Roadmap with Current Status
+✅ Phase 0: Completed (Current)
+
+FastAPI backend with core routing logic
+PostgreSQL/PostGIS geospatial database
+React dashboard with maps and analytics
+Google Maps traffic-aware routing
+Tamil Nadu crime data integration
+Safety scoring algorithm
+Feedback system
+Basic route visualization
+
+🔴 Phase 1: Authentication & User Management (2-3 months)
+Priority: CRITICAL
+
+User registration and login (JWT-based)
+Role-based access control (Admin, Dispatcher, Rider)
+Rider profile management
+Company/fleet organization
+Session management
+Password reset flow
+Launch: Internal testing with 5-10 pilot riders
+
+🔴 Phase 2: Mobile App MVP (3-4 months)
+Priority: CRITICAL
+
+React Native mobile app (iOS + Android)
+GPS tracking and live location updates
+Turn-by-turn voice navigation
+Delivery status management
+Proof of delivery (camera integration)
+Basic offline mode
+Push notifications
+Launch: Pilot with 1 delivery company, 20-30 riders
+
+🔴 Phase 3: Emergency & Safety Features (2-3 months)
+Priority: CRITICAL
+
+Panic button implementation
+Emergency contact notification
+Location sharing with emergency services
+Women rider safety features:
+
+Night-hour route adjustments
+Buddy system pairing
+Mandatory check-ins
+Safe zone recommendations
+
+
+Incident logging and management
+Launch: Safety testing with women rider focus group
+
+🟡 Phase 4: Advanced Routing & Batching (2-3 months)
+Priority: HIGH
+
+AI-powered delivery clustering
+Vehicle capacity planning
+Dynamic rebatching
+Predictive delivery time models
+Eco-routing optimization
+Multi-vehicle type support
+Launch: Scale to 100-200 riders
+
+🟡 Phase 5: Real-Time Operations (2 months)
+Priority: HIGH
+
+WebSocket-based live tracking
+Real-time dashboard updates
+Automated dispatch system
+Fleet availability monitoring
+Performance analytics
+Launch: Full commercial release
+
+🟢 Phase 6: Scale & Enterprise (3-4 months)
+Priority: MEDIUM
+
+Multi-company support
+Multi-region deployment
+Advanced analytics and reporting
+Third-party integrations (Swiggy, Zomato, etc.)
+API marketplace
+White-label options
+Target: 1000+ riders across Tamil Nadu
+
+
+12. Success Metrics (KPIs) - Updated
+Current Measurable Metrics ✅
+
+Route efficiency (distance reduction vs baseline)
+Fuel cost estimation
+Safety score accuracy
+Dashboard usage analytics
+
+Missing Key Metrics ❌
+Business Impact:
+
+Actual delivery time reduction (%)
+Actual fuel cost savings (₹)
+Deliveries per rider per shift
+Rider retention rate (monthly)
+Women rider adoption rate (%)
+Customer satisfaction score (CSAT)
+
+Safety Metrics:
+
+Safety incidents per 1000 deliveries
+Panic button response time (minutes)
+Night delivery incident rate
+Check-in compliance rate (%)
+Women rider safety feedback score
+
+Technical Performance:
+
+Mobile app crash rate
+GPS accuracy (meters)
+Route prediction accuracy (%)
+System uptime (%)
+API response time (ms)
+
+User Engagement:
+
+Daily active riders (DAU)
+Monthly active companies (MAC)
+Average session duration
+Feature adoption rates
+
+
+13. Budget & Resource Requirements (New Section)
+Development Team Needed
+
+Backend Developer (1-2) - FastAPI, PostgreSQL, ML
+Frontend Developer (1) - React, Tailwind
+Mobile Developer (1-2) - React Native or native iOS/Android
+ML Engineer (1 part-time) - Safety models, prediction algorithms
+DevOps Engineer (1 part-time) - Cloud infrastructure, CI/CD
+UI/UX Designer (1 part-time) - Mobile app design
+QA Engineer (1) - Testing, quality assurance
+Product Manager (1) - Roadmap, stakeholder management
+
+Infrastructure Costs (Monthly Estimates)
+
+Cloud Hosting: ₹20,000-₹50,000 ($250-$600)
+Google Maps API: ₹15,000-₹40,000 based on usage
+Database (Managed PostgreSQL): ₹8,000-₹15,000
+Storage (S3/equivalent): ₹3,000-₹8,000
+SMS Gateway: ₹5,000-₹15,000 based on volume
+Monitoring/Logging: ₹5,000-₹10,000
+Total: ₹56,000-₹138,000/month (~$700-$1,700)
+
+One-Time Costs
+
+Security Audit: ₹1,50,000-₹3,00,000
+Legal/Compliance: ₹50,000-₹1,00,000
+Initial Marketing: ₹2,00,000-₹5,00,000
+Testing Devices: ₹1,00,000-₹2,00,000
+
+
+14. Risk Assessment - Updated
+Technical Risks 🔴
+Risk 1: GPS Accuracy in Dense Urban Areas
+
+Impact: HIGH - Inaccurate tracking affects safety and routing
+Mitigation:
+
+Use multiple location providers (GPS, network, WiFi)
+Implement Kalman filtering for location smoothing
+Test extensively in Coimbatore, Chennai, Madurai
+Fallback to manual location updates
+
+
+
+Risk 2: Mobile App Performance
+
+Impact: HIGH - Poor performance leads to rider frustration
+Mitigation:
+
+Optimize battery usage for background GPS
+Implement aggressive caching
+Test on low-end Android devices (₹7,000-₹10,000 range)
+Provide offline mode for critical features
+
+
+
+Risk 3: Crime Data Staleness
+
+Impact: MEDIUM - 2022 data may not reflect current safety conditions
+Mitigation:
+
+Integrate user-reported incidents
+Partner with local police for real-time feeds
+Weight recent feedback higher in scoring
+Update crime data annually at minimum
+
+
+
+Business Risks 🟡
+Risk 4: Rider Privacy Concerns
+
+Impact: HIGH - Location tracking may deter adoption
+Mitigation:
+
+Transparent privacy policy
+Location tracking only during active shifts
+User control over data retention
+Compliance with DPDP Act 2023
+
+
+
+Risk 5: Competition from Established Players
+
+Impact: MEDIUM - Swiggy, Zomato have resources for similar features
+Mitigation:
+
+Focus on Tamil Nadu local expertise
+Women rider safety as unique differentiator
+White-label solution for smaller delivery companies
+B2B partnerships vs direct competition
+
+
+
+Risk 6: Low Women Rider Adoption
+
+Impact: MEDIUM - Safety features ineffective if target users don't adopt
+Mitigation:
+
+Direct outreach to women's employment organizations
+Testimonials and case studies
+Free trial period for pilot riders
+Financial incentives for early adopters
+
+
+
+Operational Risks 🟡
+Risk 7: Emergency Response Liability
+
+Impact: HIGH - Company may be liable if panic button fails
+Mitigation:
+
+Clear legal disclaimers
+Redundant alert mechanisms (SMS + push + call)
+99.9% uptime SLA for emergency features
+Insurance coverage for riders
+Regular testing of emergency protocols
+
+
+
+Risk 8: API Cost Overruns
+
+Impact: MEDIUM - Google Maps costs can escalate quickly
+Mitigation:
+
+Implement aggressive caching (24-hour route cache)
+Use Google Maps only for initial routing, OSM for display
+Monitor usage and set budget alerts
+Negotiate enterprise pricing with Google
+
+
+
+
+15. Go-to-Market Strategy (New Section)
+Target Market Segmentation
+Primary: Small-Medium Delivery Companies in Tamil Nadu
+
+10-100 riders
+Cities: Chennai, Coimbatore, Madurai, Tiruchirappalli,

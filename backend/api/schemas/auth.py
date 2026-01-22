@@ -22,6 +22,10 @@ class UserCreate(UserBase):
     emergency_contact_name: Optional[str] = None
     emergency_contact_phone: Optional[str] = None
     emergency_contact_email: Optional[str] = None
+    
+    # Rider Profile specific
+    preferences: Optional[dict] = None
+
 
 class UserLogin(BaseModel):
     username: str
@@ -42,6 +46,19 @@ class UserResponse(UserBase):
 
     class Config:
         from_attributes = True
+
+class RiderProfileSchema(BaseModel):
+    vehicle_type: Optional[str] = None
+    license_number: Optional[str] = None
+    gender: Optional[str] = None
+    preferences: Optional[dict] = None
+
+    class Config:
+        from_attributes = True
+
+class TokenRefresh(BaseModel):
+    refresh_token: str
+
 
 class Token(BaseModel):
     access_token: str

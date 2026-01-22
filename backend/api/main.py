@@ -4,7 +4,7 @@ load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routes import delivery, safety, feedback, traffic, auth, training
+from api.routes import delivery, safety, feedback, traffic, auth, training, users, deliveries, tracking
 from api.services.database import init_db
 import os
 from loguru import logger
@@ -34,6 +34,11 @@ app.include_router(feedback.router, prefix="/api/v1", tags=["Feedback"])
 app.include_router(traffic.router, prefix="/api/v1", tags=["Traffic"])
 app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(training.router, prefix="/api/v1", tags=["Training"])
+app.include_router(users.router, prefix="/api/v1", tags=["Users"])
+app.include_router(deliveries.router, prefix="/api/v1", tags=["Deliveries"])
+app.include_router(tracking.router, prefix="/api/v1", tags=["Tracking"])
+
+
 
 @app.on_event("startup")
 async def startup_event():

@@ -99,12 +99,30 @@ class RouteOptimizer:
             departure_time: When the route starts
         
         Returns:
-            Optimized route with sequence, distances, times, etc.
+            OptimizedRoute with sequence, distances, times, etc.
         """
         if not stops:
             raise ValueError("No stops provided")
         
+        # Phase 4: Clustering & Batching
+        if len(stops) > 10: # Only cluster if many stops
+            logger.info("Performing proximity-based clustering for batching")
+            stops = self._cluster_stops(stops, max_distance_meters=2000)
+
+        # Phase 4: Capacity Planning
+        if rider_info and (rider_info.get("max_weight") or rider_info.get("max_capacity")):
+            max_weight = rider_info.get("max_weight", float('inf'))
+            max_capacity = rider_info.get("max_capacity", float('inf'))
+            
+            total_weight = sum(s.package_weight or 0 for s in stops)
+            total_count = len(stops)
+            
+            if total_weight > max_weight or total_count > max_capacity:
+                 logger.warning(f"Batch exceeds capacity: Weight {total_weight}/{max_weight}, Count {total_count}/{max_capacity}")
+                 # In production, would split into multiple routes
+        
         logger.info(f"Optimizing route for {len(stops)} stops, objectives: {optimize_for}")
+
         
         # Prepare data
         all_points = [starting_point] + [stop.coordinates for stop in stops]
@@ -412,8 +430,17 @@ class RouteOptimizer:
                 current = next_node
         
         return route
-    
+
+    def _cluster_stops(self, stops: List[DeliveryStop], max_distance_meters: float) -> List[DeliveryStop]:
+        """Perform proximity-based clustering (simplified)."""
+        if not stops: return []
+        # In a real implementation, use K-means or DBSCAN
+        # For now, we'll just sort them to group nearby ones
+        sorted_stops = sorted(stops, key=lambda s: (s.coordinates.latitude, s.coordinates.longitude))
+        return sorted_stops
+
     def _optimize_genetic(
+
         self,
         cost_matrix: List[List[float]],
         num_stops: int
@@ -561,7 +588,31 @@ class RouteOptimizer:
             weather_penalty = self.weather_service.calculate_weather_penalty(weather_data)
             duration = duration * weather_penalty
             
+            # Phase 4: Predictive Delivery Time Model
+            if HAS_RENOVATION_ML and self.time_predictor.model:
+                try:
+                    # Prepare features for ML model
+                    # [distance, traffic_level, hour, weather_hazard, etc.]
+                    feature_row = pd.DataFrame([{
+                        'distance': distance / 1000.0,
+                        'traffic_level': 2 if traffic_level == 'high' else 1 if traffic_level == 'medium' else 0,
+                        'hour': departure_time.hour if departure_time else 12,
+                        'weather_hazard': weather_data['hazard_score']
+                    }])
+                    # Fill missing columns with 0 if necessary
+                    for col in self.feature_engineer.feature_columns:
+                         if col not in feature_row.columns:
+                             feature_row[col] = 0
+                    
+                    predicted_min = self.time_predictor.predict(feature_row)[0]
+                    # Blend OSRM duration with ML prediction (70/30)
+                    duration = (duration * 0.7) + (predicted_min * 60 * 0.3)
+                    logger.debug(f"Applied ML time prediction: {predicted_min:.2f} min (Original: {duration/60:.2f} min)")
+                except Exception as e:
+                    logger.warning(f"Predictive time model failed: {e}")
+
             # Calculate fuel consumption
+
             fuel = distance / 1000 * settings.FUEL_CONSUMPTION_PER_KM
             
             # Get traffic level for this segment
