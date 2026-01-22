@@ -94,59 +94,6 @@ class MLModelTrainer:
         
         return True
     
-    def train_safety_classifier(self):
-        """Train safety classification model"""
-        logger.info("=" * 60)
-        logger.info("Training Safety Classifier")
-        logger.info("=" * 60)
-        
-        df = self.load_data('crime_incidents.csv')
-        if df is None or len(df) < 100:
-            logger.warning("Insufficient data for safety classifier. Need at least 100 samples.")
-            return False
-        
-        # Aggregate crime data by location grid
-        df['lat_grid'] = (df['latitude'] * 100).round() / 100
-        df['lng_grid'] = (df['longitude'] * 100).round() / 100
-        
-        # Create features
-        location_stats = df.groupby(['lat_grid', 'lng_grid']).agg({
-            'incident_id': 'count',
-            'severity': lambda x: (x == 'high').sum(),
-            'resolved': 'mean'
-        }).reset_index()
-        
-        location_stats.columns = ['lat', 'lng', 'crime_count', 'high_severity_count', 'resolution_rate']
-        
-        # Create safety labels (binary: safe=1, unsafe=0)
-        location_stats['is_safe'] = (
-            (location_stats['crime_count'] < 5) & 
-            (location_stats['high_severity_count'] == 0)
-        ).astype(int)
-        
-        features = ['crime_count', 'high_severity_count', 'resolution_rate']
-        X = location_stats[features]
-        y = location_stats['is_safe']
-        
-        # Train model
-        results = self.safety_classifier.train(X, y)
-        
-        self.training_stats['safety_classifier'] = {
-            'samples': len(location_stats),
-            'accuracy': results['accuracy'],
-            'precision': results['precision'],
-            'recall': results['recall'],
-            'f1': results['f1'],
-            'features': features,
-            'trained_at': datetime.now().isoformat()
-        }
-        
-        logger.info(f"✅ Safety Classifier trained successfully!")
-        logger.info(f"   Accuracy: {results['accuracy']:.4f}")
-        logger.info(f"   F1 Score: {results['f1']:.4f}")
-        
-        return True
-    
     def train_rl_agent(self):
         """Train reinforcement learning agent"""
         logger.info("=" * 60)
@@ -193,19 +140,16 @@ class MLModelTrainer:
         
         # Load all data
         deliveries = self.load_data('historical_deliveries.csv')
-        crimes = self.load_data('crime_incidents.csv')
         riders = self.load_data('rider_performance.csv')
         traffic = self.load_data('traffic_patterns.csv')
         
         stats = {
             'data_summary': {
                 'total_deliveries': len(deliveries) if deliveries is not None else 0,
-                'total_crime_incidents': len(crimes) if crimes is not None else 0,
                 'total_riders': len(riders) if riders is not None else 0,
                 'traffic_data_points': len(traffic) if traffic is not None else 0
             },
             'delivery_statistics': {},
-            'safety_statistics': {},
             'rider_statistics': {},
             'traffic_statistics': {}
         }
@@ -218,15 +162,6 @@ class MLModelTrainer:
                 'success_rate': float(deliveries['success'].mean()),
                 'peak_hour_deliveries': int((deliveries['hour'].isin([8, 9, 17, 18, 19])).sum()),
                 'weekend_deliveries': int((deliveries['day_of_week'] >= 5).sum())
-            }
-        
-        # Safety statistics
-        if crimes is not None and len(crimes) > 0:
-            stats['safety_statistics'] = {
-                'high_severity_incidents': int((crimes['severity'] == 'high').sum()),
-                'resolution_rate': float(crimes['resolved'].mean()),
-                'night_incidents': int((crimes['time_of_day'] == 'night').sum()),
-                'most_common_crime': crimes['crime_type'].mode()[0] if len(crimes) > 0 else 'N/A'
             }
         
         # Rider statistics
@@ -267,14 +202,12 @@ class MLModelTrainer:
     def train_all_models(self):
         """Train all ML models"""
         logger.info("\n🚀 Starting ML Model Training Pipeline\n")
+        logger.info("⚠️  Using simplified safety scoring (no crime data required)\n")
         
         success_count = 0
         
         # Train each model
         if self.train_time_predictor():
-            success_count += 1
-        
-        if self.train_safety_classifier():
             success_count += 1
         
         if self.train_rl_agent():
@@ -288,17 +221,19 @@ class MLModelTrainer:
             'training_stats': self.training_stats,
             'data_stats': stats,
             'models_trained': success_count,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now().isoformat(),
+            'note': 'Using simplified safety scoring without crime/lighting/patrol data'
         }
         
         summary_file = self.models_dir / 'training_summary.json'
         with open(summary_file, 'w') as f:
             json.dump(summary, indent=2, fp=f)
         
-        logger.info(f"\n✅ Training complete! {success_count}/3 models trained successfully")
+        logger.info(f"\n✅ Training complete! {success_count}/2 models trained successfully")
         logger.info(f"📊 Training summary saved to {summary_file}")
+        logger.info(f"⚠️  Safety scoring uses time-of-day and success rates (no crime data)")
         
-        return success_count == 3
+        return success_count == 2
 
 
 if __name__ == "__main__":
