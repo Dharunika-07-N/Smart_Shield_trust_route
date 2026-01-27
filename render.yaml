@@ -22,7 +22,7 @@ services:
     buildCommand: npm run build
     publishDir: build
     envVars:
-      - key: REACT_APP_API_URL
+      - key: REACT_APP_API_BASE
         fromService:
           type: web
           name: smart-shield-api

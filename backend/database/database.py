@@ -15,6 +15,10 @@ from loguru import logger
 # Database URL
 SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
 
+# Handle Render's 'postgres://' format which SQLAlchemy needs as 'postgresql://'
+if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
+    SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 # Create engine
 # Use static pool for SQLite, connection pooling for PostgreSQL
 if "sqlite" in SQLALCHEMY_DATABASE_URL.lower():
