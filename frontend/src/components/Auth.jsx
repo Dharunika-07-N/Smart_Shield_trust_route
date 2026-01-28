@@ -7,7 +7,7 @@ import {
     FiBriefcase, FiShoppingBag, FiKey, FiAlertTriangle, FiEye, FiEyeOff
 } from 'react-icons/fi';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
+import { API_BASE_URL as API_URL } from '../utils/constants';
 
 const Auth = ({ setAuth }) => {
     const [isLogin, setIsLogin] = useState(true);

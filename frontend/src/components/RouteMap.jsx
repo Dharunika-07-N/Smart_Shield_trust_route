@@ -6,7 +6,7 @@ import { FiNavigation, FiClock, FiShield, FiMapPin, FiChevronRight } from 'react
 import useLocation from '../hooks/useLocation';
 import SafetyHeatmap from './SafetyHeatmap';
 
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
+import { API_ROOT_URL as API_BASE } from '../utils/constants';
 
 const MapUpdater = ({ center }) => {
   const map = useMap();

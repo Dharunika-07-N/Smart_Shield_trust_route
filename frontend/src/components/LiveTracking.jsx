@@ -3,18 +3,18 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-
 import L from 'leaflet';
 import { api } from '../services/api';
 
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
+import { API_ROOT_URL as API_BASE } from '../utils/constants';
 
 // Component to update map view when location changes
 const MapUpdater = ({ center, zoom }) => {
   const map = useMap();
-  
+
   useEffect(() => {
     if (center) {
       map.setView(center, zoom || map.getZoom());
     }
   }, [center, zoom, map]);
-  
+
   return null;
 };
 
@@ -29,7 +29,7 @@ const LiveTracking = ({ deliveryId, isRider = false }) => {
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState('');
   const [deliveryIdInput, setDeliveryIdInput] = useState(deliveryId || '');
-  
+
   const wsRef = useRef(null);
   const watchIdRef = useRef(null);
 
@@ -45,7 +45,7 @@ const LiveTracking = ({ deliveryId, isRider = false }) => {
         iconAnchor: [15, 15]
       });
     }
-    
+
     return L.divIcon({
       className: 'rider-marker',
       html: `<div style="width:30px;height:30px;border-radius:50%;background:#3b82f6;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);position:relative;transform:rotate(${heading}deg)">
@@ -95,7 +95,7 @@ const LiveTracking = ({ deliveryId, isRider = false }) => {
             const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             wsUrl = `${wsProtocol}//${window.location.host}${API_BASE}/api/v1/delivery/${deliveryIdInput.trim()}/ws`;
           }
-          
+
           const ws = new WebSocket(wsUrl);
           wsRef.current = ws;
 
@@ -108,7 +108,7 @@ const LiveTracking = ({ deliveryId, isRider = false }) => {
           ws.onmessage = (event) => {
             try {
               const data = JSON.parse(event.data);
-              
+
               if (data.type === 'location_update' || data.type === 'initial_location') {
                 const location = [data.location.latitude, data.location.longitude];
                 setCurrentLocation(location);
@@ -117,7 +117,7 @@ const LiveTracking = ({ deliveryId, isRider = false }) => {
                 setHeading(data.heading);
                 setBatteryLevel(data.battery_level);
                 setLastUpdate(new Date(data.timestamp));
-                
+
                 // Add to history
                 setLocationHistory(prev => {
                   const newHistory = [...prev, {
@@ -152,7 +152,7 @@ const LiveTracking = ({ deliveryId, isRider = false }) => {
           ws.onclose = (event) => {
             console.log('WebSocket disconnected', event.code, event.reason);
             setConnected(false);
-            
+
             // Only attempt to reconnect if it wasn't a manual close and delivery ID is still valid
             if (event.code !== 1000 && deliveryIdInput && deliveryIdInput.trim().length >= 3) {
               // Attempt to reconnect after 3 seconds
@@ -198,7 +198,7 @@ const LiveTracking = ({ deliveryId, isRider = false }) => {
         };
 
         await api.updateLocation(updateData);
-        
+
         // Update local state
         setCurrentLocation([location.latitude, location.longitude]);
         setSpeed(updateData.speed_kmh);
@@ -278,7 +278,7 @@ const LiveTracking = ({ deliveryId, isRider = false }) => {
           if (data.timestamp) {
             setLastUpdate(new Date(data.timestamp));
           }
-          
+
           // Load location history
           if (data.location_history && data.location_history.length > 0) {
             setLocationHistory(
@@ -377,7 +377,7 @@ const LiveTracking = ({ deliveryId, isRider = false }) => {
           {error.includes('Cannot connect to server') && (
             <div className="mt-2 pt-2 border-t border-red-200">
               <p className="text-xs text-red-600">
-                <strong>Tip:</strong> Make sure the backend server is running. 
+                <strong>Tip:</strong> Make sure the backend server is running.
                 Start it with: <code className="bg-red-100 px-1 rounded">cd backend && python -m uvicorn api.main:app --reload</code>
               </p>
             </div>
@@ -409,7 +409,7 @@ const LiveTracking = ({ deliveryId, isRider = false }) => {
                   </span>
                 </div>
               </div>
-              
+
               {speed !== null && (
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Speed</label>
@@ -418,7 +418,7 @@ const LiveTracking = ({ deliveryId, isRider = false }) => {
                   </span>
                 </div>
               )}
-              
+
               {heading !== null && (
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Heading</label>
@@ -427,17 +427,16 @@ const LiveTracking = ({ deliveryId, isRider = false }) => {
                   </span>
                 </div>
               )}
-              
+
               {batteryLevel !== null && (
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Battery</label>
                   <div className="flex items-center space-x-2">
                     <div className="flex-1 bg-gray-200 rounded-full h-2">
                       <div
-                        className={`h-2 rounded-full ${
-                          batteryLevel > 50 ? 'bg-green-500' :
-                          batteryLevel > 20 ? 'bg-yellow-500' : 'bg-red-500'
-                        }`}
+                        className={`h-2 rounded-full ${batteryLevel > 50 ? 'bg-green-500' :
+                            batteryLevel > 20 ? 'bg-yellow-500' : 'bg-red-500'
+                          }`}
                         style={{ width: `${batteryLevel}%` }}
                       ></div>
                     </div>

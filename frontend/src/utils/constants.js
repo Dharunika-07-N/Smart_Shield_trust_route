@@ -2,7 +2,29 @@
  * Application Constants
  */
 
-export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
+const getApiUrls = () => {
+  const envUrl = process.env.REACT_APP_API_URL || process.env.REACT_APP_API_BASE;
+  if (envUrl) {
+    // If it's a relative path, convert to full URL for development
+    let root = envUrl;
+    if (envUrl.startsWith('/') && process.env.NODE_ENV === 'development') {
+      root = `http://localhost:8000${envUrl}`;
+    }
+
+    // Split to get root and base
+    const rootUrl = root.split('/api/v1')[0].replace(/\/$/, '');
+    const baseUrl = `${rootUrl}/api/v1`;
+    return { rootUrl, baseUrl };
+  }
+  return {
+    rootUrl: 'http://localhost:8000',
+    baseUrl: 'http://localhost:8000/api/v1'
+  };
+};
+
+const urls = getApiUrls();
+export const API_ROOT_URL = urls.rootUrl;
+export const API_BASE_URL = urls.baseUrl;
 
 export const API_ENDPOINTS = {
   HEALTH: '/health',

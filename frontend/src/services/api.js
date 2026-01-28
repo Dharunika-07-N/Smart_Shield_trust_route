@@ -3,26 +3,7 @@
  */
 import axios from 'axios';
 
-// Get API URL from environment or use default
-// Note: package.json has proxy set to http://localhost:8000
-// So relative paths like /api/v1 will be proxied in development
-// But we'll use full URL to be explicit and avoid proxy issues
-let API_BASE_URL;
-if (process.env.REACT_APP_API_URL) {
-  // If explicitly set, use it (could be relative or absolute)
-  API_BASE_URL = process.env.REACT_APP_API_URL;
-  // If it's a relative path, convert to full URL for development
-  if (API_BASE_URL.startsWith('/') && process.env.NODE_ENV === 'development') {
-    API_BASE_URL = `http://localhost:8000${API_BASE_URL}`;
-  }
-} else if (process.env.REACT_APP_API_BASE) {
-  // If base URL is set, append /api/v1
-  const base = process.env.REACT_APP_API_BASE;
-  API_BASE_URL = base.endsWith('/api/v1') ? base : `${base}/api/v1`;
-} else {
-  // Default to full URL for development (more reliable than proxy)
-  API_BASE_URL = 'http://localhost:8000/api/v1';
-}
+import { API_BASE_URL } from '../utils/constants';
 
 // Log the API base URL in development
 if (process.env.NODE_ENV === 'development') {
