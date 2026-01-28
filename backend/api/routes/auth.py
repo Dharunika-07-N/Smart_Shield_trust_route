@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from database.database import get_db
-from database.models import User, RiderProfile, UserSession
+from database.models import User, RiderProfile, DriverProfile, UserSession
 from api.schemas.auth import UserCreate, UserResponse, Token, UserLogin, TokenRefresh
 from api.services.security import get_password_hash, verify_password, create_access_token, create_refresh_token
 from loguru import logger
@@ -12,9 +12,17 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 @router.post("/register", response_model=UserResponse)
 def register(user_in: UserCreate, db: Session = Depends(get_db)):
-    """Register a new user (Admin, Dispatcher, or Rider)."""
+    """Register a new user (Rider or Driver publicly, Others via restricted paths)."""
     try:
-        # Check if user already exists
+        # 1. Check if registration is allowed for this role publicly
+        allowed_public_roles = ["rider", "driver"]
+        if user_in.role not in allowed_public_roles and not user_in.admin_code:
+             raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Registration for role '{user_in.role}' is not allowed publicly."
+            )
+
+        # 2. Check if user already exists
         existing_user = db.query(User).filter(User.username == user_in.username).first()
         if existing_user:
             logger.warning(f"Registration failed: Username {user_in.username} already exists")
@@ -23,31 +31,26 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
                 detail="Username already registered"
             )
         
-        # Verify admin code for admin role
-        ADMIN_CODE = "Grunt123"
-        if user_in.role == "admin":
-            if not user_in.admin_code or user_in.admin_code != ADMIN_CODE:
-                logger.warning(f"Registration failed: Invalid admin code for {user_in.username}")
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Invalid admin access code"
-                )
+        # 3. Handle status based on role
+        user_status = "active"
+        if user_in.role == "driver":
+            user_status = "pending_approval"
         
-        # Create new user
+        # 4. Create new user
         new_user = User(
             username=user_in.username,
             hashed_password=get_password_hash(user_in.password),
-            role=user_in.role, # admin, dispatcher, rider
+            role=user_in.role,
             full_name=user_in.full_name,
             phone=user_in.phone,
             email=user_in.email,
-            status="active"
+            status=user_status
         )
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
         
-        # Create Rider Profile if role is rider
+        # 5. Create specific Profiles
         if new_user.role == "rider":
             rider_profile = RiderProfile(
                 user_id=new_user.id,
@@ -58,8 +61,18 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
             )
             db.add(rider_profile)
             db.commit()
+        elif new_user.role == "driver":
+            driver_profile = DriverProfile(
+                user_id=new_user.id,
+                license_number=user_in.license_number,
+                vehicle_type=user_in.vehicle_type,
+                vehicle_number=user_in.vehicle_number,
+                documents=user_in.uploaded_documents or {}
+            )
+            db.add(driver_profile)
+            db.commit()
         
-        logger.info(f"New user registered: {new_user.username} (role: {new_user.role})")
+        logger.info(f"New user registered: {new_user.username} (role: {new_user.role}, status: {new_user.status})")
         return new_user
     except Exception as e:
         logger.error(f"Error during registration: {str(e)}")
@@ -72,13 +85,40 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def login(user_in: UserLogin, db: Session = Depends(get_db)):
-    """Login and get access & refresh tokens."""
+    """Login and status verification."""
     user = db.query(User).filter(User.username == user_in.username).first()
+    
     if not user or not verify_password(user_in.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="Invalid credentials",
             headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Check if the logging in role matches the user's role
+    if user_in.role and user.role != user_in.role:
+         raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Unauthorized: This account is registered as a {user.role}, but you are trying to log in as a {user_in.role}."
+        )
+
+    # Status Checks
+    if user.status == "suspended":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account suspended. Please contact support."
+        )
+    
+    if user.status == "pending_approval" and user.role == "driver":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your application is under review. You will be notified once approved."
+        )
+    
+    if user.status == "rejected" and user.role == "driver":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your application was not approved. Please contact support for details."
         )
     
     if user.status != "active":
@@ -99,7 +139,7 @@ def login(user_in: UserLogin, db: Session = Depends(get_db)):
     db.add(session)
     db.commit()
     
-    logger.info(f"User logged in: {user.username}")
+    logger.info(f"User logged in: {user.username} as {user.role}")
     return {
         "access_token": access_token, 
         "token_type": "bearer",

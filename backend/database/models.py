@@ -259,16 +259,17 @@ class User(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     username = Column(String, unique=True, nullable=False, index=True)
     hashed_password = Column(String, nullable=False)
-    role = Column(String, default="rider")  # admin, dispatcher, rider
-    status = Column(String, default="active") # active, inactive, suspended
+    role = Column(String, default="rider")  # admin, dispatcher, rider, driver, super_admin
+    status = Column(String, default="active") # active, inactive, suspended, pending_approval, rejected
     
     # Common Profile Info
     full_name = Column(String, nullable=True)
     phone = Column(String, nullable=True)
     email = Column(String, nullable=True)
     
-    # Relationship to RiderProfile
+    # Relationships
     rider_profile = relationship("RiderProfile", back_populates="user", uselist=False)
+    driver_profile = relationship("DriverProfile", back_populates="user", uselist=False)
     
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -286,6 +287,20 @@ class RiderProfile(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     user = relationship("User", back_populates="rider_profile")
+
+class DriverProfile(Base):
+    """Specific profile for drivers (who need approval)."""
+    __tablename__ = "driver_profiles"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), unique=True)
+    license_number = Column(String, nullable=True)
+    vehicle_type = Column(String, nullable=True)
+    vehicle_number = Column(String, nullable=True)
+    documents = Column(JSON, default=list) # List of document URLs or metadata
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    user = relationship("User", back_populates="driver_profile")
 
 class UserSession(Base):
     """User sessions for authentication tracking."""

@@ -17,6 +17,9 @@ class UserCreate(UserBase):
     license_number: Optional[str] = None
     vehicle_type: Optional[str] = None
     company_name: Optional[str] = None
+    # Driver Specific
+    vehicle_number: Optional[str] = None
+    uploaded_documents: Optional[dict] = None
     # Rider Info
     gender: Optional[str] = None
     emergency_contact_name: Optional[str] = None
@@ -30,15 +33,18 @@ class UserCreate(UserBase):
 class UserLogin(BaseModel):
     username: str
     password: str
+    role: Optional[str] = "rider" # Added role check for login
 
 class UserResponse(UserBase):
     id: str
+    status: str
     is_active: bool
     created_at: datetime
     # Include other profile fields if needed
     license_number: Optional[str] = None
     vehicle_type: Optional[str] = None
     company_name: Optional[str] = None
+    vehicle_number: Optional[str] = None
     gender: Optional[str] = None
     emergency_contact_name: Optional[str] = None
     emergency_contact_phone: Optional[str] = None

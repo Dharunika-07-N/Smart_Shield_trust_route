@@ -2,13 +2,13 @@
 import React, { useEffect, useState } from 'react';
 import AdminDashboard from './AdminDashboard';
 import RiderDashboard from './RiderDashboard';
-import CustomerDashboard from './CustomerDashboard';
+import DriverDashboard from './DriverDashboard';
+import DispatcherDashboard from './DispatcherDashboard';
 
 const Dashboard = ({ setAuth }) => {
   const [role, setRole] = useState(localStorage.getItem('role') || 'rider');
 
   useEffect(() => {
-    // Sync role with local storage in case it changes
     const storedRole = localStorage.getItem('role');
     if (storedRole) {
       setRole(storedRole);
@@ -17,13 +17,18 @@ const Dashboard = ({ setAuth }) => {
 
   console.log('Current Dashboard Role:', role);
 
-  if (role === 'admin') {
-    return <AdminDashboard setAuth={setAuth} />;
-  } else if (role === 'customer') {
-    return <CustomerDashboard setAuth={setAuth} />;
-  } else {
-    // Default to Rider Dashboard for 'rider' and 'delivery_person'
-    return <RiderDashboard setAuth={setAuth} />;
+  switch (role) {
+    case 'admin':
+    case 'super_admin':
+      return <AdminDashboard setAuth={setAuth} />;
+    case 'driver':
+      return <DriverDashboard setAuth={setAuth} />;
+    case 'dispatcher':
+      return <DispatcherDashboard setAuth={setAuth} />;
+    case 'rider':
+      return <RiderDashboard setAuth={setAuth} />;
+    default:
+      return <RiderDashboard setAuth={setAuth} />;
   }
 };
 
