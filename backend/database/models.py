@@ -266,6 +266,7 @@ class User(Base):
     full_name = Column(String, nullable=True)
     phone = Column(String, nullable=True)
     email = Column(String, nullable=True)
+    emergency_contacts = Column(JSON, nullable=True)  # List of {name, phone, email}
     
     # Relationships
     rider_profile = relationship("RiderProfile", back_populates="user", uselist=False)

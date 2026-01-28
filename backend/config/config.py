@@ -96,7 +96,7 @@ class Settings(BaseSettings):
     EMERGENCY_EMAIL: str = os.getenv("EMERGENCY_EMAIL", "dharunikaktm@gmail.com")
     
     model_config = {
-        "env_file": ".env",
+        "env_file": str(Path(__file__).parent.parent / ".env"),
         "case_sensitive": True,
         "extra": "ignore"
     }

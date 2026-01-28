@@ -100,14 +100,26 @@ This is an automated alert from Smart Shield Trust Route system.
         """
         try:
             # Check if we have credentials
-            if not self.smtp_username or not self.smtp_password or self.smtp_password == "xxxx-xxxx-xxxx-xxxx":
+            if not self.smtp_username or not self.smtp_password:
+                missing = []
+                if not self.smtp_username: missing.append("SMTP_USERNAME")
+                if not self.smtp_password: missing.append("SMTP_PASSWORD")
+                
                 logger.warning(
-                    f"EMAIL NOT SENT: SMTP credentials missing. To enable actual emails, "
-                    f"add SMTP_USERNAME and SMTP_PASSWORD to your .env file in the backend folder.\n"
-                    f"Destination: {to_email}\n"
-                    f"Subject: {subject}"
+                    f"EMAIL NOT SENT: Missing {', '.join(missing)} in config. "
+                    f"Destination: {to_email} | Subject: {subject}"
                 )
-                # Still return True so the frontend thinks it worked during development
+                return True # Dev mode success
+            
+            # Auto-strip quotes from password if present
+            password = self.smtp_password
+            if password.startswith('"') and password.endswith('"'):
+                password = password[1:-1]
+            elif password.startswith("'") and password.endswith("'"):
+                password = password[1:-1]
+            
+            if password == "xxxx-xxxx-xxxx-xxxx":
+                logger.warning(f"EMAIL NOT SENT: Placeholder password in use. Destination: {to_email}")
                 return True
             
             # Create message
@@ -127,7 +139,7 @@ This is an automated alert from Smart Shield Trust Route system.
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
                 if self.use_tls:
                     server.starttls()
-                server.login(self.smtp_username, self.smtp_password)
+                server.login(self.smtp_username, password)
                 server.send_message(msg)
             
             logger.info(f"Email sent successfully to {to_email}")

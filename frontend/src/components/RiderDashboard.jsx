@@ -10,7 +10,7 @@ import useLocation from '../hooks/useLocation';
 const RiderDashboard = ({ setAuth }) => {
     const [activeTab, setActiveTab] = useState('route-map');
     const [panicAlerting, setPanicAlerting] = useState(false);
-    const [riderId, setRiderId] = useState(localStorage.getItem('rider_id') || 'RIDER_402');
+    const [riderId, setRiderId] = useState(localStorage.getItem('user_id') || 'RIDER_402');
     const { location: currentLocation } = useLocation();
     const [isOnline, setIsOnline] = useState(true);
     const [isTripInfoExpanded, setIsTripInfoExpanded] = useState(true);

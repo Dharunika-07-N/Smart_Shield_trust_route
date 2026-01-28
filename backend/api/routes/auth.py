@@ -37,6 +37,14 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
             user_status = "pending_approval"
         
         # 4. Create new user
+        emergency_contacts = []
+        if user_in.emergency_contact_name or user_in.emergency_contact_phone or user_in.emergency_contact_email:
+            emergency_contacts.append({
+                "name": user_in.emergency_contact_name,
+                "phone": user_in.emergency_contact_phone,
+                "email": user_in.emergency_contact_email
+            })
+
         new_user = User(
             username=user_in.username,
             hashed_password=get_password_hash(user_in.password),
@@ -44,7 +52,8 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
             full_name=user_in.full_name,
             phone=user_in.phone,
             email=user_in.email,
-            status=user_status
+            status=user_status,
+            emergency_contacts=emergency_contacts
         )
         db.add(new_user)
         db.commit()

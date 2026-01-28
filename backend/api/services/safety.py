@@ -59,12 +59,18 @@ class SafetyService:
             Alert data with notification status
         """
         try:
-            # Get rider info
-            rider = db.query(Rider).filter(Rider.id == rider_id).first()
-            if not rider:
-                raise ValueError(f"Rider {rider_id} not found")
+            # Try to get user info (new system)
+            user = db.query(User).filter(User.id == rider_id).first()
             
-            # Create panic alert
+            # Fallback to old Rider model if not found in User
+            rider = None
+            if user:
+                # Map user fields to what the service expects
+                rider = user
+            else:
+                rider = db.query(Rider).filter(Rider.id == rider_id).first()
+            
+            # Create panic alert anyway, even if rider not in DB (still want to log and try system email)
             alert = PanicAlert(
                 rider_id=rider_id,
                 route_id=route_id,
@@ -80,40 +86,56 @@ class SafetyService:
             db.refresh(alert)
             
             # Notify emergency contacts
-            emergency_contacts = rider.emergency_contacts or []
+            emergency_contacts = []
+            if rider:
+                emergency_contacts = getattr(rider, 'emergency_contacts', []) or []
+            
             alerted_contacts = []
             emails_sent = 0
             
             for contact in emergency_contacts:
-                success = self._notify_emergency_contact(contact, rider, alert)
-                if success:
-                    alerted_contacts.append({
-                        "name": contact.get("name"),
-                        "phone": contact.get("phone"),
-                        "email": contact.get("email"),
-                        "notified": True
-                    })
-                    if contact.get("email"):
-                        emails_sent += 1
+                try:
+                    success = self._notify_emergency_contact(contact, rider, alert)
+                    if success:
+                        alerted_contacts.append({
+                            "name": contact.get("name"),
+                            "phone": contact.get("phone"),
+                            "email": contact.get("email"),
+                            "notified": True
+                        })
+                        if contact.get("email"):
+                            emails_sent += 1
+                except Exception as contact_err:
+                    logger.error(f"Error notifying contact {contact}: {contact_err}")
             
             alert.alerted_contacts = alerted_contacts
             
-            # Send email to the system emergency email as a backup
-            system_email_sent = self._send_sos_email(rider, alert)
+            # Send email to the system emergency email as a critical backup
+            system_email_sent = False
+            try:
+                system_email_sent = self._send_sos_email(rider if rider else None, alert)
+            except Exception as email_err:
+                logger.error(f"Critical error sending system SOS email: {email_err}")
             
             # Notify company
-            company_notified = self._notify_company(db, rider, alert)
+            company_notified = False
+            try:
+                if rider:
+                    company_notified = self._notify_company(db, rider, alert)
+            except Exception as company_err:
+                logger.error(f"Error notifying company: {company_err}")
+            
             alert.company_notified = company_notified
             
             # Optionally notify emergency services (can be configured)
-            # In production, integrate with emergency services API
-            emergency_services_notified = False  # Placeholder
-            
+            emergency_services_notified = False  
             alert.emergency_services_notified = emergency_services_notified
+            
             db.commit()
             
             logger.critical(
-                f"PANIC ALERT: Rider {rider_id} at {location.latitude}, {location.longitude}"
+                f"PANIC ALERT: User {rider_id} at {location.latitude}, {location.longitude}. "
+                f"Backup Email Sent: {system_email_sent}"
             )
             
             return {
@@ -130,28 +152,36 @@ class SafetyService:
             }
             
         except Exception as e:
-            logger.error(f"Error triggering panic button: {e}")
+            logger.error(f"Critical failure in trigger_panic_button: {e}")
             db.rollback()
             raise
     
-    def _send_sos_email(self, rider: Rider, alert: PanicAlert, to_email: Optional[str] = None) -> bool:
+    def _send_sos_email(self, rider: Optional[User] = None, alert: Optional[PanicAlert] = None, to_email: Optional[str] = None) -> bool:
         """Send SOS alert email to emergency contact."""
         try:
             # Get location from alert
-            location = alert.location
+            location = alert.location if alert else {}
             
+            # Extract rider name and ID
+            rider_name = "Unknown Rider"
+            rider_id = "Unknown"
+            
+            if rider:
+                rider_name = getattr(rider, 'full_name', getattr(rider, 'name', rider.username if hasattr(rider, 'username') else "Unknown Rider"))
+                rider_id = getattr(rider, 'id', "Unknown")
+
             # Send email using email service
             email_sent = self.email_service.send_sos_alert(
-                rider_name=rider.name or "Unknown Rider",
-                rider_id=rider.id,
+                rider_name=rider_name,
+                rider_id=rider_id,
                 location=location,
                 to_email=to_email
             )
             
             if email_sent:
-                logger.info(f"SOS email sent successfully for rider {rider.id}")
+                logger.info(f"SOS email sent successfully for rider {rider_id}")
             else:
-                logger.warning(f"Failed to send SOS email for rider {rider.id}")
+                logger.warning(f"Failed to send SOS email for rider {rider_id}")
             
             return email_sent
             

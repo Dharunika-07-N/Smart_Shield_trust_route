@@ -1,6 +1,8 @@
 """Main FastAPI application."""
 from dotenv import load_dotenv
-load_dotenv()
+from pathlib import Path
+import os
+load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
