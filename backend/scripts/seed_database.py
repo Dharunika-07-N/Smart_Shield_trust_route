@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from database.database import engine, SessionLocal, Base
 from database.models import User, RiderProfile, Customer, Delivery, SafetyFeedback, CrimeData, SafeZone
+from api.services.security import get_password_hash
 
 fake = Faker()
 
@@ -45,7 +46,7 @@ def seed_users(db: Session, count=50):
         user = User(
             email=fake.email(),
             username=fake.user_name(),
-            hashed_password="hashed_password", # Simplified
+            hashed_password=get_password_hash("password123"), # Standard password for demo
             full_name=fake.name(),
             phone=fake.phone_number()[:15],
             role=role,
