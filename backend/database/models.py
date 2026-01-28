@@ -151,6 +151,9 @@ class Delivery(Base):
     dropoff_location = Column(JSON, nullable=False) # {lat, lng, address}
     status = Column(String, default="pending") # pending, assigned, picked_up, in_transit, delivered, failed
     assigned_rider_id = Column(String, ForeignKey("users.id"), nullable=True)
+    safety_score = Column(Float, nullable=True)
+    estimated_distance = Column(Float, nullable=True)
+    estimated_duration = Column(Float, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     delivered_at = Column(DateTime, nullable=True)
 

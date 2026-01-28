@@ -75,7 +75,7 @@ class Settings(BaseSettings):
     
     # ML Models
     MODEL_CACHE_DIR: Path = Path("models/cache")
-    SAFETY_MODEL_PATH: str = "models/safety_scorer.h5"
+    SAFETY_MODEL_PATH: str = "api/models/saved_models/safety_scorer_rf.pkl"
     SAFETY_SCALER_PATH: str = "models/safety_scaler.pkl"
     HOSPITALS_DATA_PATH: str = "data/hospitals.json"
     

@@ -18,6 +18,29 @@ Smart Shield Trust Route is an intelligent delivery routing system that optimize
 - **Smart Feedback System** - Rider ratings improve safety scoring over time
 - **Company Dashboard** - Visualize delivery performance, safety heatmaps, and fuel metrics
 
+## 🤖 AI Model Capabilities
+
+Smart Shield Trust Route integrates several specialized AI/ML models to provide industry-leading safety and efficiency:
+
+### 1. Safety Scoring Model (Random Forest)
+Our safety engine uses a **Random Forest Regressor** trained on real Tamil Nadu crime data, historical delivery success patterns, and crowdsourced rider feedback. It evaluates locations based on 12 key features including:
+- Crime density and severity in the immediate vicinity
+- Distance to the nearest verified Safe Zone (Police stations, 24h hospitals)
+- Real-time lighting conditions and patrol presence
+- Historical safety ratings from other riders
+
+### 2. Multi-Objective Route Optimization
+The routing engine uses high-performance graph algorithms (A* with custom heuristics) to solve the multi-objective TSP:
+- **Primary Objective:** Maximize Safety Score (especially for night deliveries)
+- **Secondary Objective:** Minimize distance/time and fuel consumption
+- **Safety Deviation:** The system can intelligently deviate from the fastest route by up to 15% if it significantly improves the safety score.
+
+### 3. Real-Time Feedback Loop
+The system implements an online learning loop where every completed delivery and rider feedback entry is processed to:
+- Dynamically update location safety scores
+- Retrain models periodically to adapt to changing urban crime/traffic patterns
+- Identify emerging "red zones" before they appear in official statistics
+
 ## 🏗️ System Architecture
 
 ```

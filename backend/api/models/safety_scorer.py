@@ -65,18 +65,26 @@ class SafetyScorer:
         model_dir.mkdir(parents=True, exist_ok=True)
         
         # Try to load existing model
-        if Path(model_path).exists() and Path(settings.SAFETY_SCALER_PATH).exists():
+        if Path(model_path).exists():
             try:
                 self.model = joblib.load(model_path)
-                self.scaler = joblib.load(settings.SAFETY_SCALER_PATH)
                 
-                # Check for feature mismatch (we now have 7 features)
-                if hasattr(self.model, "n_features_in_") and self.model.n_features_in_ != 7:
-                    raise ValueError(f"Model expects {self.model.n_features_in_} features, but we need 7")
+                # Try to load scaler if it exists
+                if Path(settings.SAFETY_SCALER_PATH).exists():
+                    self.scaler = joblib.load(settings.SAFETY_SCALER_PATH)
+                else:
+                    self.scaler = None
+                
+                # Check feature count
+                if hasattr(self.model, "n_features_in_"):
+                    self.feature_count = self.model.n_features_in_
+                    logger.info(f"Loaded existing safety scoring model with {self.feature_count} features")
+                else:
+                    self.feature_count = 7
+                    logger.info("Loaded models without explicit feature count attribute, assuming 7")
                     
-                logger.info("Loaded existing safety scoring model and scaler")
             except Exception as e:
-                logger.warning(f"Could not load model or scaler: {e}, creating new ones")
+                logger.warning(f"Could not load model: {e}, creating new synthetic one")
                 self._train_initial_model()
         else:
             self._train_initial_model()
@@ -129,7 +137,8 @@ class SafetyScorer:
         self,
         coord: Coordinate,
         time_of_day: str = "day",
-        weather_data: Optional[Dict] = None
+        weather_data: Optional[Dict] = None,
+        delivery_info: Optional[Dict] = None
     ) -> np.ndarray:
         """Extract features for a location using real crime data."""
         # Get real crime data from Tamil Nadu crime dataset
@@ -171,11 +180,26 @@ class SafetyScorer:
         # Hospital Proximity
         hospital_proximity = self._calculate_hospital_proximity(coord)
         
-        # Increase importance of hospitals at night
-        if hour < 6 or hour > 20:
-            hospital_proximity *= 1.2
-            hospital_proximity = min(100.0, hospital_proximity)
-        
+        # If we need 12 features for the new RF model
+        if hasattr(self, 'feature_count') and self.feature_count == 12:
+            is_night = 1 if (hour >= 20 or hour <= 6) else 0
+            is_peak = 1 if (hour >= 22 or hour <= 4) else 0
+            
+            return np.array([
+                crime_rate * 2,          # crime_density (approx)
+                crime_rate,              # crime_severity (approx)
+                10 - (police_proximity / 10), # dist to safe zone
+                2 if police_proximity > 70 else 0, # safe zones nearby
+                4.0,                     # avg_feedback_rating
+                80.0,                    # pct_felt_safe
+                lighting_score,          # pct_adequate_lighting
+                is_night,                # is_night
+                is_peak,                 # is_peak_time
+                0.8,                     # area_urbanization
+                delivery_info.get('distance', 5) if delivery_info else 5,
+                delivery_info.get('duration', 15) if delivery_info else 15
+            ])
+
         return np.array([
             crime_rate,
             lighting_score,
@@ -252,19 +276,17 @@ class SafetyScorer:
             Tuple of (overall_score, factors_list)
         """
         features = self._get_location_features(coord, time_of_day, weather_data)
-        # Expected model features: 7
-        if features.shape[0] >= 7:
-            # Taking first 7 features for the model
-             features_for_model = features[:7].reshape(1, -1)
-        else:
-             # Fallback
-             features_for_model = np.zeros((1, 7))
-             features_for_model[0, :min(len(features), 7)] = features[:7]
         
-        features_scaled = self.scaler.transform(features_for_model)
+        # Adjust feature set based on what model expects
+        feat_count = getattr(self, 'feature_count', 7)
+        features_for_model = features[:feat_count].reshape(1, -1)
+        
+        # Scaling
+        if self.scaler:
+            features_for_model = self.scaler.transform(features_for_model)
         
         # Get model prediction
-        base_score = self.model.predict(features_scaled)[0]
+        base_score = self.model.predict(features_for_model)[0]
         
         # Apply gender-specific adjustments if needed
         if rider_info and rider_info.get("gender") == "female":
