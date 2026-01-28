@@ -72,9 +72,8 @@ const AdminDashboard = ({ setAuth }) => {
 
   const navItems = [
     { id: 'route-map', label: 'Route Optimizer', icon: FiNavigation },
-    { id: 'overview', label: 'Fleet Overview', icon: FiLayers },
+    { id: 'fleet-insights', label: 'Operations & Insights', icon: FiBarChart2 },
     { id: 'tracking', label: 'Live Tracking', icon: FiMap },
-    { id: 'analytics', label: 'Insights', icon: FiBarChart2 },
     { id: 'training', label: 'AI Training', icon: FiCpu },
   ];
 
@@ -202,7 +201,7 @@ const AdminDashboard = ({ setAuth }) => {
         </div>
 
         <main className="flex-1 overflow-y-auto p-4 md:p-8">
-          {activeTab === 'overview' && (
+          {activeTab === 'fleet-insights' && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {stats.map((s, i) => (
@@ -220,11 +219,12 @@ const AdminDashboard = ({ setAuth }) => {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 premium-card p-6 h-[400px]">
-                  <h3 className="text-lg font-bold text-gray-900 mb-4">Real-time Performance</h3>
-                  <Analytics compact />
+                <div className="lg:col-span-2 space-y-8">
+                  <div className="premium-card p-6">
+                    <Analytics />
+                  </div>
                 </div>
-                <div className="premium-card p-6">
+                <div className="premium-card p-6 h-fit shrink-0">
                   <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
                     <FiMessageSquare className="text-blue-600" />
                     Rider Pulse Feed
@@ -260,7 +260,6 @@ const AdminDashboard = ({ setAuth }) => {
 
           {activeTab === 'route-map' && <RouteMap />}
           {activeTab === 'tracking' && <LiveTracking />}
-          {activeTab === 'analytics' && <Analytics />}
           {activeTab === 'training' && <TrainingCenter />}
         </main>
       </div>
