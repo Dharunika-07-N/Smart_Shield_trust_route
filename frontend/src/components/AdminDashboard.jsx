@@ -8,6 +8,7 @@ import Analytics from './Analytics';
 import RouteMap from './RouteMap';
 import LiveTracking from './LiveTracking';
 import TrainingCenter from './TrainingCenter';
+import ModelPerformance from './ModelPerformance';
 import { api } from '../services/api';
 
 const AdminDashboard = ({ setAuth }) => {
@@ -26,6 +27,7 @@ const AdminDashboard = ({ setAuth }) => {
     { id: 'Users', icon: FiUsers, label: 'User Management' },
     { id: 'Analytics', icon: FiBarChart2, label: 'Advanced Analytics' },
     { id: 'Training', icon: FiCpu, label: 'ML Training Center' },
+    { id: 'Performance', icon: FiActivity, label: 'AI Monitoring' },
     { id: 'Reports', icon: FiAlertTriangle, label: 'Incident Reports' }
   ];
 
@@ -49,8 +51,8 @@ const AdminDashboard = ({ setAuth }) => {
               key={item.id}
               onClick={() => setActiveTab(item.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-semibold text-sm ${activeTab === item.id
-                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/50'
+                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/50'
                 }`}
             >
               <item.icon size={18} />
@@ -280,6 +282,7 @@ const AdminDashboard = ({ setAuth }) => {
               </div>
             </div>
           )}
+          {activeTab === 'Performance' && <ModelPerformance />}
         </main>
       </div>
     </div>

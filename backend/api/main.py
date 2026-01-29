@@ -6,7 +6,7 @@ load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routes import delivery, safety, feedback, traffic, auth, training, users, deliveries, tracking, dashboard
+from api.routes import delivery, safety, feedback, traffic, auth, training, users, deliveries, tracking, dashboard, monitoring, experiments
 from api.services.database import init_db
 import os
 from loguru import logger
@@ -46,6 +46,8 @@ app.include_router(users.router, prefix="/api/v1", tags=["Users"])
 app.include_router(deliveries.router, prefix="/api/v1", tags=["Deliveries"])
 app.include_router(tracking.router, prefix="/api/v1", tags=["Tracking"])
 app.include_router(dashboard.router, prefix="/api/v1", tags=["Dashboard"])
+app.include_router(monitoring.router, prefix="/api/v1", tags=["Monitoring"])
+app.include_router(experiments.router, prefix="/api/v1", tags=["Experiments"])
 
 
 
