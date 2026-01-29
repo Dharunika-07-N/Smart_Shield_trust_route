@@ -8,6 +8,7 @@ import {
 } from 'react-icons/fi';
 import RouteMap from './RouteMap';
 import { api } from '../services/api';
+import dashboardApi from '../services/dashboardApi';
 import useLocation from '../hooks/useLocation';
 
 const ModernDashboard = ({ setAuth }) => {
@@ -16,10 +17,22 @@ const ModernDashboard = ({ setAuth }) => {
     const [riderId] = useState(localStorage.getItem('user_id') || 'R 2847');
     const { location: currentLocation } = useLocation();
 
+    // State for API data
+    const [stats, setStats] = useState([
+        { label: 'Active Deliveries', value: '12', subValue: '4 in transit', trend: '+8% vs last week', icon: FiPackage, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+        { label: 'Safety Score', value: '87%', subValue: 'Above average', trend: '+5% vs last week', icon: FiShield, color: 'text-blue-600', bg: 'bg-blue-50' },
+        { label: 'Fuel Saved', value: '24.5L', subValue: 'This week', trend: '+12% vs last week', icon: FiZap, color: 'text-amber-600', bg: 'bg-amber-50' },
+        { label: 'Avg. Delivery Time', value: '18 min', subValue: 'Target: 20 min', trend: '+3% vs last week', icon: FiClock, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    ]);
+    const [deliveryQueue, setDeliveryQueue] = useState([]);
+    const [zoneSafety, setZoneSafety] = useState([]);
+    const [weather, setWeather] = useState(null);
+    const [loading, setLoading] = useState(true);
+
     const sideBarItems = [
         { name: 'Dashboard', icon: FiActivity, badge: null },
         { name: 'Route Map', icon: FiMap, badge: null },
-        { name: 'Deliveries', icon: FiPackage, badge: 12 },
+        { name: 'Deliveries', icon: FiPackage, badge: deliveryQueue.length || 12 },
         { name: 'Safety Zones', icon: FiShield, badge: null },
         { name: 'Alerts', icon: FiAlertTriangle, badge: 3 },
         { name: 'Analytics', icon: FiBarChart2, badge: null },
@@ -28,12 +41,99 @@ const ModernDashboard = ({ setAuth }) => {
         { name: 'Settings', icon: FiSettings, badge: null },
     ];
 
-    const stats = [
-        { label: 'Active Deliveries', value: '12', subValue: '4 in transit', trend: '+8% vs last week', icon: FiPackage, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-        { label: 'Safety Score', value: '87%', subValue: 'Above average', trend: '+5% vs last week', icon: FiShield, color: 'text-blue-600', bg: 'bg-blue-50' },
-        { label: 'Fuel Saved', value: '24.5L', subValue: 'This week', trend: '+12% vs last week', icon: FiZap, color: 'text-amber-600', bg: 'bg-amber-50' },
-        { label: 'Avg. Delivery Time', value: '18 min', subValue: 'Target: 20 min', trend: '+3% vs last week', icon: FiClock, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    ];
+    // Fetch dashboard data on mount
+    useEffect(() => {
+        const fetchDashboardData = async () => {
+            try {
+                setLoading(true);
+
+                // Fetch all dashboard data in parallel
+                const [statsRes, queueRes, zonesRes, weatherRes] = await Promise.all([
+                    dashboardApi.getStats(riderId).catch(err => ({ data: null })),
+                    dashboardApi.getDeliveryQueue(4).catch(err => ({ data: [] })),
+                    dashboardApi.getZoneSafety().catch(err => ({ data: [] })),
+                    dashboardApi.getWeather().catch(err => ({ data: null }))
+                ]);
+
+                // Update stats if API returns data
+                if (statsRes.data) {
+                    const apiStats = [
+                        {
+                            label: 'Active Deliveries',
+                            value: statsRes.data.active_deliveries.value,
+                            subValue: statsRes.data.active_deliveries.subValue,
+                            trend: statsRes.data.active_deliveries.trend,
+                            icon: FiPackage,
+                            color: 'text-emerald-600',
+                            bg: 'bg-emerald-50'
+                        },
+                        {
+                            label: 'Safety Score',
+                            value: statsRes.data.safety_score.value,
+                            subValue: statsRes.data.safety_score.subValue,
+                            trend: statsRes.data.safety_score.trend,
+                            icon: FiShield,
+                            color: 'text-blue-600',
+                            bg: 'bg-blue-50'
+                        },
+                        {
+                            label: 'Fuel Saved',
+                            value: statsRes.data.fuel_saved.value,
+                            subValue: statsRes.data.fuel_saved.subValue,
+                            trend: statsRes.data.fuel_saved.trend,
+                            icon: FiZap,
+                            color: 'text-amber-600',
+                            bg: 'bg-amber-50'
+                        },
+                        {
+                            label: 'Avg. Delivery Time',
+                            value: statsRes.data.avg_delivery_time.value,
+                            subValue: statsRes.data.avg_delivery_time.subValue,
+                            trend: statsRes.data.avg_delivery_time.trend,
+                            icon: FiClock,
+                            color: 'text-emerald-600',
+                            bg: 'bg-emerald-50'
+                        },
+                    ];
+                    setStats(apiStats);
+                }
+
+                if (queueRes.data) {
+                    setDeliveryQueue(queueRes.data);
+                }
+
+                if (zonesRes.data) {
+                    setZoneSafety(zonesRes.data);
+                }
+
+                if (weatherRes.data) {
+                    setWeather(weatherRes.data);
+                }
+            } catch (error) {
+                console.error('Error fetching dashboard data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchDashboardData();
+
+        // Refresh data every 30 seconds
+        const interval = setInterval(fetchDashboardData, 30000);
+        return () => clearInterval(interval);
+    }, [riderId]);
+
+    const handleOptimizeRoute = async () => {
+        try {
+            const deliveryIds = deliveryQueue.map(d => d.id);
+            const result = await dashboardApi.optimizeRoute(deliveryIds);
+            alert(`Route optimized! ${result.message}\nTime saved: ${result.estimated_time_saved}\nFuel saved: ${result.fuel_saved}`);
+        } catch (error) {
+            console.error('Error optimizing route:', error);
+            alert('Failed to optimize route. Please try again.');
+        }
+    };
+
 
     return (
         <div className="flex h-screen app-dashboard overflow-hidden font-['Inter']">
@@ -208,61 +308,77 @@ const ModernDashboard = ({ setAuth }) => {
                                                 <FiPackage className="text-emerald-500" />
                                                 Delivery Queue
                                             </h3>
-                                            <span className="text-xs text-slate-500">4 deliveries</span>
+                                            <span className="text-xs text-slate-500">{deliveryQueue.length || 0} deliveries</span>
                                         </div>
 
                                         <div className="space-y-4">
-                                            {[
-                                                { id: '#DEL-2847', name: 'Rajesh Sharma', address: '42, Anna Nagar East, Chennai 600102', time: '12 mins', dist: '3.2 km', score: 88, status: 'In Transit', priority: 'High', priorityColor: 'text-amber-600 bg-amber-50 border-amber-100' },
-                                                { id: '#DEL-2848', name: 'Lakshmi Venkat', address: '15/3, T. Nagar Main Road, Chennai 600017', time: '25 mins', dist: '5.8 km', score: 72, status: 'Pending', priority: 'Normal', priorityColor: 'text-blue-600 bg-blue-50 border-blue-100' },
-                                                { id: '#DEL-2849', name: 'Amit Singh', address: '8, Adyar Bridge Road, Chennai 600020', time: '40 mins', dist: '8.4 km', score: 91, status: 'Pending', priority: 'Urgent', priorityColor: 'text-red-600 bg-red-50 border-red-100' },
-                                            ].map((del, idx) => (
-                                                <div key={idx} className="bg-slate-50 border border-slate-100 rounded-2xl p-4 hover:border-slate-200 transition-all group">
-                                                    <div className="flex items-start justify-between mb-4">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{del.id}</div>
-                                                            <div className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${del.priorityColor}`}>{del.priority}</div>
-                                                            <div className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-100 text-emerald-600">{del.status}</div>
-                                                        </div>
-                                                        <div className="text-2xl font-black text-emerald-500 group-hover:drop-shadow-[0_0_8px_rgba(16,185,129,0.2)] transition-all">
-                                                            {del.score}
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex justify-between items-end">
-                                                        <div>
-                                                            <h4 className="font-bold text-slate-800 text-base mb-1">{del.name}</h4>
-                                                            <div className="flex items-center gap-2 text-slate-500 text-xs mb-3">
-                                                                <FiMapPin className="text-[10px]" />
-                                                                {del.address}
-                                                            </div>
-                                                            <div className="flex items-center gap-4">
-                                                                <div className="flex items-center gap-1.5 text-xs text-slate-700 font-medium">
-                                                                    <FiClock className="text-emerald-500" />
-                                                                    {del.time}
-                                                                </div>
-                                                                <div className="flex items-center gap-1.5 text-xs text-slate-700 font-medium">
-                                                                    <FiNavigation className="text-emerald-500" />
-                                                                    {del.dist}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <button className="p-2 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-slate-800 hover:bg-slate-50 transition-all shadow-sm">
-                                                            <FiChevronRight size={20} />
-                                                        </button>
-                                                    </div>
+                                            {loading ? (
+                                                <div className="text-center py-8 text-slate-400">
+                                                    <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                                                    Loading deliveries...
                                                 </div>
-                                            ))}
+                                            ) : deliveryQueue.length === 0 ? (
+                                                <div className="text-center py-8 text-slate-400">
+                                                    No active deliveries
+                                                </div>
+                                            ) : (
+                                                deliveryQueue.map((del, idx) => {
+                                                    const priorityColors = {
+                                                        'High': 'text-amber-600 bg-amber-50 border-amber-100',
+                                                        'Normal': 'text-blue-600 bg-blue-50 border-blue-100',
+                                                        'Urgent': 'text-red-600 bg-red-50 border-red-100'
+                                                    };
+
+                                                    return (
+                                                        <div key={del.id || idx} className="bg-slate-50 border border-slate-100 rounded-2xl p-4 hover:border-slate-200 transition-all group">
+                                                            <div className="flex items-start justify-between mb-4">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{del.id}</div>
+                                                                    <div className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${priorityColors[del.priority] || priorityColors['Normal']}`}>{del.priority}</div>
+                                                                    <div className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-100 text-emerald-600">{del.status}</div>
+                                                                </div>
+                                                                <div className="text-2xl font-black text-emerald-500 group-hover:drop-shadow-[0_0_8px_rgba(16,185,129,0.2)] transition-all">
+                                                                    {del.safety_score}
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex justify-between items-end">
+                                                                <div>
+                                                                    <h4 className="font-bold text-slate-800 text-base mb-1">{del.customer_name}</h4>
+                                                                    <div className="flex items-center gap-2 text-slate-500 text-xs mb-3">
+                                                                        <FiMapPin className="text-[10px]" />
+                                                                        {del.address}
+                                                                    </div>
+                                                                    <div className="flex items-center gap-4">
+                                                                        <div className="flex items-center gap-1.5 text-xs text-slate-700 font-medium">
+                                                                            <FiClock className="text-emerald-500" />
+                                                                            {del.estimated_time}
+                                                                        </div>
+                                                                        <div className="flex items-center gap-1.5 text-xs text-slate-700 font-medium">
+                                                                            <FiNavigation className="text-emerald-500" />
+                                                                            {del.distance}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <button className="p-2 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-slate-800 hover:bg-slate-50 transition-all shadow-sm">
+                                                                    <FiChevronRight size={20} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })
+                                            )}
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Right Section: Quick Actions & Weather & Zone Safety */}
-                                <div className="space-y-6">
+
+                                < div className="space-y-6" >
                                     {/* Quick Actions */}
-                                    <div className="premium-card p-6">
+                                    < div className="premium-card p-6" >
                                         <h3 className="text-lg font-bold text-slate-800 mb-6">Quick Actions</h3>
                                         <div className="grid grid-cols-2 gap-4">
-                                            <button className="flex flex-col items-center justify-center p-4 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white transition-all group shadow-md shadow-emerald-500/10">
+                                            <button onClick={handleOptimizeRoute} className="flex flex-col items-center justify-center p-4 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white transition-all group shadow-md shadow-emerald-500/10">
                                                 <FiNavigation className="text-2xl mb-2 group-hover:scale-110 transition-transform" />
                                                 <span className="text-[10px] font-black uppercase tracking-tight">Optimize Route</span>
                                                 <span className="text-[8px] opacity-70">AI-powered</span>
@@ -283,7 +399,7 @@ const ModernDashboard = ({ setAuth }) => {
                                                 <span className="text-[8px] opacity-70">Quick dial</span>
                                             </button>
                                         </div>
-                                    </div>
+                                    </div >
 
                                     {/* Zone Safety */}
                                     <div className="premium-card p-6">
@@ -295,77 +411,97 @@ const ModernDashboard = ({ setAuth }) => {
                                             <span className="text-[10px] text-slate-400 font-medium">Updated 5 min ago</span>
                                         </div>
                                         <div className="space-y-4">
-                                            {[
-                                                { name: 'T. Nagar', incidents: '12 incidents', trend: 'down', score: 72, color: 'bg-amber-500' },
-                                                { name: 'Anna Nagar', incidents: '3 incidents', trend: 'neutral', score: 88, color: 'bg-emerald-500' },
-                                                { name: 'Velachery', incidents: '28 incidents', trend: 'up', score: 45, color: 'bg-red-500' },
-                                                { name: 'Adyar', incidents: '2 incidents', trend: 'down', score: 91, color: 'bg-emerald-500' },
-                                            ].map((zone, idx) => (
-                                                <div key={idx} className="space-y-2">
-                                                    <div className="flex justify-between items-end">
-                                                        <div>
-                                                            <h4 className="text-sm font-bold text-slate-800 leading-none">{zone.name}</h4>
-                                                            <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-1">
-                                                                {zone.incidents}
-                                                                <span className={zone.trend === 'down' ? 'text-emerald-500' : zone.trend === 'up' ? 'text-red-500' : 'text-slate-400'}>
-                                                                    {zone.trend === 'down' ? '↓' : zone.trend === 'up' ? '↑' : '•'}
-                                                                </span>
-                                                            </p>
-                                                        </div>
-                                                        <div className="text-lg font-black text-slate-300">{zone.score}</div>
-                                                    </div>
-                                                    <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                                                        <div
-                                                            className={`h-full rounded-full transition-all duration-1000 ${zone.color}`}
-                                                            style={{ width: `${zone.score}%` }}
-                                                        />
-                                                    </div>
+                                            {loading ? (
+                                                <div className="text-center py-4 text-slate-400">
+                                                    <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
                                                 </div>
-                                            ))}
+                                            ) : zoneSafety.length === 0 ? (
+                                                <div className="text-center py-4 text-slate-400 text-sm">No zone data available</div>
+                                            ) : (
+                                                zoneSafety.map((zone, idx) => {
+                                                    const colorMap = {
+                                                        'green': 'bg-emerald-500',
+                                                        'amber': 'bg-amber-500',
+                                                        'red': 'bg-red-500'
+                                                    };
+
+                                                    return (
+                                                        <div key={idx} className="space-y-2">
+                                                            <div className="flex justify-between items-end">
+                                                                <div>
+                                                                    <h4 className="text-sm font-bold text-slate-800 leading-none">{zone.name}</h4>
+                                                                    <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-1">
+                                                                        {zone.incidents}
+                                                                        <span className={zone.trend === 'down' ? 'text-emerald-500' : zone.trend === 'up' ? 'text-red-500' : 'text-slate-400'}>
+                                                                            {zone.trend === 'down' ? '↓' : zone.trend === 'up' ? '↑' : '•'}
+                                                                        </span>
+                                                                    </p>
+                                                                </div>
+                                                                <div className="text-lg font-black text-slate-300">{zone.score}</div>
+                                                            </div>
+                                                            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                                                <div
+                                                                    className={`h-full rounded-full transition-all duration-1000 ${colorMap[zone.color] || 'bg-slate-500'}`}
+                                                                    style={{ width: `${zone.score}%` }}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })
+                                            )}
                                         </div>
                                     </div>
 
                                     {/* Weather Conditions */}
                                     <div className="premium-card p-6 bg-slate-50">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <h3 className="text-lg font-bold text-slate-800 leading-none">Weather Conditions</h3>
-                                            <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-600 rounded-full font-bold">Low Impact</span>
-                                        </div>
-                                        <div className="flex items-center gap-4 mb-6">
-                                            <div className="w-16 h-16 flex items-center justify-center text-amber-500 text-5xl">
-                                                ☁️
+                                        {loading || !weather ? (
+                                            <div className="text-center py-8 text-slate-400">
+                                                <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                                                Loading weather...
                                             </div>
-                                            <div>
-                                                <div className="text-4xl font-black text-slate-800 leading-none">28°C</div>
-                                                <div className="text-xs text-slate-500 font-medium">Partly Cloudy</div>
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-2">
-                                            <div className="bg-white p-2 rounded-xl text-center border border-slate-100 shadow-sm">
-                                                <FiDroplet className="mx-auto text-blue-500 mb-1" />
-                                                <div className="text-[10px] text-slate-400 uppercase tracking-tighter">Humidity</div>
-                                                <div className="text-xs font-bold text-slate-800">72%</div>
-                                            </div>
-                                            <div className="bg-white p-2 rounded-xl text-center border border-slate-100 shadow-sm">
-                                                <FiWind className="mx-auto text-emerald-500 mb-1" />
-                                                <div className="text-[10px] text-slate-400 uppercase tracking-tighter">Wind</div>
-                                                <div className="text-xs font-bold text-slate-800">12 km/h</div>
-                                            </div>
-                                            <div className="bg-white p-2 rounded-xl text-center border border-slate-100 shadow-sm">
-                                                <FiEye className="mx-auto text-purple-500 mb-1" />
-                                                <div className="text-[10px] text-slate-400 uppercase tracking-tighter">Visibility</div>
-                                                <div className="text-xs font-bold text-slate-800">Good</div>
-                                            </div>
-                                        </div>
+                                        ) : (
+                                            <>
+                                                <div className="flex justify-between items-start mb-4">
+                                                    <h3 className="text-lg font-bold text-slate-800 leading-none">Weather Conditions</h3>
+                                                    <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-600 rounded-full font-bold">{weather.impact} Impact</span>
+                                                </div>
+                                                <div className="flex items-center gap-4 mb-6">
+                                                    <div className="w-16 h-16 flex items-center justify-center text-amber-500 text-5xl">
+                                                        {weather.icon}
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-4xl font-black text-slate-800 leading-none">{weather.temperature}°C</div>
+                                                        <div className="text-xs text-slate-500 font-medium">{weather.condition}</div>
+                                                    </div>
+                                                </div>
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    <div className="bg-white p-2 rounded-xl text-center border border-slate-100 shadow-sm">
+                                                        <FiDroplet className="mx-auto text-blue-500 mb-1" />
+                                                        <div className="text-[10px] text-slate-400 uppercase tracking-tighter">Humidity</div>
+                                                        <div className="text-xs font-bold text-slate-800">{weather.humidity}%</div>
+                                                    </div>
+                                                    <div className="bg-white p-2 rounded-xl text-center border border-slate-100 shadow-sm">
+                                                        <FiWind className="mx-auto text-emerald-500 mb-1" />
+                                                        <div className="text-[10px] text-slate-400 uppercase tracking-tighter">Wind</div>
+                                                        <div className="text-xs font-bold text-slate-800">{weather.wind_speed} km/h</div>
+                                                    </div>
+                                                    <div className="bg-white p-2 rounded-xl text-center border border-slate-100 shadow-sm">
+                                                        <FiEye className="mx-auto text-purple-500 mb-1" />
+                                                        <div className="text-[10px] text-slate-400 uppercase tracking-tighter">Visibility</div>
+                                                        <div className="text-xs font-bold text-slate-800">{weather.visibility}</div>
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
-                                </div>
-                            </div>
-                        </div>
+                                </div >
+                            </div >
+                        </div >
                     )}
                     {activeTab === 'Route Map' && <RouteMap />}
-                </main>
-            </div>
-        </div>
+                </main >
+            </div >
+        </div >
     );
 };
 
