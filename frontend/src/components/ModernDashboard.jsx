@@ -10,6 +10,7 @@ import RouteMap from './RouteMap';
 import { api } from '../services/api';
 import dashboardApi from '../services/dashboardApi';
 import useLocation from '../hooks/useLocation';
+import NotificationDropdown from './NotificationDropdown';
 
 const ModernDashboard = ({ setAuth }) => {
     const [activeTab, setActiveTab] = useState('Dashboard');
@@ -198,10 +199,7 @@ const ModernDashboard = ({ setAuth }) => {
                         </div>
 
                         <div className="flex items-center gap-4 text-slate-400 relative">
-                            <button className="hover:text-slate-800 transition-colors relative">
-                                <FiBell className="text-xl" />
-                                <span className="absolute -top-1 -right-1 w-2 h-2 bg-orange-500 rounded-full border-2 border-white" />
-                            </button>
+                            <NotificationDropdown userId={riderId} />
                             <button className="hover:text-slate-800 transition-colors">
                                 <FiSettings className="text-xl" />
                             </button>
