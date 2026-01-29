@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import AdminDashboard from './AdminDashboard';
-import RiderDashboard from './RiderDashboard';
+import ModernDashboard from './ModernDashboard';
 import DriverDashboard from './DriverDashboard';
 import DispatcherDashboard from './DispatcherDashboard';
 
@@ -26,9 +26,9 @@ const Dashboard = ({ setAuth }) => {
     case 'dispatcher':
       return <DispatcherDashboard setAuth={setAuth} />;
     case 'rider':
-      return <RiderDashboard setAuth={setAuth} />;
+      return <ModernDashboard setAuth={setAuth} />;
     default:
-      return <RiderDashboard setAuth={setAuth} />;
+      return <ModernDashboard setAuth={setAuth} />;
   }
 };
 

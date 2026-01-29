@@ -68,7 +68,7 @@ const SafetyGauge = ({ score }) => {
   );
 };
 
-const RouteMap = () => {
+const RouteMap = ({ variant = 'default' }) => {
   const { location, loading: locationLoading, error: locationError } = useLocation();
   const [currentPos, setCurrentPos] = useState(null);
   const [destPos, setDestPos] = useState(null);
@@ -551,8 +551,75 @@ const RouteMap = () => {
     return null;
   };
 
+  if (variant === 'dark-minimal') {
+    return (
+      <div className="w-full h-full">
+        <MapContainer
+          center={centerPosition}
+          zoom={13}
+          zoomControl={false}
+          style={{ height: '100%', width: '100%' }}
+          className="dark-map"
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          />
+
+          {/* Display current position */}
+          {currentPos && (
+            <Marker position={currentPos} icon={pulsingIcon} />
+          )}
+
+          {/* Simple Curved Route Visualization (Mocking Image 2) */}
+          <Polyline
+            positions={[
+              [centerPosition[0], centerPosition[1] - 0.02],
+              [centerPosition[0] + 0.01, centerPosition[1] - 0.01],
+              [centerPosition[0] - 0.01, centerPosition[1] + 0.01],
+              [centerPosition[0], centerPosition[1] + 0.02],
+            ]}
+            pathOptions={{
+              color: '#39FF14',
+              weight: 5,
+              opacity: 0.8,
+              dashArray: '10, 10'
+            }}
+          />
+
+          {/* Map markers like Image 2 */}
+          <Marker
+            position={[centerPosition[0], centerPosition[1] - 0.02]}
+            icon={L.divIcon({
+              className: 'map-num-marker',
+              html: `<div style="width:24px;height:24px;background:#10b981;border-radius:50%;display:flex;items-center;justify-content:center;color:white;font-weight:bold;font-size:12px;border:2px solid rgba(255,255,255,0.2)">1</div>`
+            })}
+          />
+
+          <Marker
+            position={[centerPosition[0] + 0.01, centerPosition[1] - 0.01]}
+            icon={L.divIcon({
+              className: 'map-num-marker',
+              html: `<div style="width:24px;height:24px;background:#10b981;border-radius:50%;display:flex;items-center;justify-content:center;color:white;font-weight:bold;font-size:12px;border:2px solid rgba(255,255,255,0.2)">2</div>`
+            })}
+          />
+
+          <Marker
+            position={[centerPosition[0], centerPosition[1] + 0.02]}
+            icon={L.divIcon({
+              className: 'map-pin-marker',
+              html: `<div style="color:#f97316;font-size:24px;filter:drop-shadow(0 0 10px rgba(249,115,22,0.4))">📍</div>`
+            })}
+          />
+
+          <MapUpdater center={centerPosition} />
+        </MapContainer>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 lg:p-4">
 
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1039,8 +1106,11 @@ const RouteMap = () => {
                 style={{ height: '100%', width: '100%' }}
               >
                 <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                  url={variant === 'dark-minimal'
+                    ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                    : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  }
                 />
 
                 <SafetyHeatmap show={showSafetyOverlay} />
