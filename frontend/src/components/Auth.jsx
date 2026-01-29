@@ -368,8 +368,24 @@ const Auth = ({ setAuth }) => {
                                                     value={formData.phone}
                                                     onChange={handleInputChange}
                                                     required
-                                                    className="w-full bg-black/20 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-white outline-none focus:ring-2 focus:ring-blue-500/20"
-                                                    placeholder="+1"
+                                                    className="w-full bg-black/20 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-white outline-none focus:ring-2 focus:ring-emerald-500/20"
+                                                    placeholder="+91-XXXXXXXXXX"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="md:col-span-1">
+                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Emergency Contact</label>
+                                            <div className="relative group">
+                                                <FiAlertTriangle className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+                                                <input
+                                                    type="text"
+                                                    name="emergency_contact_phone"
+                                                    value={formData.emergency_contact_phone}
+                                                    onChange={handleInputChange}
+                                                    required
+                                                    className="w-full bg-black/20 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-white outline-none focus:ring-2 focus:ring-emerald-500/20"
+                                                    placeholder="Emergency Phone"
                                                 />
                                             </div>
                                         </div>
@@ -387,7 +403,7 @@ const Auth = ({ setAuth }) => {
                                                             value={formData.license_number}
                                                             onChange={handleInputChange}
                                                             required
-                                                            className="w-full bg-black/20 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-white outline-none focus:ring-2 focus:ring-blue-500/20"
+                                                            className="w-full bg-black/20 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-white outline-none focus:ring-2 focus:ring-emerald-500/20"
                                                             placeholder="AB12345"
                                                         />
                                                     </div>
@@ -402,7 +418,7 @@ const Auth = ({ setAuth }) => {
                                                             value={formData.vehicle_number}
                                                             onChange={handleInputChange}
                                                             required
-                                                            className="w-full bg-black/20 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-white outline-none focus:ring-2 focus:ring-blue-500/20"
+                                                            className="w-full bg-black/20 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-white outline-none focus:ring-2 focus:ring-emerald-500/20"
                                                             placeholder="TN 01 AB 1234"
                                                         />
                                                     </div>
@@ -420,7 +436,7 @@ const Auth = ({ setAuth }) => {
                                                         name="gender"
                                                         value={formData.gender}
                                                         onChange={handleInputChange}
-                                                        className="w-full bg-black/20 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-white outline-none focus:ring-2 focus:ring-blue-500/20 appearance-none"
+                                                        className="w-full bg-black/20 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-white outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none"
                                                     >
                                                         <option value="female" className="bg-slate-900 leading-tight">Female</option>
                                                         <option value="male" className="bg-slate-900 leading-tight">Male</option>
@@ -429,6 +445,23 @@ const Auth = ({ setAuth }) => {
                                                 </div>
                                             </div>
                                         )}
+
+                                        {/* Terms & Conditions */}
+                                        <div className="md:col-span-2 mt-2">
+                                            <label className="flex items-center gap-3 cursor-pointer group">
+                                                <div className="relative flex items-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        required
+                                                        className="peer h-5 w-5 cursor-pointer appearance-none rounded border border-slate-500 bg-slate-900/50 checked:border-emerald-500 checked:bg-emerald-500 transition-all"
+                                                    />
+                                                    <FiCheckCircle className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none" />
+                                                </div>
+                                                <span className="text-sm text-slate-400 group-hover:text-slate-300 transition-colors select-none">
+                                                    I agree to the <span className="text-emerald-400 hover:text-emerald-300 underline underline-offset-2">Terms of Service</span> and <span className="text-emerald-400 hover:text-emerald-300 underline underline-offset-2">Privacy Policy</span>
+                                                </span>
+                                            </label>
+                                        </div>
                                     </>
                                 )}
                             </div>
