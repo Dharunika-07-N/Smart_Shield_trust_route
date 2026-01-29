@@ -551,7 +551,8 @@ const RouteMap = ({ variant = 'default' }) => {
     return null;
   };
 
-  if (variant === 'dark-minimal') {
+  if (variant === 'dark-minimal' || variant === 'light-minimal') {
+    const isDark = variant === 'dark-minimal';
     return (
       <div className="w-full h-full">
         <MapContainer
@@ -559,11 +560,14 @@ const RouteMap = ({ variant = 'default' }) => {
           zoom={13}
           zoomControl={false}
           style={{ height: '100%', width: '100%' }}
-          className="dark-map"
+          className={isDark ? "dark-map" : "light-map"}
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            url={isDark
+              ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+              : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            }
           />
 
           {/* Display current position */}
@@ -580,7 +584,7 @@ const RouteMap = ({ variant = 'default' }) => {
               [centerPosition[0], centerPosition[1] + 0.02],
             ]}
             pathOptions={{
-              color: '#39FF14',
+              color: '#10b981',
               weight: 5,
               opacity: 0.8,
               dashArray: '10, 10'
@@ -592,7 +596,7 @@ const RouteMap = ({ variant = 'default' }) => {
             position={[centerPosition[0], centerPosition[1] - 0.02]}
             icon={L.divIcon({
               className: 'map-num-marker',
-              html: `<div style="width:24px;height:24px;background:#10b981;border-radius:50%;display:flex;items-center;justify-content:center;color:white;font-weight:bold;font-size:12px;border:2px solid rgba(255,255,255,0.2)">1</div>`
+              html: `<div style="width:24px;height:24px;background:#10b981;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:12px;border:2px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'white'};box-shadow:0 2px 4px rgba(0,0,0,0.1)">1</div>`
             })}
           />
 
@@ -600,7 +604,7 @@ const RouteMap = ({ variant = 'default' }) => {
             position={[centerPosition[0] + 0.01, centerPosition[1] - 0.01]}
             icon={L.divIcon({
               className: 'map-num-marker',
-              html: `<div style="width:24px;height:24px;background:#10b981;border-radius:50%;display:flex;items-center;justify-content:center;color:white;font-weight:bold;font-size:12px;border:2px solid rgba(255,255,255,0.2)">2</div>`
+              html: `<div style="width:24px;height:24px;background:#10b981;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:12px;border:2px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'white'};box-shadow:0 2px 4px rgba(0,0,0,0.1)">2</div>`
             })}
           />
 
@@ -608,7 +612,7 @@ const RouteMap = ({ variant = 'default' }) => {
             position={[centerPosition[0], centerPosition[1] + 0.02]}
             icon={L.divIcon({
               className: 'map-pin-marker',
-              html: `<div style="color:#f97316;font-size:24px;filter:drop-shadow(0 0 10px rgba(249,115,22,0.4))">📍</div>`
+              html: `<div style="color:#f97316;font-size:24px;filter:drop-shadow(0 0 10px rgba(249,115,22,0.3))">📍</div>`
             })}
           />
 

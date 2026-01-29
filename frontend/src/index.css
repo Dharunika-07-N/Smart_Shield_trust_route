@@ -37,28 +37,28 @@ code {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #888;
+  background: #cbd5e1;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: #94a3b8;
 }
 
 /* Route Label Tooltips (Google Maps style) */
 .route-label-tooltip {
-  background: rgba(45, 55, 72, 0.95) !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
   border-radius: 8px !important;
   padding: 4px 8px !important;
-  color: white !important;
+  color: #1e293b !important;
   font-family: 'Inter', sans-serif !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
   pointer-events: none !important;
 }
 
 .route-label-tooltip::before {
-  border-top-color: rgba(45, 55, 72, 0.95) !important;
+  border-top-color: rgba(255, 255, 255, 0.95) !important;
 }
 
 .fastest-active {
@@ -70,21 +70,23 @@ code {
   display: none;
 }
 
-/* Delivery Service Themes */
+/* Light Theme Variables */
 :root {
   --swiggy-orange: #fc8019;
   --zomato-red: #cb202d;
   --rapido-yellow: #f9d923;
   --redtaxi-maroon: #800000;
-  --premium-dark: #0b0f1a;
-  --card-bg: #111827;
-  --sidebar-bg: #090e16;
+  --premium-bg: #f8fafc;
+  --card-bg: #ffffff;
+  --sidebar-bg: #ffffff;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
   --accent-green: #10b981;
   --accent-orange: #f59e0b;
   --accent-red: #ef4444;
-  --glass-bg: rgba(255, 255, 255, 0.03);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --neon-glow: 0 0 15px rgba(16, 185, 129, 0.4);
+  --glass-bg: rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(0, 0, 0, 0.05);
+  --neon-glow: 0 0 15px rgba(16, 185, 129, 0.1);
 }
 
 .service-swiggy {
@@ -119,7 +121,6 @@ code {
   background-color: var(--redtaxi-maroon);
 }
 
-/* Animation for pulsing alert */
 @keyframes alert-pulse {
   0% {
     transform: scale(1);
@@ -152,50 +153,60 @@ code {
 .premium-card {
   background: var(--card-bg);
   border-radius: 20px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
   border: 1px solid var(--glass-border);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .premium-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.4);
-  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.08);
 }
 
 .neon-green-glow {
-  box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.1);
 }
 
 .neon-orange-glow {
-  box-shadow: 0 0 15px rgba(245, 158, 11, 0.2);
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.1);
 }
 
-.dark-dashboard {
-  background-color: var(--premium-dark) !important;
-  color: #e5e7eb;
+/* Dashboard Themes */
+.app-dashboard {
+  background-color: var(--premium-bg) !important;
+  color: var(--text-main);
 }
 
 .sidebar-item-active {
-  background: linear-gradient(90deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0) 100%);
+  background: linear-gradient(90deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0) 100%);
   border-left: 3px solid var(--accent-green);
   color: var(--accent-green) !important;
 }
 
-/* Custom dark scrollbar */
-.dark-dashboard ::-webkit-scrollbar-track {
-  background: #0f172a;
+.app-dashboard ::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.dark-dashboard ::-webkit-scrollbar-thumb {
-  background: #334155;
+.app-dashboard ::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 10px;
 }
 
-.dark-dashboard ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
-}@keyframes fade-in {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+.app-dashboard ::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-in {
@@ -211,10 +222,10 @@ code {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.05);
   border-radius: 10px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.1);
 }
