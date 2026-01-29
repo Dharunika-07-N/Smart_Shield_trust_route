@@ -22,10 +22,10 @@ const ModernDashboard = () => {
 
     // State for API data
     const [stats, setStats] = useState([
-        { label: 'Active Deliveries', value: '12', subValue: '4 in transit', trend: '+8% vs last week', icon: FiPackage, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+        { label: 'Active Deliveries', value: '12', subValue: '4 in transit', trend: '+8% vs last week', icon: FiPackage, color: 'text-indigo-600', bg: 'bg-indigo-50' },
         { label: 'Safety Score', value: '87%', subValue: 'Above average', trend: '+5% vs last week', icon: FiShield, color: 'text-blue-600', bg: 'bg-blue-50' },
         { label: 'Fuel Saved', value: '24.5L', subValue: 'This week', trend: '+12% vs last week', icon: FiZap, color: 'text-amber-600', bg: 'bg-amber-50' },
-        { label: 'Avg. Delivery Time', value: '18 min', subValue: 'Target: 20 min', trend: '+3% vs last week', icon: FiClock, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+        { label: 'Avg. Delivery Time', value: '18 min', subValue: 'Target: 20 min', trend: '+3% vs last week', icon: FiClock, color: 'text-indigo-600', bg: 'bg-indigo-50' },
     ]);
     const [deliveryQueue, setDeliveryQueue] = useState([]);
     const [zoneSafety, setZoneSafety] = useState([]);
@@ -67,8 +67,8 @@ const ModernDashboard = () => {
                             subValue: statsRes.data.active_deliveries.subValue,
                             trend: statsRes.data.active_deliveries.trend,
                             icon: FiPackage,
-                            color: 'text-emerald-600',
-                            bg: 'bg-emerald-50'
+                            color: 'text-indigo-600',
+                            bg: 'bg-indigo-50'
                         },
                         {
                             label: 'Safety Score',
@@ -94,8 +94,8 @@ const ModernDashboard = () => {
                             subValue: statsRes.data.avg_delivery_time.subValue,
                             trend: statsRes.data.avg_delivery_time.trend,
                             icon: FiClock,
-                            color: 'text-emerald-600',
-                            bg: 'bg-emerald-50'
+                            color: 'text-indigo-600',
+                            bg: 'bg-indigo-50'
                         },
                     ];
                     setStats(apiStats);
@@ -143,8 +143,8 @@ const ModernDashboard = () => {
             {/* Sidebar */}
             <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-white border-r border-slate-200 transition-all duration-300 flex flex-col z-30`}>
                 <div className="p-6 flex items-center gap-3">
-                    <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center border border-emerald-500/20">
-                        <FiShield className="text-emerald-500 text-xl" />
+                    <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center border border-indigo-500/20">
+                        <FiShield className="text-indigo-600" />
                     </div>
                     {isSidebarOpen && (
                         <div>
@@ -160,16 +160,16 @@ const ModernDashboard = () => {
                             key={item.name}
                             onClick={() => setActiveTab(item.name)}
                             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${activeTab === item.name
-                                ? 'sidebar-item-active text-emerald-600'
+                                ? 'sidebar-item-active text-indigo-600'
                                 : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
                                 }`}
                         >
-                            <item.icon className={`text-lg transition-colors ${activeTab === item.name ? 'text-emerald-500' : 'group-hover:text-emerald-400'}`} />
+                            <item.icon className={`text-lg transition-colors ${activeTab === item.name ? 'text-indigo-600' : 'group-hover:text-indigo-400'}`} />
                             {isSidebarOpen && (
                                 <span className="flex-1 text-left text-sm font-medium">{item.name}</span>
                             )}
                             {isSidebarOpen && item.badge && (
-                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${item.name === 'Alerts' ? 'bg-orange-100 text-orange-600' : 'bg-emerald-100 text-emerald-600'
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${item.name === 'Alerts' ? 'bg-orange-100 text-orange-600' : 'bg-indigo-100 text-indigo-600'
                                     }`}>
                                     {item.badge}
                                 </span>
@@ -189,14 +189,14 @@ const ModernDashboard = () => {
                             <input
                                 type="text"
                                 placeholder="Search deliveries, routes, zones..."
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-11 pr-4 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/10 transition-all text-slate-800"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-11 pr-4 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/10 transition-all text-slate-800"
                             />
                         </div>
                     </div>
 
                     <div className="flex items-center gap-6">
-                        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100 text-[10px] font-bold text-emerald-600">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-50 border border-indigo-100 text-[10px] font-bold text-indigo-600">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
                             SYSTEM ACTIVE
                         </div>
 
@@ -214,7 +214,7 @@ const ModernDashboard = () => {
                             </div>
                             <button
                                 onClick={logout}
-                                className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 border border-emerald-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 transition-colors group"
+                                className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 border border-indigo-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 transition-colors group"
                             >
                                 <FiLogOut className="text-xl group-hover:hidden" />
                                 <FiUser className="text-xl hidden group-hover:block" />
@@ -241,7 +241,7 @@ const ModernDashboard = () => {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <span className="text-[10px] font-black text-emerald-600">{s.trend}</span>
+                                            <span className="text-[10px] font-black text-indigo-600">{s.trend}</span>
                                         </div>
                                     </div>
                                 ))}
@@ -254,7 +254,7 @@ const ModernDashboard = () => {
                                     <div className="premium-card p-6 relative overflow-hidden flex flex-col min-h-[500px]">
                                         <div className="flex items-center justify-between mb-6 z-10">
                                             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                                                <FiNavigation className="text-emerald-500" />
+                                                <FiNavigation className="text-indigo-600" />
                                                 Active Route
                                             </h3>
                                             <div className="flex items-center gap-2">
@@ -282,7 +282,7 @@ const ModernDashboard = () => {
                                                 <button className="w-10 h-10 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-all shadow-md">
                                                     <FiTarget />
                                                 </button>
-                                                <button className="mt-4 w-10 h-10 bg-emerald-500 border border-emerald-400 rounded-lg flex items-center justify-center text-white hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20">
+                                                <button className="mt-4 w-10 h-10 bg-indigo-600 border border-indigo-500 rounded-lg flex items-center justify-center text-white hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20">
                                                     <FiLayers />
                                                 </button>
                                             </div>
@@ -290,7 +290,7 @@ const ModernDashboard = () => {
                                             {/* Legend */}
                                             <div className="absolute bottom-4 left-4 z-10 flex gap-4 bg-white/90 backdrop-blur-md px-3 py-2 rounded-lg border border-slate-200">
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]" />
+                                                    <div className="w-2.5 h-2.5 rounded-full bg-indigo-600 shadow-[0_0_8px_rgba(79,70,229,0.3)]" />
                                                     <span className="text-[10px] text-slate-600 font-bold uppercase">Safe</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
@@ -309,7 +309,7 @@ const ModernDashboard = () => {
                                     <div className="premium-card p-6">
                                         <div className="flex items-center justify-between mb-6">
                                             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                                                <FiPackage className="text-emerald-500" />
+                                                <FiPackage className="text-indigo-600" />
                                                 Delivery Queue
                                             </h3>
                                             <span className="text-xs text-slate-500">{deliveryQueue.length || 0} deliveries</span>
@@ -318,7 +318,7 @@ const ModernDashboard = () => {
                                         <div className="space-y-4">
                                             {loading ? (
                                                 <div className="text-center py-8 text-slate-400">
-                                                    <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                                                    <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
                                                     Loading deliveries...
                                                 </div>
                                             ) : deliveryQueue.length === 0 ? (
@@ -339,9 +339,9 @@ const ModernDashboard = () => {
                                                                 <div className="flex items-center gap-3">
                                                                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{del.id}</div>
                                                                     <div className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${priorityColors[del.priority] || priorityColors['Normal']}`}>{del.priority}</div>
-                                                                    <div className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-100 text-emerald-600">{del.status}</div>
+                                                                    <div className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-100 text-indigo-600">{del.status}</div>
                                                                 </div>
-                                                                <div className="text-2xl font-black text-emerald-500 group-hover:drop-shadow-[0_0_8px_rgba(16,185,129,0.2)] transition-all">
+                                                                <div className="text-2xl font-black text-indigo-600 group-hover:drop-shadow-[0_0_8px_rgba(79,70,229,0.2)] transition-all">
                                                                     {del.safety_score}
                                                                 </div>
                                                             </div>
@@ -354,11 +354,11 @@ const ModernDashboard = () => {
                                                                     </div>
                                                                     <div className="flex items-center gap-4">
                                                                         <div className="flex items-center gap-1.5 text-xs text-slate-700 font-medium">
-                                                                            <FiClock className="text-emerald-500" />
+                                                                            <FiClock className="text-indigo-600" />
                                                                             {del.estimated_time}
                                                                         </div>
                                                                         <div className="flex items-center gap-1.5 text-xs text-slate-700 font-medium">
-                                                                            <FiNavigation className="text-emerald-500" />
+                                                                            <FiNavigation className="text-indigo-600" />
                                                                             {del.distance}
                                                                         </div>
                                                                     </div>
@@ -382,17 +382,17 @@ const ModernDashboard = () => {
                                     < div className="premium-card p-6" >
                                         <h3 className="text-lg font-bold text-slate-800 mb-6">Quick Actions</h3>
                                         <div className="grid grid-cols-2 gap-4">
-                                            <button onClick={handleOptimizeRoute} className="flex flex-col items-center justify-center p-4 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white transition-all group shadow-md shadow-emerald-500/10">
+                                            <button onClick={handleOptimizeRoute} className="flex flex-col items-center justify-center p-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white transition-all group shadow-md shadow-indigo-600/10">
                                                 <FiNavigation className="text-2xl mb-2 group-hover:scale-110 transition-transform" />
                                                 <span className="text-[10px] font-black uppercase tracking-tight">Optimize Route</span>
                                                 <span className="text-[8px] opacity-70">AI-powered</span>
                                             </button>
-                                            <button className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-50 border border-slate-200 hover:border-emerald-500/30 text-emerald-600 transition-all group">
+                                            <button className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-50 border border-slate-200 hover:border-indigo-500/30 text-indigo-600 transition-all group">
                                                 <FiShield className="text-2xl mb-2 group-hover:scale-110 transition-transform" />
                                                 <span className="text-[10px] font-black uppercase tracking-tight text-slate-800">Find Safe Zone</span>
                                                 <span className="text-[8px] text-slate-500">Nearest spot</span>
                                             </button>
-                                            <button className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-50 border border-slate-200 hover:border-emerald-500/30 text-slate-400 transition-all group">
+                                            <button className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-50 border border-slate-200 hover:border-indigo-500/30 text-indigo-600 transition-all group">
                                                 <FiAlertTriangle className="text-2xl mb-2 group-hover:scale-110 transition-transform" />
                                                 <span className="text-[10px] font-black uppercase tracking-tight text-slate-800">Report Issue</span>
                                                 <span className="text-[8px] text-slate-500">Safety concern</span>
@@ -409,7 +409,7 @@ const ModernDashboard = () => {
                                     <div className="premium-card p-6">
                                         <div className="flex items-center justify-between mb-6">
                                             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                                                <FiShield className="text-emerald-500" />
+                                                <FiShield className="text-indigo-600" />
                                                 Zone Safety
                                             </h3>
                                             <span className="text-[10px] text-slate-400 font-medium">Updated 5 min ago</span>
@@ -417,14 +417,14 @@ const ModernDashboard = () => {
                                         <div className="space-y-4">
                                             {loading ? (
                                                 <div className="text-center py-4 text-slate-400">
-                                                    <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                                                    <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
                                                 </div>
                                             ) : zoneSafety.length === 0 ? (
                                                 <div className="text-center py-4 text-slate-400 text-sm">No zone data available</div>
                                             ) : (
                                                 zoneSafety.map((zone, idx) => {
                                                     const colorMap = {
-                                                        'green': 'bg-emerald-500',
+                                                        'green': 'bg-indigo-600',
                                                         'amber': 'bg-amber-500',
                                                         'red': 'bg-red-500'
                                                     };
@@ -436,7 +436,7 @@ const ModernDashboard = () => {
                                                                     <h4 className="text-sm font-bold text-slate-800 leading-none">{zone.name}</h4>
                                                                     <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-1">
                                                                         {zone.incidents}
-                                                                        <span className={zone.trend === 'down' ? 'text-emerald-500' : zone.trend === 'up' ? 'text-red-500' : 'text-slate-400'}>
+                                                                        <span className={zone.trend === 'down' ? 'text-indigo-600' : zone.trend === 'up' ? 'text-red-500' : 'text-slate-400'}>
                                                                             {zone.trend === 'down' ? '↓' : zone.trend === 'up' ? '↑' : '•'}
                                                                         </span>
                                                                     </p>
@@ -460,14 +460,14 @@ const ModernDashboard = () => {
                                     <div className="premium-card p-6 bg-slate-50">
                                         {loading || !weather ? (
                                             <div className="text-center py-8 text-slate-400">
-                                                <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                                                <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
                                                 Loading weather...
                                             </div>
                                         ) : (
                                             <>
                                                 <div className="flex justify-between items-start mb-4">
                                                     <h3 className="text-lg font-bold text-slate-800 leading-none">Weather Conditions</h3>
-                                                    <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-600 rounded-full font-bold">{weather.impact} Impact</span>
+                                                    <span className="text-[10px] px-2 py-0.5 bg-indigo-100 text-indigo-600 rounded-full font-bold">{weather.impact} Impact</span>
                                                 </div>
                                                 <div className="flex items-center gap-4 mb-6">
                                                     <div className="w-16 h-16 flex items-center justify-center text-amber-500 text-5xl">
@@ -485,7 +485,7 @@ const ModernDashboard = () => {
                                                         <div className="text-xs font-bold text-slate-800">{weather.humidity}%</div>
                                                     </div>
                                                     <div className="bg-white p-2 rounded-xl text-center border border-slate-100 shadow-sm">
-                                                        <FiWind className="mx-auto text-emerald-500 mb-1" />
+                                                        <FiWind className="mx-auto text-indigo-500 mb-1" />
                                                         <div className="text-[10px] text-slate-400 uppercase tracking-tighter">Wind</div>
                                                         <div className="text-xs font-bold text-slate-800">{weather.wind_speed} km/h</div>
                                                     </div>

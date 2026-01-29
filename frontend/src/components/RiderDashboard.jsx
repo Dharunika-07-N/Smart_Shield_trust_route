@@ -62,7 +62,7 @@ const RiderDashboard = ({ setAuth }) => {
             <div className="flex-1 flex flex-col min-w-0">
                 <header className="bg-white border-b border-gray-200 p-4 flex items-center justify-between shadow-sm z-10">
                     <div className="flex items-center gap-3">
-                        <div className="bg-blue-600 p-2 rounded-lg text-white">
+                        <div className="bg-indigo-600 p-2 rounded-lg text-white">
                             <FiShield size={20} />
                         </div>
                         <div>
@@ -97,7 +97,7 @@ const RiderDashboard = ({ setAuth }) => {
                     </button>
                     <button
                         onClick={handleCheckIn}
-                        className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 active:scale-95 transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2"
+                        className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 active:scale-95 transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2"
                     >
                         <FiCheckCircle /> SAFETY CHECK-IN
                     </button>
@@ -126,7 +126,7 @@ const RiderDashboard = ({ setAuth }) => {
                                 <div className="text-2xl font-black text-gray-900 tracking-tight">
                                     14 <span className="text-base font-normal text-gray-500">mins</span>
                                 </div>
-                                <div className="mt-1 text-xs text-blue-600 font-medium flex items-center gap-1">
+                                <div className="mt-1 text-xs text-indigo-600 font-medium flex items-center gap-1">
                                     <FiShield size={12} />
                                     via Safe Zone Corridor
                                 </div>
@@ -147,7 +147,7 @@ const RiderDashboard = ({ setAuth }) => {
                 {/* Bottom Nav */}
                 <nav className="bg-white border-t border-gray-200 pb-safe">
                     <div className="flex justify-around p-2">
-                        <button className="p-2 text-blue-600 flex flex-col items-center gap-1">
+                        <button className="p-2 text-indigo-600 flex flex-col items-center gap-1">
                             <FiMap size={24} />
                             <span className="text-[10px] font-bold">Map</span>
                         </button>

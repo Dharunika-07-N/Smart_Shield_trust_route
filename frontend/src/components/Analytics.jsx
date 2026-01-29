@@ -36,8 +36,8 @@ const Analytics = () => {
       {
         label: 'Avg Delivery Time (min)',
         data: [42, 38, 35, 32, 30, 28, 32],
-        borderColor: 'rgb(14, 165, 233)',
-        backgroundColor: 'rgba(14, 165, 233, 0.1)',
+        borderColor: 'rgb(79, 70, 229)', // indigo-600
+        backgroundColor: 'rgba(79, 70, 229, 0.1)', // indigo-600 with transparency
         tension: 0.4,
       },
     ],
@@ -49,8 +49,8 @@ const Analytics = () => {
       {
         label: 'Fuel Consumed (L)',
         data: [1250, 1100, 980, 850],
-        backgroundColor: 'rgba(34, 197, 94, 0.6)',
-        borderColor: 'rgb(34, 197, 94)',
+        backgroundColor: 'rgba(34, 197, 94, 0.6)', // emerald-500
+        borderColor: 'rgb(34, 197, 94)', // emerald-500
         borderWidth: 2,
       },
     ],
@@ -62,9 +62,9 @@ const Analytics = () => {
       {
         data: [65, 30, 5],
         backgroundColor: [
-          'rgba(34, 197, 94, 0.8)',
-          'rgba(245, 158, 11, 0.8)',
-          'rgba(239, 68, 68, 0.8)',
+          'rgba(79, 70, 229, 0.8)', // indigo-600
+          'rgba(245, 158, 11, 0.8)', // warning-600
+          'rgba(239, 68, 68, 0.8)', // danger-600
         ],
         borderWidth: 0,
       },
@@ -77,7 +77,7 @@ const Analytics = () => {
       {
         label: 'Delivery Routes',
         data: [45, 120, 95, 140, 80, 25],
-        backgroundColor: 'rgba(14, 165, 233, 0.8)',
+        backgroundColor: 'rgba(79, 70, 229, 0.8)', // indigo-600
       },
     ],
   };
@@ -103,8 +103,8 @@ const Analytics = () => {
               key={range}
               onClick={() => setTimeRange(range)}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${timeRange === range
-                  ? 'bg-white text-primary-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-white text-indigo-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
                 }`}
             >
               {range === '7d' ? '7 Days' : range === '30d' ? '30 Days' : '90 Days'}
@@ -119,7 +119,7 @@ const Analytics = () => {
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-              <FiClock className="mr-2 text-primary-500" />
+              <FiClock className="mr-2 text-indigo-500" />
               Delivery Time Trend
             </h3>
           </div>
@@ -171,7 +171,7 @@ const Analytics = () => {
           <div className="mt-4 pt-4 border-t border-gray-200">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
-                <div className="text-2xl font-bold text-success-600">65%</div>
+                <div className="text-2xl font-bold text-indigo-600">65%</div>
                 <div className="text-sm text-gray-600">High Safety</div>
               </div>
               <div>
@@ -189,7 +189,7 @@ const Analytics = () => {
         {/* Routes by Time Period */}
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <FiCalendar className="mr-2 text-primary-500" />
+            <FiCalendar className="mr-2 text-indigo-500" />
             Peak Delivery Hours
           </h3>
           <div className="h-64">

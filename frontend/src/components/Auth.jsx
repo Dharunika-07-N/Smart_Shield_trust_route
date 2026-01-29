@@ -181,11 +181,11 @@ const Auth = ({ setAuth }) => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0F172A] via-slate-900 to-[#0F172A] px-4 py-12 relative overflow-hidden">
-            {/* Animated Background Elements */}
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-12 relative overflow-hidden">
+            {/* Background Decorative Elements */}
             <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
-                <div className="absolute top-[-20%] left-[-15%] w-[500px] h-[500px] bg-[#2563EB]/20 rounded-full blur-[150px] animate-pulse"></div>
-                <div className="absolute bottom-[-20%] right-[-15%] w-[500px] h-[500px] bg-[#10B981]/20 rounded-full blur-[150px] animate-pulse" style={{ animationDelay: '1s' }}></div>
+                <div className="absolute top-[-10%] left-[-5%] w-[400px] h-[400px] bg-indigo-500/5 rounded-full blur-[120px]"></div>
+                <div className="absolute bottom-[-10%] right-[-5%] w-[400px] h-[400px] bg-blue-500/5 rounded-full blur-[120px]"></div>
             </div>
 
             <div className="max-w-2xl w-full z-10 transition-all transform duration-500">
@@ -201,20 +201,19 @@ const Auth = ({ setAuth }) => {
 
                 {/* Header */}
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center p-4 bg-gradient-to-br from-[#2563EB] to-[#1e40af] rounded-3xl mb-5 shadow-2xl relative group">
-                        <FiShield size={40} className="text-white relative z-10" />
-                        <div className="absolute inset-0 bg-white opacity-20 blur-xl rounded-full scale-50 group-hover:scale-100 transition-transform"></div>
+                    <div className="inline-flex items-center justify-center p-4 bg-white rounded-3xl mb-5 shadow-[0_20px_50px_rgba(8,112,184,0.1)] relative group border border-slate-100">
+                        <FiShield size={40} className="text-indigo-600 relative z-10" />
                     </div>
-                    <h1 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-3 tracking-tight">
-                        Smart Shield
+                    <h1 className="text-5xl font-black text-slate-900 mb-2 tracking-tight">
+                        SmartShield
                     </h1>
-                    <p className="text-gray-400 text-lg font-light tracking-wide uppercase text-xs">AI-Powered Multi-Role Trust Route</p>
+                    <p className="text-slate-400 text-xs font-bold tracking-[0.2em] uppercase">AI-Powered Multi-Role Trust Route</p>
                 </div>
 
-                <div className="bg-white/5 backdrop-blur-3xl border border-white/10 p-1 rounded-3xl shadow-3xl overflow-hidden">
+                <div className="bg-white border border-slate-200 p-1 rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.08)] overflow-hidden">
                     <div className="p-8 md:p-10">
                         {/* Role Tabs */}
-                        <div className="flex flex-wrap justify-center gap-3 mb-10">
+                        <div className="flex flex-wrap justify-center gap-2 mb-10">
                             {visibleRoles.map((option) => {
                                 const Icon = option.icon;
                                 const isSelected = role === option.value;
@@ -224,24 +223,24 @@ const Auth = ({ setAuth }) => {
                                         type="button"
                                         onClick={() => setRole(option.value)}
                                         className={`flex items-center gap-2 px-5 py-2.5 rounded-full border transition-all duration-300 ${isSelected
-                                            ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/20'
-                                            : 'border-white/10 text-gray-400 hover:border-white/30 hover:text-white bg-white/5'
+                                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+                                            : 'border-slate-100 text-slate-400 hover:border-slate-200 hover:text-slate-600 bg-slate-50'
                                             }`}
                                     >
                                         <Icon size={18} />
-                                        <span className="font-semibold text-sm tracking-wide">{option.label}</span>
+                                        <span className="font-bold text-xs tracking-wide">{option.label}</span>
                                     </button>
                                 );
                             })}
                         </div>
 
                         {/* Login/Signup Toggle */}
-                        <div className="flex bg-black/40 p-1 rounded-2xl mb-8 border border-white/5 max-w-sm mx-auto">
+                        <div className="flex bg-slate-100 p-1 rounded-2xl mb-8 border border-slate-200 max-w-sm mx-auto">
                             <button
                                 onClick={() => setIsLogin(true)}
                                 className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all duration-300 ${isLogin
-                                    ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg'
-                                    : 'text-gray-500 hover:text-white'
+                                    ? 'bg-white text-indigo-600 shadow-sm'
+                                    : 'text-slate-400 hover:text-slate-600'
                                     }`}
                             >
                                 Sign In
@@ -250,8 +249,8 @@ const Auth = ({ setAuth }) => {
                                 <button
                                     onClick={() => setIsLogin(false)}
                                     className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all duration-300 ${!isLogin
-                                        ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg'
-                                        : 'text-gray-500 hover:text-white'
+                                        ? 'bg-white text-indigo-600 shadow-sm'
+                                        : 'text-slate-400 hover:text-slate-600'
                                         }`}
                                 >
                                     Register
@@ -263,35 +262,35 @@ const Auth = ({ setAuth }) => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* Email */}
                                 <div className={!isLogin ? "md:col-span-1" : "md:col-span-2"}>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Login Email</label>
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Login Email</label>
                                     <div className="relative group">
-                                        <FiMail className={`absolute left-4 top-1/2 -translate-y-1/2 ${errors.email ? 'text-red-400' : 'text-gray-500 group-focus-within:text-blue-400'} transition-colors`} />
+                                        <FiMail className={`absolute left-4 top-1/2 -translate-y-1/2 ${errors.email ? 'text-rose-500' : 'text-slate-400 group-focus-within:text-indigo-600'} transition-colors`} />
                                         <input
                                             type="email"
                                             name="email"
                                             value={formData.email}
                                             onChange={handleInputChange}
                                             required
-                                            className={`w-full bg-black/20 border rounded-2xl py-3.5 pl-12 pr-4 text-white focus:ring-2 focus:border-transparent outline-none transition-all placeholder:text-gray-700 ${errors.email ? 'border-red-500/50 focus:ring-red-500/20' : 'border-white/10 focus:ring-blue-500/20'}`}
+                                            className={`w-full bg-slate-50 border rounded-2xl py-3.5 pl-12 pr-4 text-slate-900 focus:ring-4 focus:border-indigo-600/30 outline-none transition-all placeholder:text-slate-400 ${errors.email ? 'border-rose-500/50 focus:ring-rose-500/20' : 'border-slate-200 focus:ring-indigo-600/10'}`}
                                             placeholder="Enter your email"
                                         />
                                     </div>
-                                    {errors.email && <p className="mt-1.5 text-xs text-red-400 px-1">{errors.email}</p>}
+                                    {errors.email && <p className="mt-1.5 text-xs text-rose-500 px-1 font-medium">{errors.email}</p>}
                                 </div>
 
                                 {/* Full Name (Signup only) */}
                                 {!isLogin && (
                                     <div className="md:col-span-1">
-                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Full Name</label>
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Full Name</label>
                                         <div className="relative group">
-                                            <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-400 transition-colors" />
+                                            <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
                                             <input
                                                 type="text"
                                                 name="full_name"
                                                 value={formData.full_name}
                                                 onChange={handleInputChange}
                                                 required
-                                                className="w-full bg-black/20 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-white focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3.5 pl-12 pr-4 text-slate-900 focus:ring-4 focus:ring-indigo-600/10 focus:border-indigo-600/30 outline-none transition-all"
                                                 placeholder="Legal name"
                                             />
                                         </div>
@@ -300,48 +299,48 @@ const Auth = ({ setAuth }) => {
 
                                 {/* Password */}
                                 <div className={!isLogin ? "md:col-span-1" : "md:col-span-2"}>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Password</label>
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Password</label>
                                     <div className="relative group">
-                                        <FiLock className={`absolute left-4 top-1/2 -translate-y-1/2 ${errors.password ? 'text-red-400' : 'text-gray-500 group-focus-within:text-blue-400'} transition-colors`} />
+                                        <FiLock className={`absolute left-4 top-1/2 -translate-y-1/2 ${errors.password ? 'text-rose-500' : 'text-slate-400 group-focus-within:text-indigo-600'} transition-colors`} />
                                         <input
                                             type={showPassword ? "text" : "password"}
                                             name="password"
                                             value={formData.password}
                                             onChange={handleInputChange}
                                             required
-                                            className={`w-full bg-black/20 border rounded-2xl py-3.5 pl-12 pr-12 text-white focus:ring-2 focus:border-transparent outline-none transition-all placeholder:text-gray-700 ${errors.password ? 'border-red-500/50 focus:ring-red-500/20' : 'border-white/10 focus:ring-blue-500/20'}`}
+                                            className={`w-full bg-slate-50 border rounded-2xl py-3.5 pl-12 pr-12 text-slate-900 focus:ring-4 focus:border-indigo-600/30 outline-none transition-all placeholder:text-slate-400 ${errors.password ? 'border-rose-500/50 focus:ring-rose-500/20' : 'border-slate-200 focus:ring-indigo-600/10'}`}
                                             placeholder="••••••••"
                                         />
                                         <button
                                             type="button"
                                             onClick={() => setShowPassword(!showPassword)}
-                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 hover:text-white"
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600"
                                         >
                                             {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
                                         </button>
                                     </div>
-                                    {errors.password && <p className="mt-1.5 text-xs text-red-400 px-1">{errors.password}</p>}
+                                    {errors.password && <p className="mt-1.5 text-xs text-rose-500 px-1 font-medium">{errors.password}</p>}
                                 </div>
 
                                 {/* Confirm Password (Signup) */}
                                 {!isLogin && (
                                     <div className="md:col-span-1">
-                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Confirm Password</label>
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Confirm Password</label>
                                         <div className="relative group">
-                                            <FiLock className={`absolute left-4 top-1/2 -translate-y-1/2 ${errors.confirmPassword ? 'text-red-400' : 'text-gray-500 group-focus-within:text-blue-400'} transition-colors`} />
+                                            <FiLock className={`absolute left-4 top-1/2 -translate-y-1/2 ${errors.confirmPassword ? 'text-rose-500' : 'text-slate-400 group-focus-within:text-indigo-600'} transition-colors`} />
                                             <input
                                                 type={showConfirmPassword ? "text" : "password"}
                                                 name="confirmPassword"
                                                 value={formData.confirmPassword}
                                                 onChange={handleInputChange}
                                                 required
-                                                className={`w-full bg-black/20 border rounded-2xl py-3.5 pl-12 pr-12 text-white focus:ring-2 focus:border-transparent outline-none transition-all placeholder:text-gray-700 ${errors.confirmPassword ? 'border-red-500/50 focus:ring-red-500/20' : 'border-white/10 focus:ring-blue-500/20'}`}
+                                                className={`w-full bg-slate-50 border rounded-2xl py-3.5 pl-12 pr-12 text-slate-900 focus:ring-4 focus:border-indigo-600/30 outline-none transition-all placeholder:text-slate-400 ${errors.confirmPassword ? 'border-rose-500/50 focus:ring-rose-500/20' : 'border-slate-200 focus:ring-indigo-600/10'}`}
                                                 placeholder="••••••••"
                                             />
                                             <button
                                                 type="button"
                                                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 hover:text-white"
+                                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600"
                                             >
                                                 {showConfirmPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
                                             </button>
@@ -353,32 +352,32 @@ const Auth = ({ setAuth }) => {
                                     <>
                                         {/* Common Profile Fields */}
                                         <div className="md:col-span-1">
-                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Phone Number</label>
+                                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Phone Number</label>
                                             <div className="relative group">
-                                                <FiPhone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+                                                <FiPhone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                                                 <input
                                                     type="text"
                                                     name="phone"
                                                     value={formData.phone}
                                                     onChange={handleInputChange}
                                                     required
-                                                    className="w-full bg-black/20 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-white outline-none focus:ring-2 focus:ring-emerald-500/20"
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3.5 pl-12 pr-4 text-slate-900 focus:ring-4 focus:ring-indigo-600/10 focus:border-indigo-600/30 outline-none transition-all"
                                                     placeholder="+91-XXXXXXXXXX"
                                                 />
                                             </div>
                                         </div>
 
                                         <div className="md:col-span-1">
-                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Emergency Contact</label>
+                                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Emergency Contact</label>
                                             <div className="relative group">
-                                                <FiAlertTriangle className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+                                                <FiAlertTriangle className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                                                 <input
                                                     type="text"
                                                     name="emergency_contact_phone"
                                                     value={formData.emergency_contact_phone}
                                                     onChange={handleInputChange}
                                                     required
-                                                    className="w-full bg-black/20 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-white outline-none focus:ring-2 focus:ring-emerald-500/20"
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3.5 pl-12 pr-4 text-slate-900 focus:ring-4 focus:ring-indigo-600/10 focus:border-indigo-600/30 outline-none transition-all"
                                                     placeholder="Emergency Phone"
                                                 />
                                             </div>
@@ -388,31 +387,31 @@ const Auth = ({ setAuth }) => {
                                         {role === 'driver' && (
                                             <>
                                                 <div className="md:col-span-1">
-                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">License ID</label>
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">License ID</label>
                                                     <div className="relative group">
-                                                        <FiCreditCard className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+                                                        <FiCreditCard className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                                                         <input
                                                             type="text"
                                                             name="license_number"
                                                             value={formData.license_number}
                                                             onChange={handleInputChange}
                                                             required
-                                                            className="w-full bg-black/20 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-white outline-none focus:ring-2 focus:ring-emerald-500/20"
+                                                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3.5 pl-12 pr-4 text-slate-900 focus:ring-4 focus:ring-indigo-600/10 focus:border-indigo-600/30 outline-none transition-all"
                                                             placeholder="AB12345"
                                                         />
                                                     </div>
                                                 </div>
                                                 <div className="md:col-span-1">
-                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Vehicle Number</label>
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Vehicle Number</label>
                                                     <div className="relative group">
-                                                        <FiBriefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+                                                        <FiBriefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                                                         <input
                                                             type="text"
                                                             name="vehicle_number"
                                                             value={formData.vehicle_number}
                                                             onChange={handleInputChange}
                                                             required
-                                                            className="w-full bg-black/20 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-white outline-none focus:ring-2 focus:ring-emerald-500/20"
+                                                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3.5 pl-12 pr-4 text-slate-900 focus:ring-4 focus:ring-indigo-600/10 focus:border-indigo-600/30 outline-none transition-all"
                                                             placeholder="TN 01 AB 1234"
                                                         />
                                                     </div>
@@ -423,18 +422,18 @@ const Auth = ({ setAuth }) => {
                                         {/* Rider Specific Registration */}
                                         {role === 'rider' && (
                                             <div className="md:col-span-1">
-                                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Gender</label>
+                                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Gender</label>
                                                 <div className="relative">
-                                                    <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 z-10" />
+                                                    <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
                                                     <select
                                                         name="gender"
                                                         value={formData.gender}
                                                         onChange={handleInputChange}
-                                                        className="w-full bg-black/20 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-white outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none"
+                                                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3.5 pl-12 pr-4 text-slate-900 outline-none focus:ring-4 focus:ring-indigo-600/10 focus:border-indigo-600/30 appearance-none"
                                                     >
-                                                        <option value="female" className="bg-slate-900 leading-tight">Female</option>
-                                                        <option value="male" className="bg-slate-900 leading-tight">Male</option>
-                                                        <option value="other" className="bg-slate-900 leading-tight">Other</option>
+                                                        <option value="female" className="bg-white">Female</option>
+                                                        <option value="male" className="bg-white">Male</option>
+                                                        <option value="other" className="bg-white">Other</option>
                                                     </select>
                                                 </div>
                                             </div>
@@ -447,12 +446,12 @@ const Auth = ({ setAuth }) => {
                                                     <input
                                                         type="checkbox"
                                                         required
-                                                        className="peer h-5 w-5 cursor-pointer appearance-none rounded border border-slate-500 bg-slate-900/50 checked:border-emerald-500 checked:bg-emerald-500 transition-all"
+                                                        className="peer h-5 w-5 cursor-pointer appearance-none rounded border border-slate-200 bg-slate-50 checked:border-indigo-600 checked:bg-indigo-600 transition-all"
                                                     />
                                                     <FiCheckCircle className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none" />
                                                 </div>
-                                                <span className="text-sm text-slate-400 group-hover:text-slate-300 transition-colors select-none">
-                                                    I agree to the <span className="text-emerald-400 hover:text-emerald-300 underline underline-offset-2">Terms of Service</span> and <span className="text-emerald-400 hover:text-emerald-300 underline underline-offset-2">Privacy Policy</span>
+                                                <span className="text-sm text-slate-500 group-hover:text-slate-700 transition-colors select-none font-medium">
+                                                    I agree to the <span className="text-indigo-600 hover:text-indigo-700 underline underline-offset-2">Terms of Service</span> and <span className="text-indigo-600 hover:text-indigo-700 underline underline-offset-2">Privacy Policy</span>
                                                 </span>
                                             </label>
                                         </div>
@@ -462,9 +461,9 @@ const Auth = ({ setAuth }) => {
 
                             {/* Status and Info Messages for non-self registrable roles */}
                             {!canRegister && !isLogin && (
-                                <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-2xl flex items-start gap-3">
+                                <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex items-start gap-3">
                                     <FiAlertTriangle className="text-amber-500 shrink-0 mt-0.5" />
-                                    <p className="text-xs text-amber-200/80 leading-relaxed">
+                                    <p className="text-xs text-amber-600 leading-relaxed font-medium">
                                         Accounts for {role === 'dispatcher' ? 'Dispatchers' : 'Admins'} are managed by the organization.
                                         Please contact your system administrator for access.
                                     </p>
@@ -473,16 +472,16 @@ const Auth = ({ setAuth }) => {
 
                             {/* Error Reporting */}
                             {globalError && (
-                                <div className={`p-4 rounded-2xl flex items-center gap-3 backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-300 ${globalError.includes('successfully') ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>
+                                <div className={`p-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${globalError.includes('successfully') ? 'bg-emerald-50 border border-emerald-100 text-emerald-600' : 'bg-rose-50 border border-rose-100 text-rose-600'}`}>
                                     {globalError.includes('successfully') ? <FiCheckCircle className="shrink-0" /> : <FiAlertTriangle className="shrink-0" />}
-                                    <span className="text-sm font-medium">{globalError}</span>
+                                    <span className="text-sm font-bold">{globalError}</span>
                                 </div>
                             )}
 
                             <button
                                 type="submit"
                                 disabled={loading || (Object.keys(errors).length > 0) || (!canRegister && !isLogin)}
-                                className="w-full py-4 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 text-white font-bold rounded-2xl shadow-xl shadow-blue-500/10 transition-all active:scale-[0.98] disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed group"
+                                className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-xl shadow-indigo-600/20 transition-all active:scale-[0.98] disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed group"
                             >
                                 {loading ? (
                                     <div className="flex items-center justify-center gap-2">
@@ -498,25 +497,25 @@ const Auth = ({ setAuth }) => {
                             </button>
                         </form>
 
-                        <div className="mt-8 text-center">
+                        <div className="mt-8 text-center text-xs">
                             {isLogin ? (
-                                <p className="text-gray-500 text-sm">
+                                <p className="text-slate-400 font-bold">
                                     {canRegister ? (
-                                        <>New to Smart Shield? <span onClick={() => setIsLogin(false)} className="text-blue-400 font-bold cursor-pointer hover:underline underline-offset-4 decoration-2">Apply Now</span></>
+                                        <>New to SmartShield? <span onClick={() => setIsLogin(false)} className="text-indigo-600 cursor-pointer hover:underline underline-offset-4 decoration-2">Apply Now</span></>
                                     ) : (
-                                        <span className="opacity-50 italic italic">Restricted Access: Organizational Login Only</span>
+                                        <span className="opacity-50 italic">Restricted Access: Organizational Login Only</span>
                                     )}
                                 </p>
                             ) : (
-                                <p className="text-gray-500 text-sm">
-                                    Already using Smart Shield? <span onClick={() => setIsLogin(true)} className="text-blue-400 font-bold cursor-pointer hover:underline underline-offset-4 decoration-2">Sign In</span>
+                                <p className="text-slate-400 font-bold">
+                                    Already using SmartShield? <span onClick={() => setIsLogin(true)} className="text-indigo-600 cursor-pointer hover:underline underline-offset-4 decoration-2">Sign In</span>
                                 </p>
                             )}
                         </div>
                     </div>
                 </div>
 
-                <p className="mt-8 text-center text-gray-600 text-[10px] font-bold uppercase tracking-[0.2em]">
+                <p className="mt-8 text-center text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em]">
                     Enterprise-Grade Safety Infrastructure &copy; 2026
                 </p>
             </div>

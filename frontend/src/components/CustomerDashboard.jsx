@@ -74,7 +74,7 @@ const CustomerDashboard = ({ setAuth }) => {
             {/* Header */}
             <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-30">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+                    <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
                         <FiShield size={24} />
                     </div>
                     <div>
@@ -113,13 +113,13 @@ const CustomerDashboard = ({ setAuth }) => {
                                     value={trackingId}
                                     onChange={(e) => setTrackingId(e.target.value)}
                                     placeholder="Enter Order ID"
-                                    className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium text-slate-800"
+                                    className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium text-slate-800"
                                 />
                             </div>
                             <button
                                 type="submit"
                                 disabled={loading || !trackingId}
-                                className="px-6 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+                                className="px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50"
                             >
                                 {loading ? '...' : 'Track'}
                             </button>
@@ -133,7 +133,7 @@ const CustomerDashboard = ({ setAuth }) => {
                             <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
                                 <div className="flex items-center justify-between mb-4">
                                     <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Live Status</span>
-                                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full uppercase tracking-wider">
+                                    <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full uppercase tracking-wider">
                                         {orderData.status.replace('_', ' ')}
                                     </span>
                                 </div>
@@ -143,7 +143,7 @@ const CustomerDashboard = ({ setAuth }) => {
                                         {[0, 1, 2, 3, 4].map((step) => (
                                             <div
                                                 key={step}
-                                                className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-colors ${getStatusStep() >= step ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400'
+                                                className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-colors ${getStatusStep() >= step ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-400'
                                                     }`}
                                             >
                                                 {getStatusStep() > step ? <FiCheckCircle /> : step + 1}
@@ -152,7 +152,7 @@ const CustomerDashboard = ({ setAuth }) => {
                                     </div>
                                     <div className="absolute top-5 left-0 w-full h-0.5 bg-slate-200 -z-0">
                                         <div
-                                            className="h-full bg-emerald-500 transition-all duration-500"
+                                            className="h-full bg-indigo-600 transition-all duration-500"
                                             style={{ width: `${(getStatusStep() / 4) * 100}%` }}
                                         ></div>
                                     </div>
@@ -167,7 +167,7 @@ const CustomerDashboard = ({ setAuth }) => {
 
                                 <div className="mt-4 flex items-center justify-between pt-4 border-t border-slate-200">
                                     <div className="flex items-center gap-2">
-                                        <FiClock className="text-emerald-500" />
+                                        <FiClock className="text-indigo-600" />
                                         <span className="text-sm font-bold text-slate-700">ETA: {orderData.eta}</span>
                                     </div>
                                     <span className="text-xs text-slate-400">Arriving Soon</span>
@@ -196,7 +196,7 @@ const CustomerDashboard = ({ setAuth }) => {
                                     <button className="flex items-center justify-center gap-2 py-2.5 bg-slate-50 hover:bg-slate-100 rounded-xl text-slate-700 text-sm font-bold transition-all border border-slate-200">
                                         <FiPhone size={14} /> Call
                                     </button>
-                                    <button className="flex items-center justify-center gap-2 py-2.5 bg-emerald-50 hover:bg-emerald-100 rounded-xl text-emerald-700 text-sm font-bold transition-all border border-emerald-100">
+                                    <button className="flex items-center justify-center gap-2 py-2.5 bg-indigo-50 hover:bg-indigo-100 rounded-xl text-indigo-700 text-sm font-bold transition-all border border-indigo-100">
                                         <FiMessageSquare size={14} /> Chat
                                     </button>
                                 </div>
@@ -214,17 +214,17 @@ const CustomerDashboard = ({ setAuth }) => {
                                     ))}
                                     <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
                                         <span className="font-bold text-slate-800">Total</span>
-                                        <span className="text-lg font-extrabold text-emerald-600">{orderData.total}</span>
+                                        <span className="text-lg font-extrabold text-indigo-600">{orderData.total}</span>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Safety Promise */}
-                            <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-start gap-4">
-                                <FiShield className="text-emerald-500 shrink-0 mt-1" />
+                            <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 flex items-start gap-4">
+                                <FiShield className="text-indigo-600 shrink-0 mt-1" />
                                 <div>
-                                    <h4 className="text-sm font-bold text-emerald-900">Your route is safe</h4>
-                                    <p className="text-xs text-emerald-700/70 mt-1 leading-relaxed">
+                                    <h4 className="text-sm font-bold text-indigo-900">Your route is safe</h4>
+                                    <p className="text-xs text-indigo-700/70 mt-1 leading-relaxed">
                                         SmartShield AI is monitoring your delivery path in real-time. Emergency responders are on standby.
                                     </p>
                                 </div>
@@ -275,10 +275,10 @@ const CustomerDashboard = ({ setAuth }) => {
                             <div className="bg-white/80 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-white/20 flex flex-col items-center gap-2">
                                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Signal State</div>
                                 <div className="flex gap-1">
-                                    <div className="w-1 h-3 bg-emerald-500 rounded-full animate-pulse"></div>
-                                    <div className="w-1 h-4 bg-emerald-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                                    <div className="w-1 h-3 bg-emerald-500 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                                    <div className="w-1 h-5 bg-emerald-500 rounded-full animate-pulse" style={{ animationDelay: '0.6s' }}></div>
+                                    <div className="w-1 h-3 bg-indigo-600 rounded-full animate-pulse"></div>
+                                    <div className="w-1 h-4 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                                    <div className="w-1 h-3 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                                    <div className="w-1 h-5 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.6s' }}></div>
                                 </div>
                             </div>
                         </div>

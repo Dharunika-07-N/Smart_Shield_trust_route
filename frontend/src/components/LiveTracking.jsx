@@ -38,8 +38,8 @@ const LiveTracking = ({ deliveryId, isRider = false }) => {
     if (!heading) {
       return L.divIcon({
         className: 'rider-marker',
-        html: `<div style="width:30px;height:30px;border-radius:50%;background:#3b82f6;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);position:relative">
-                 <div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:8px solid #3b82f6"></div>
+        html: `<div style="width:30px;height:30px;border-radius:50%;background:#4f46e5;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);position:relative">
+                 <div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:8px solid #4f46e5"></div>
                </div>`,
         iconSize: [30, 30],
         iconAnchor: [15, 15]
@@ -48,8 +48,8 @@ const LiveTracking = ({ deliveryId, isRider = false }) => {
 
     return L.divIcon({
       className: 'rider-marker',
-      html: `<div style="width:30px;height:30px;border-radius:50%;background:#3b82f6;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);position:relative;transform:rotate(${heading}deg)">
-               <div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%) rotate(0deg);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:8px solid #3b82f6"></div>
+      html: `<div style="width:30px;height:30px;border-radius:50%;background:#4f46e5;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);position:relative;transform:rotate(${heading}deg)">
+               <div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%) rotate(0deg);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:8px solid #4f46e5"></div>
              </div>`,
       iconSize: [30, 30],
       iconAnchor: [15, 15]
@@ -310,7 +310,7 @@ const LiveTracking = ({ deliveryId, isRider = false }) => {
   const getStatusColor = (status) => {
     switch (status) {
       case 'delivered': return 'bg-green-500';
-      case 'in_transit': return 'bg-blue-500';
+      case 'in_transit': return 'bg-indigo-600';
       case 'pending': return 'bg-yellow-500';
       case 'failed': return 'bg-red-500';
       default: return 'bg-gray-500';
@@ -435,7 +435,7 @@ const LiveTracking = ({ deliveryId, isRider = false }) => {
                     <div className="flex-1 bg-gray-200 rounded-full h-2">
                       <div
                         className={`h-2 rounded-full ${batteryLevel > 50 ? 'bg-green-500' :
-                            batteryLevel > 20 ? 'bg-yellow-500' : 'bg-red-500'
+                          batteryLevel > 20 ? 'bg-yellow-500' : 'bg-red-500'
                           }`}
                         style={{ width: `${batteryLevel}%` }}
                       ></div>
@@ -491,7 +491,7 @@ const LiveTracking = ({ deliveryId, isRider = false }) => {
                 <Polyline
                   positions={locationHistory.map(h => h.location)}
                   pathOptions={{
-                    color: '#3b82f6',
+                    color: '#4f46e5',
                     weight: 3,
                     opacity: 0.6
                   }}

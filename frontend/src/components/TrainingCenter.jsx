@@ -39,14 +39,14 @@ const TrainingCenter = () => {
 
     return (
         <div className="space-y-6">
-            <div className="bg-gradient-to-br from-gray-900 to-indigo-950 rounded-2xl p-8 text-white shadow-xl border border-white/10">
+            <div className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-2xl p-8 text-white shadow-xl shadow-indigo-500/10 border border-white/5">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>
                         <h2 className="text-3xl font-bold mb-2 flex items-center">
-                            <FiCpu className="mr-3 text-indigo-400" />
+                            <FiCpu className="mr-3 text-white" />
                             AI Model Training Center
                         </h2>
-                        <p className="text-indigo-200">
+                        <p className="text-indigo-50 font-medium opacity-90">
                             Manage the lifecycle and continuous learning of the Smart Shield Trust Route models.
                         </p>
                     </div>
@@ -54,8 +54,8 @@ const TrainingCenter = () => {
                         onClick={handleRetrain}
                         disabled={retraining}
                         className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-bold transition-all ${retraining
-                            ? 'bg-indigo-500/50 cursor-not-allowed'
-                            : 'bg-indigo-500 hover:bg-indigo-600 shadow-lg shadow-indigo-500/30'
+                            ? 'bg-white/20 cursor-not-allowed'
+                            : 'bg-white text-indigo-600 hover:bg-slate-50 shadow-lg active:scale-95'
                             }`}
                     >
                         <FiRefreshCw className={retraining ? 'animate-spin' : ''} />
@@ -64,25 +64,25 @@ const TrainingCenter = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-10">
-                    <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10">
-                        <div className="text-indigo-400 text-xs uppercase tracking-wider mb-1">Total Training Samples</div>
+                    <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/10">
+                        <div className="text-indigo-100 text-[10px] font-bold uppercase tracking-wider mb-1">Total Training Samples</div>
                         <div className="text-2xl font-bold">{stats.total_samples.toLocaleString()}</div>
-                        <div className="text-[10px] text-green-400 mt-1">↑ 124 this week</div>
+                        <div className="text-[10px] text-green-300 mt-1 font-bold">↑ 124 this week</div>
                     </div>
-                    <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10">
-                        <div className="text-indigo-400 text-xs uppercase tracking-wider mb-1">Last Retrained</div>
+                    <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/10">
+                        <div className="text-indigo-100 text-[10px] font-bold uppercase tracking-wider mb-1">Last Retrained</div>
                         <div className="text-2xl font-bold">{stats.last_trained}</div>
-                        <div className="text-[10px] text-indigo-300 mt-1">Status: Stable</div>
+                        <div className="text-[10px] text-indigo-200 mt-1 font-bold">Status: Stable</div>
                     </div>
-                    <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10">
-                        <div className="text-indigo-400 text-xs uppercase tracking-wider mb-1">Predictive Accuracy</div>
+                    <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/10">
+                        <div className="text-indigo-100 text-[10px] font-bold uppercase tracking-wider mb-1">Predictive Accuracy</div>
                         <div className="text-2xl font-bold">{stats.accuracy.toFixed(1)}%</div>
-                        <div className="text-[10px] text-green-400 mt-1">↑ 2.1% improvement</div>
+                        <div className="text-[10px] text-green-300 mt-1 font-bold">↑ 2.1% improvement</div>
                     </div>
-                    <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10">
-                        <div className="text-indigo-400 text-xs uppercase tracking-wider mb-1">User Feedback Pool</div>
+                    <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/10">
+                        <div className="text-indigo-100 text-[10px] font-bold uppercase tracking-wider mb-1">User Feedback Pool</div>
                         <div className="text-2xl font-bold">{stats.feedback_pending}</div>
-                        <div className="text-[10px] text-amber-400 mt-1">Requires processing</div>
+                        <div className="text-[10px] text-amber-300 mt-1 font-bold">Requires processing</div>
                     </div>
                 </div>
             </div>

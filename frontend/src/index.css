@@ -62,8 +62,8 @@ code {
 }
 
 .fastest-active {
-  background: #2563eb !important;
-  border-color: #60a5fa !important;
+  background: #4f46e5 !important;
+  border-color: #818cf8 !important;
 }
 
 .route-label-tooltip .leaflet-tooltip-tip {
@@ -81,12 +81,13 @@ code {
   --sidebar-bg: #ffffff;
   --text-main: #1e293b;
   --text-muted: #64748b;
-  --accent-green: #10b981;
-  --accent-orange: #f59e0b;
-  --accent-red: #ef4444;
-  --glass-bg: rgba(255, 255, 255, 0.8);
-  --glass-border: rgba(0, 0, 0, 0.05);
-  --neon-glow: 0 0 15px rgba(16, 185, 129, 0.1);
+  --accent-green: #059669;
+  --accent-indigo: #4f46e5;
+  --accent-orange: #ea580c;
+  --accent-red: #e11d48;
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(0, 0, 0, 0.04);
+  --neon-glow: 0 0 15px rgba(79, 70, 229, 0.05);
 }
 
 .service-swiggy {
@@ -179,9 +180,9 @@ code {
 }
 
 .sidebar-item-active {
-  background: linear-gradient(90deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0) 100%);
-  border-left: 3px solid var(--accent-green);
-  color: var(--accent-green) !important;
+  background: linear-gradient(90deg, rgba(79, 70, 229, 0.08) 0%, rgba(79, 70, 229, 0) 100%);
+  border-left: 3px solid var(--accent-indigo);
+  color: var(--accent-indigo) !important;
 }
 
 .app-dashboard ::-webkit-scrollbar-track {
