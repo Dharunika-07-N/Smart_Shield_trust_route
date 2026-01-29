@@ -148,37 +148,36 @@ const Auth = ({ setAuth }) => {
             const response = await axios.post(`${API_URL}${endpoint}`, payload);
 
             if (isLogin) {
-                localStorage.setItem('auth_token', response.data.access_token);
-                localStorage.setItem('user', response.data.username);
-                localStorage.setItem('user_id', response.data.user_id);
-                localStorage.setItem('role', response.data.role);
+                // The setAuth prop is now the login function from AuthContext
+                setAuth({
+                    access_token: response.data.access_token,
+                    username: response.data.username,
+                    role: response.data.role,
+                    user_id: response.data.user_id
+                });
 
-                if (rememberMe) {
-                    localStorage.setItem('rememberMe', 'true');
-                }
-
-                if (response.data.role === 'rider') {
-                    localStorage.setItem('rider_id', response.data.user_id);
-                }
-
-                setAuth(true);
-
-                // Get default route from config
+                // Navigate based on role default route
                 const configRole = ROLE_OPTIONS.find(r => r.value === response.data.role);
                 navigate(configRole?.defaultRoute || '/dashboard');
             } else {
                 setIsLogin(true);
-                if (role === 'driver') {
-                    setGlobalError('Application submitted successfully! Our team will review your account.');
-                } else {
-                    setGlobalError('Account created successfully! Please sign in.');
-                }
+                setGlobalError('Success! Please sign in with your new credentials.');
             }
         } catch (err) {
-            setGlobalError(err.response?.data?.detail || 'An error occurred. Please try again.');
+            setGlobalError(err.response?.data?.detail || 'Authentication failed. Check your network or credentials.');
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleDevBypass = () => {
+        setAuth({
+            access_token: 'dev_token',
+            username: 'Dev_User',
+            role: role || 'rider',
+            user_id: 'DEV_001'
+        });
+        navigate('/dashboard');
     };
 
     return (
@@ -193,13 +192,8 @@ const Auth = ({ setAuth }) => {
                 {/* Dev Bypass */}
                 <div className="absolute top-4 right-4 z-50">
                     <button
-                        onClick={() => {
-                            localStorage.setItem('auth_token', 'dev_token');
-                            localStorage.setItem('role', 'rider');
-                            setAuth(true);
-                            navigate('/dashboard');
-                        }}
-                        className="text-[10px] text-white/20 hover:text-white/50 bg-white/5 px-2 py-1 rounded"
+                        onClick={handleDevBypass}
+                        className="text-[10px] text-white/20 hover:text-white/50 bg-white/5 px-2 py-1 rounded transition-all"
                     >
                         Skip Login (Dev)
                     </button>

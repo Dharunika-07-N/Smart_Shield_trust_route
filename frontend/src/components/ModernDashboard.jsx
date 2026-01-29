@@ -4,18 +4,20 @@ import {
     FiShield, FiMap, FiPackage, FiZap, FiAlertTriangle, FiBarChart2,
     FiSettings, FiMessageSquare, FiSearch, FiBell, FiUser, FiChevronRight,
     FiNavigation, FiClock, FiWind, FiDroplet, FiEye, FiActivity, FiLayers,
-    FiPlus, FiMinus, FiTarget, FiPhone, FiMapPin
+    FiPlus, FiMinus, FiTarget, FiPhone, FiMapPin, FiLogOut
 } from 'react-icons/fi';
 import RouteMap from './RouteMap';
 import { api } from '../services/api';
 import dashboardApi from '../services/dashboardApi';
 import useLocation from '../hooks/useLocation';
 import NotificationDropdown from './NotificationDropdown';
+import { useAuth } from '../context/AuthContext';
 
-const ModernDashboard = ({ setAuth }) => {
+const ModernDashboard = () => {
+    const { user, logout } = useAuth();
     const [activeTab, setActiveTab] = useState('Dashboard');
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-    const [riderId] = useState(localStorage.getItem('user_id') || 'R 2847');
+    const [riderId] = useState(user?.username || localStorage.getItem('user_id') || 'R 2847');
     const { location: currentLocation } = useLocation();
 
     // State for API data
@@ -207,12 +209,16 @@ const ModernDashboard = ({ setAuth }) => {
 
                         <div className="flex items-center gap-3 pl-6 border-l border-slate-200">
                             <div className="text-right hidden sm:block">
-                                <p className="text-sm font-bold text-slate-800 leading-none">Priya Kumar</p>
-                                <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider">Rider ID: {riderId}</p>
+                                <p className="text-sm font-bold text-slate-800 leading-none">{user?.username || 'Priya Kumar'}</p>
+                                <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider">Role: {user?.role || 'Rider'}</p>
                             </div>
-                            <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 border border-emerald-100">
-                                <FiUser className="text-xl" />
-                            </div>
+                            <button
+                                onClick={logout}
+                                className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 border border-emerald-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 transition-colors group"
+                            >
+                                <FiLogOut className="text-xl group-hover:hidden" />
+                                <FiUser className="text-xl hidden group-hover:block" />
+                            </button>
                         </div>
                     </div>
                 </header>

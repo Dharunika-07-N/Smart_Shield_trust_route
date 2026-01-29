@@ -68,7 +68,7 @@ const SafetyGauge = ({ score }) => {
   );
 };
 
-const RouteMap = ({ variant = 'default' }) => {
+const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerClick }) => {
   const { location, loading: locationLoading, error: locationError } = useLocation();
   const [currentPos, setCurrentPos] = useState(null);
   const [destPos, setDestPos] = useState(null);
@@ -553,11 +553,14 @@ const RouteMap = ({ variant = 'default' }) => {
 
   if (variant === 'dark-minimal' || variant === 'light-minimal') {
     const isDark = variant === 'dark-minimal';
+    const mapCenter = center || centerPosition;
+    const mapZoom = zoom || 13;
+
     return (
       <div className="w-full h-full">
         <MapContainer
-          center={centerPosition}
-          zoom={13}
+          center={mapCenter}
+          zoom={mapZoom}
           zoomControl={false}
           style={{ height: '100%', width: '100%' }}
           className={isDark ? "dark-map" : "light-map"}
@@ -570,53 +573,76 @@ const RouteMap = ({ variant = 'default' }) => {
             }
           />
 
-          {/* Display current position */}
+          {/* Display current position if provided */}
           {currentPos && (
             <Marker position={currentPos} icon={pulsingIcon} />
           )}
 
-          {/* Simple Curved Route Visualization (Mocking Image 2) */}
-          <Polyline
-            positions={[
-              [centerPosition[0], centerPosition[1] - 0.02],
-              [centerPosition[0] + 0.01, centerPosition[1] - 0.01],
-              [centerPosition[0] - 0.01, centerPosition[1] + 0.01],
-              [centerPosition[0], centerPosition[1] + 0.02],
-            ]}
-            pathOptions={{
-              color: '#10b981',
-              weight: 5,
-              opacity: 0.8,
-              dashArray: '10, 10'
-            }}
-          />
+          {/* Custom Markers from Props */}
+          {markers && markers.map((marker, idx) => (
+            <Marker
+              key={idx}
+              position={marker.position}
+              icon={marker.icon || L.divIcon({
+                className: 'map-marker',
+                html: `<div style="background:${marker.color || '#10b981'};width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.2)"></div>`
+              })}
+              eventHandlers={{
+                click: () => onMarkerClick && onMarkerClick(marker)
+              }}
+            >
+              {marker.popup && <Popup>{marker.popup}</Popup>}
+            </Marker>
+          ))}
 
-          {/* Map markers like Image 2 */}
-          <Marker
-            position={[centerPosition[0], centerPosition[1] - 0.02]}
-            icon={L.divIcon({
-              className: 'map-num-marker',
-              html: `<div style="width:24px;height:24px;background:#10b981;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:12px;border:2px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'white'};box-shadow:0 2px 4px rgba(0,0,0,0.1)">1</div>`
-            })}
-          />
+          {/* Route Polyline from Props */}
+          {route && route.length > 0 && (
+            <Polyline
+              positions={route}
+              pathOptions={{
+                color: isDark ? '#10b981' : '#059669',
+                weight: 5,
+                opacity: 0.8,
+                dashArray: '10, 10'
+              }}
+            />
+          )}
 
-          <Marker
-            position={[centerPosition[0] + 0.01, centerPosition[1] - 0.01]}
-            icon={L.divIcon({
-              className: 'map-num-marker',
-              html: `<div style="width:24px;height:24px;background:#10b981;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:12px;border:2px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'white'};box-shadow:0 2px 4px rgba(0,0,0,0.1)">2</div>`
-            })}
-          />
+          {/* Fallback Mock Data if no route/markers provided (for compatibility/demo) */}
+          {!route && !markers && (
+            <>
+              <Marker
+                position={[mapCenter[0], mapCenter[1] - 0.02]}
+                icon={L.divIcon({
+                  className: 'map-num-marker',
+                  html: `<div style="width:24px;height:24px;background:#10b981;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:12px;border:2px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'white'};box-shadow:0 2px 4px rgba(0,0,0,0.1)">1</div>`
+                })}
+              />
+              <Marker
+                position={[mapCenter[0] + 0.01, mapCenter[1] - 0.01]}
+                icon={L.divIcon({
+                  className: 'map-num-marker',
+                  html: `<div style="width:24px;height:24px;background:#10b981;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:12px;border:2px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'white'};box-shadow:0 2px 4px rgba(0,0,0,0.1)">2</div>`
+                })}
+              />
+              <Polyline
+                positions={[
+                  [mapCenter[0], mapCenter[1] - 0.02],
+                  [mapCenter[0] + 0.01, mapCenter[1] - 0.01],
+                  [mapCenter[0] - 0.01, mapCenter[1] + 0.01],
+                  [mapCenter[0], mapCenter[1] + 0.02],
+                ]}
+                pathOptions={{
+                  color: '#10b981',
+                  weight: 5,
+                  opacity: 0.8,
+                  dashArray: '10, 10'
+                }}
+              />
+            </>
+          )}
 
-          <Marker
-            position={[centerPosition[0], centerPosition[1] + 0.02]}
-            icon={L.divIcon({
-              className: 'map-pin-marker',
-              html: `<div style="color:#f97316;font-size:24px;filter:drop-shadow(0 0 10px rgba(249,115,22,0.3))">📍</div>`
-            })}
-          />
-
-          <MapUpdater center={centerPosition} />
+          <MapUpdater center={mapCenter} />
         </MapContainer>
       </div>
     );

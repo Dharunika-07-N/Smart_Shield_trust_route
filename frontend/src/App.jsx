@@ -1,38 +1,64 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Dashboard from './components/Dashboard';
 import Auth from './components/Auth';
+import LandingPage from './components/LandingPage';
+import NotFound from './components/NotFound';
+import Unauthorized from './components/Unauthorized';
+import { useAuth } from './context/AuthContext';
 import './App.css';
 
-function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('auth_token'));
+// Protected Route Wrapper
+const ProtectedRoute = ({ children, requiredRole }) => {
+  const { isAuthenticated, user, loading } = useAuth();
+  const location = useLocation();
 
-  useEffect(() => {
-    // Check for token existence periodically or on mount
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-      setIsAuthenticated(true);
-    }
-  }, []);
+  if (loading) return (
+    <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#0F172A] text-white">
+      <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+      <p className="font-black tracking-widest uppercase text-xs animate-pulse">Initializing SmartShield...</p>
+    </div>
+  );
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (requiredRole && user?.role !== requiredRole) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  return children;
+};
+
+function App() {
+  const { isAuthenticated, login } = useAuth();
 
   return (
     <Router>
-      <div className="App min-h-screen bg-gray-50">
+      <div className="App min-h-screen bg-slate-50">
         <Routes>
-          <Route
-            path="/"
-            element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />}
-          />
+          {/* Public Routes */}
+          <Route path="/" element={<LandingPage />} />
           <Route
             path="/login"
-            element={!isAuthenticated ? <Auth setAuth={setIsAuthenticated} /> : <Navigate to="/dashboard" replace />}
+            element={!isAuthenticated ? <Auth setAuth={login} /> : <Navigate to="/dashboard" replace />}
           />
+          <Route path="/unauthorized" element={<Unauthorized />} />
+
+          {/* Protected Dashboard Routes */}
           <Route
             path="/dashboard/*"
-            element={isAuthenticated ? <Dashboard setAuth={setIsAuthenticated} /> : <Navigate to="/login" replace />}
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
           />
-          {/* Catch all redirect to root */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+
+          {/* Fallback */}
+          <Route path="/404" element={<NotFound />} />
+          <Route path="*" element={<Navigate to="/404" replace />} />
         </Routes>
       </div>
     </Router>
