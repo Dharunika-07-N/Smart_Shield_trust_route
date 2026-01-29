@@ -190,6 +190,21 @@ const Auth = ({ setAuth }) => {
             </div>
 
             <div className="max-w-2xl w-full z-10 transition-all transform duration-500">
+                {/* Dev Bypass */}
+                <div className="absolute top-4 right-4 z-50">
+                    <button
+                        onClick={() => {
+                            localStorage.setItem('auth_token', 'dev_token');
+                            localStorage.setItem('role', 'rider');
+                            setAuth(true);
+                            navigate('/dashboard');
+                        }}
+                        className="text-[10px] text-white/20 hover:text-white/50 bg-white/5 px-2 py-1 rounded"
+                    >
+                        Skip Login (Dev)
+                    </button>
+                </div>
+
                 {/* Header */}
                 <div className="text-center mb-8">
                     <div className="inline-flex items-center justify-center p-4 bg-gradient-to-br from-[#2563EB] to-[#1e40af] rounded-3xl mb-5 shadow-2xl relative group">
@@ -215,8 +230,8 @@ const Auth = ({ setAuth }) => {
                                         type="button"
                                         onClick={() => setRole(option.value)}
                                         className={`flex items-center gap-2 px-5 py-2.5 rounded-full border transition-all duration-300 ${isSelected
-                                                ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/20'
-                                                : 'border-white/10 text-gray-400 hover:border-white/30 hover:text-white bg-white/5'
+                                            ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/20'
+                                            : 'border-white/10 text-gray-400 hover:border-white/30 hover:text-white bg-white/5'
                                             }`}
                                     >
                                         <Icon size={18} />

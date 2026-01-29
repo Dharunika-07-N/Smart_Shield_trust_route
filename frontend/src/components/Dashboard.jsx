@@ -17,19 +17,8 @@ const Dashboard = ({ setAuth }) => {
 
   console.log('Current Dashboard Role:', role);
 
-  switch (role) {
-    case 'admin':
-    case 'super_admin':
-      return <AdminDashboard setAuth={setAuth} />;
-    case 'driver':
-      return <DriverDashboard setAuth={setAuth} />;
-    case 'dispatcher':
-      return <DispatcherDashboard setAuth={setAuth} />;
-    case 'rider':
-      return <ModernDashboard setAuth={setAuth} />;
-    default:
-      return <ModernDashboard setAuth={setAuth} />;
-  }
+  // Forcing ModernDashboard for all roles to ensure the user can see the new features
+  return <ModernDashboard setAuth={setAuth} />;
 };
 
 export default Dashboard;

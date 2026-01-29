@@ -4,7 +4,7 @@ import {
     FiShield, FiMap, FiPackage, FiZap, FiAlertTriangle, FiBarChart2,
     FiSettings, FiMessageSquare, FiSearch, FiBell, FiUser, FiChevronRight,
     FiNavigation, FiClock, FiWind, FiDroplet, FiEye, FiActivity, FiLayers,
-    FiPlus, FiMinus, FiTarget, FiPhone
+    FiPlus, FiMinus, FiTarget, FiPhone, FiMapPin
 } from 'react-icons/fi';
 import RouteMap from './RouteMap';
 import { api } from '../services/api';
