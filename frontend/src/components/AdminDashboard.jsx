@@ -180,8 +180,8 @@ const AdminDashboard = ({ setAuth }) => {
                       </div>
                       <button className="px-4 py-2 bg-white hover:bg-slate-50 text-xs font-bold text-slate-600 rounded-xl transition-all border border-slate-200">Export Report</button>
                     </div>
-                    <div className="h-[400px]">
-                      <Analytics />
+                    <div className="mt-4 h-auto overflow-visible">
+                      <Analytics hideTitle={true} />
                     </div>
                   </div>
 

@@ -26,7 +26,7 @@ ChartJS.register(
   Legend
 );
 
-const Analytics = () => {
+const Analytics = ({ hideTitle = false }) => {
   const [timeRange, setTimeRange] = useState('7d');
 
   // Mock data for demonstration
@@ -95,23 +95,25 @@ const Analytics = () => {
   return (
     <div className="space-y-6">
       {/* Time Range Selector */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Analytics Dashboard</h2>
-        <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
-          {['7d', '30d', '90d'].map((range) => (
-            <button
-              key={range}
-              onClick={() => setTimeRange(range)}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${timeRange === range
-                ? 'bg-white text-indigo-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-                }`}
-            >
-              {range === '7d' ? '7 Days' : range === '30d' ? '30 Days' : '90 Days'}
-            </button>
-          ))}
+      {!hideTitle && (
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-gray-900">Analytics Dashboard</h2>
+          <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
+            {['7d', '30d', '90d'].map((range) => (
+              <button
+                key={range}
+                onClick={() => setTimeRange(range)}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${timeRange === range
+                  ? 'bg-white text-indigo-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+                  }`}
+              >
+                {range === '7d' ? '7 Days' : range === '30d' ? '30 Days' : '90 Days'}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
