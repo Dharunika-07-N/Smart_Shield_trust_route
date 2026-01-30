@@ -2,6 +2,7 @@
 import networkx as nx
 from typing import List, Dict, Tuple, Optional
 import numpy as np
+import pandas as pd
 from datetime import datetime, timedelta
 import sys
 from pathlib import Path
@@ -694,10 +695,10 @@ class RouteOptimizer:
                         'hour': departure_time.hour if departure_time else 12,
                         'weather_hazard': weather_data['hazard_score']
                     }])
-                    # Fill missing columns with 0 if necessary
-                    for col in self.feature_engineer.feature_columns:
-                         if col not in feature_row.columns:
-                             feature_row[col] = 0
+                    if hasattr(self.time_predictor, 'feature_columns') and self.time_predictor.feature_columns:
+                        for col in self.time_predictor.feature_columns:
+                             if col not in feature_row.columns:
+                                 feature_row[col] = 0
                     
                     predicted_min = self.time_predictor.predict(feature_row)[0]
                     # Blend OSRM duration with ML prediction (70/30)

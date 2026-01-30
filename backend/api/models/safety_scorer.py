@@ -287,14 +287,22 @@ class SafetyScorer:
         
         # Get model prediction
         base_score = self.model.predict(features_for_model)[0]
-        
         # Apply gender-specific adjustments if needed
         if rider_info and rider_info.get("gender") == "female":
-            # Women riders prefer higher lighting and patrol presence
-            if features[1] < 50:  # Low lighting
-                base_score -= 10
-            if features[2] < 50:  # Low patrol
-                base_score -= 10
+            # Determine indices based on feature count
+            feat_cnt = getattr(self, "feature_count", 7)
+            if feat_cnt == 12:
+                # 12-feature model: index 6 is lighting, index 1 is crime_severity
+                if features[6] < 50:  # Low lighting
+                    base_score -= 10
+                if features[1] > 5:   # High crime (0-10 scale)
+                    base_score -= 10
+            else:
+                # 7-feature model: index 1 is lighting, index 2 is patrol
+                if features[1] < 50:  # Low lighting
+                    base_score -= 10
+                if features[2] < 50:  # Low patrol
+                    base_score -= 10
         
         base_score = np.clip(base_score, 0, 100)
         

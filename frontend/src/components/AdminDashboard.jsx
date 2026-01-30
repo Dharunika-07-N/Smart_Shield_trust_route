@@ -23,6 +23,7 @@ const AdminDashboard = ({ setAuth }) => {
 
   const menuItems = [
     { id: 'Overview', icon: FiMonitor, label: 'System Overview' },
+    { id: 'Optimizer', icon: FiNavigation, label: 'Route Optimizer' },
     { id: 'Fleet', icon: FiMap, label: 'Fleet Map' },
     { id: 'Users', icon: FiUsers, label: 'User Management' },
     { id: 'Analytics', icon: FiBarChart2, label: 'Advanced Analytics' },
@@ -132,7 +133,12 @@ const AdminDashboard = ({ setAuth }) => {
                     <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl group-hover:scale-110 transition-transform">
                       <FiUsers size={24} />
                     </div>
-                    <span className="text-xs font-bold text-indigo-600">+4 ready</span>
+                    <button
+                      onClick={() => setActiveTab('Optimizer')}
+                      className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all"
+                    >
+                      Open Optimizer
+                    </button>
                   </div>
                   <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Active Fleet</p>
                   <p className="text-3xl font-black text-slate-900 mt-1">{stats.activeDrivers}</p>
@@ -250,6 +256,24 @@ const AdminDashboard = ({ setAuth }) => {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'Optimizer' && (
+            <div className="flex-1 flex flex-col bg-white rounded-[2.5rem] p-8 border border-slate-200 shadow-sm min-h-[800px]">
+              <div className="mb-6 flex justify-between items-end">
+                <div>
+                  <h2 className="text-3xl font-black text-slate-900 tracking-tight">AI Route Optimizer</h2>
+                  <p className="text-slate-500 font-medium">Plan, compare and monitor safety-first paths for your fleet.</p>
+                </div>
+                <div className="flex gap-2">
+                  <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-bold rounded-full border border-emerald-100">XGBoost Active</span>
+                  <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-full border border-blue-100">RF Scoring Live</span>
+                </div>
+              </div>
+              <div className="flex-1">
+                <RouteMap />
               </div>
             </div>
           )}
