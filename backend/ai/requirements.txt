@@ -1,0 +1,15 @@
+# AI Report Summarizer Dependencies
+# Add these to your existing requirements.txt
+
+# OpenAI Integration
+openai>=1.12.0
+
+# Anthropic Claude Integration
+anthropic>=0.18.0
+
+# Google Gemini Integration
+google-generativeai>=0.3.0
+
+# Additional utilities (if not already installed)
+python-dotenv>=1.0.0
+requests>=2.31.0
