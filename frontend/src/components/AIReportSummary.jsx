@@ -16,6 +16,7 @@ import {
     Zap
 } from 'lucide-react';
 import './AIReportSummary.css';
+import { api } from '../services/api';
 
 const AIReportSummary = () => {
     const [activeTab, setActiveTab] = useState('executive');
@@ -55,7 +56,6 @@ const AIReportSummary = () => {
         setError(null);
 
         try {
-            const token = localStorage.getItem('token');
             let endpoint = '';
 
             switch (reportType) {
@@ -78,25 +78,15 @@ const AIReportSummary = () => {
                     endpoint = '/api/ai/reports/executive-dashboard';
             }
 
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    time_period: timePeriod,
-                    provider: aiProvider,
-                    format: 'json'
-                })
+            const data = await api.post(endpoint, {
+                time_period: timePeriod,
+                provider: aiProvider,
+                format: 'json'
             });
 
-            if (!response.ok) throw new Error('Failed to fetch summary');
-
-            const data = await response.json();
             setSummaries(prev => ({ ...prev, [reportType]: data }));
         } catch (err) {
-            setError(err.message);
+            setError(err.message || 'Failed to fetch summary');
             console.error('Error fetching summary:', err);
         } finally {
             setLoading(false);
