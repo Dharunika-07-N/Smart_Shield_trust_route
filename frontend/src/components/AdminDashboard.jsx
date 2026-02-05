@@ -9,6 +9,7 @@ import RouteMap from './RouteMap';
 import LiveTracking from './LiveTracking';
 import TrainingCenter from './TrainingCenter';
 import ModelPerformance from './ModelPerformance';
+import AIReportSummary from './AIReportSummary';
 import { api } from '../services/api';
 
 const AdminDashboard = ({ setAuth }) => {
@@ -29,6 +30,7 @@ const AdminDashboard = ({ setAuth }) => {
     { id: 'Analytics', icon: FiBarChart2, label: 'Advanced Analytics' },
     { id: 'Training', icon: FiCpu, label: 'ML Training Center' },
     { id: 'Performance', icon: FiActivity, label: 'AI Monitoring' },
+    { id: 'AIReports', icon: FiCpu, label: 'AI Reports' },
     { id: 'Reports', icon: FiAlertTriangle, label: 'Incident Reports' }
   ];
 
@@ -307,6 +309,7 @@ const AdminDashboard = ({ setAuth }) => {
             </div>
           )}
           {activeTab === 'Performance' && <ModelPerformance />}
+          {activeTab === 'AIReports' && <AIReportSummary />}
         </main>
       </div>
     </div>
