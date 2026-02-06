@@ -3,7 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database.database import get_db
 from database.models import User, Route, SafetyFeedback, DeliveryStatus
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
+from pydantic import BaseModel
 from datetime import datetime, timedelta
 from loguru import logger
 import random
@@ -198,9 +199,12 @@ async def get_weather_conditions(
         logger.error(f"Error fetching weather: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+class OptimizeRequest(BaseModel):
+    delivery_ids: List[str]
+
 @router.post("/route/optimize")
 async def optimize_current_route(
-    delivery_ids: List[str],
+    request: OptimizeRequest,
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """Optimize route for given deliveries."""
