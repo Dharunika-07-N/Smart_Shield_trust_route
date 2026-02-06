@@ -58,7 +58,13 @@ async def calculate_safety_score(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/safety/heatmap")
-async def get_safety_heatmap(min_lat: float, min_lng: float, max_lat: float, max_lng: float):
+async def get_safety_heatmap(
+    min_lat: float, 
+    min_lng: float, 
+    max_lat: float, 
+    max_lng: float,
+    grid_size: Optional[int] = 15
+):
     return {"points": []}
 
 
