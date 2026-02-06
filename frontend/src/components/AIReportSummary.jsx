@@ -60,22 +60,22 @@ const AIReportSummary = () => {
 
             switch (reportType) {
                 case 'executive':
-                    endpoint = '/api/ai/reports/executive-dashboard';
+                    endpoint = '/ai/reports/executive-dashboard';
                     break;
                 case 'user':
-                    endpoint = '/api/ai/reports/user-summary';
+                    endpoint = '/ai/reports/user-summary';
                     break;
                 case 'rider':
-                    endpoint = '/api/ai/reports/rider-summary';
+                    endpoint = '/ai/reports/rider-summary';
                     break;
                 case 'feedback':
-                    endpoint = '/api/ai/reports/feedback-summary';
+                    endpoint = '/ai/reports/feedback-summary';
                     break;
                 case 'ml':
-                    endpoint = '/api/ai/reports/ml-performance';
+                    endpoint = '/ai/reports/ml-performance';
                     break;
                 default:
-                    endpoint = '/api/ai/reports/executive-dashboard';
+                    endpoint = '/ai/reports/executive-dashboard';
             }
 
             const data = await api.post(endpoint, {
