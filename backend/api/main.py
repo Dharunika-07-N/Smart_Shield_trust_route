@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from api.routes import (
     delivery, safety, feedback, traffic, auth, 
@@ -25,20 +25,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register routes
-app.include_router(auth.router)
-app.include_router(delivery.router)
-app.include_router(deliveries.router)
-app.include_router(safety.router)
-app.include_router(feedback.router)
-app.include_router(traffic.router)
-app.include_router(users.router)
-app.include_router(training.router)
-app.include_router(tracking.router)
-app.include_router(dashboard.router)
-app.include_router(monitoring.router)
-app.include_router(experiments.router)
-app.include_router(ai_reports.router)
+# Create versioned router
+api_v1_router = APIRouter(prefix="/api/v1")
+
+# Register routes to the versioned router
+api_v1_router.include_router(auth.router)
+api_v1_router.include_router(delivery.router)
+api_v1_router.include_router(deliveries.router)
+api_v1_router.include_router(safety.router)
+api_v1_router.include_router(feedback.router)
+api_v1_router.include_router(traffic.router)
+api_v1_router.include_router(users.router)
+api_v1_router.include_router(training.router)
+api_v1_router.include_router(tracking.router)
+api_v1_router.include_router(dashboard.router)
+api_v1_router.include_router(monitoring.router)
+api_v1_router.include_router(experiments.router)
+api_v1_router.include_router(ai_reports.router)
+
+# Register the versioned router to the app
+app.include_router(api_v1_router)
 
 @app.get("/")
 async def root():
