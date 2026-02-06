@@ -11,17 +11,17 @@ import os
 import sys
 
 # Add parent directory to path for imports
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from backend.ai.report_summarizer import ReportSummarizer, ReportFormatter
-from backend.database.database import get_db
-from backend.database.models import (
+from ai.report_summarizer import ReportSummarizer, ReportFormatter
+from database.database import get_db
+from database.models import (
     User, Rider, Delivery, SafetyFeedback, 
     DeliveryRoute, DeliveryFeedback, PanicAlert
 )
 from sqlalchemy import func
 
-router = APIRouter(prefix="/api/ai/reports", tags=["ai-reports"])
+router = APIRouter(prefix="/ai/reports", tags=["ai-reports"])
 
 def get_date_range(time_period: str):
     """Calculate date range based on time period"""
