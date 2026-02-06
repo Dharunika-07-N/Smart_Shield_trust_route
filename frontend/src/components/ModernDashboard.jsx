@@ -11,6 +11,10 @@ import { api } from '../services/api';
 import dashboardApi from '../services/dashboardApi';
 import useLocation from '../hooks/useLocation';
 import NotificationDropdown from './NotificationDropdown';
+import Analytics from './Analytics';
+import AIReportSummary from './AIReportSummary';
+import LiveTracking from './LiveTracking';
+import FeedbackForm from './FeedbackForm';
 import { useAuth } from '../context/AuthContext';
 
 const ModernDashboard = () => {
@@ -36,10 +40,10 @@ const ModernDashboard = () => {
         { name: 'Dashboard', icon: FiActivity, badge: null },
         { name: 'Route Map', icon: FiMap, badge: null },
         { name: 'Deliveries', icon: FiPackage, badge: deliveryQueue.length || 12 },
+        { name: 'AI Insights', icon: FiZap, badge: 'AI' },
+        { name: 'Analytics', icon: FiBarChart2, badge: null },
         { name: 'Safety Zones', icon: FiShield, badge: null },
         { name: 'Alerts', icon: FiAlertTriangle, badge: 3 },
-        { name: 'Analytics', icon: FiBarChart2, badge: null },
-        { name: 'Fuel Metrics', icon: FiZap, badge: null },
         { name: 'Feedback', icon: FiMessageSquare, badge: null },
         { name: 'Settings', icon: FiSettings, badge: null },
     ];
@@ -131,6 +135,9 @@ const ModernDashboard = () => {
             const deliveryIds = deliveryQueue.map(d => d.id);
             const result = await dashboardApi.optimizeRoute(deliveryIds);
             alert(`Route optimized! ${result.message}\nTime saved: ${result.estimated_time_saved}\nFuel saved: ${result.fuel_saved}`);
+
+            // Navigate to Route Map as requested
+            setActiveTab('Route Map');
         } catch (error) {
             console.error('Error optimizing route:', error);
             alert('Failed to optimize route. Please try again.');
@@ -503,6 +510,33 @@ const ModernDashboard = () => {
                         </div >
                     )}
                     {activeTab === 'Route Map' && <RouteMap />}
+                    {activeTab === 'Deliveries' && <div className="p-4"><LiveTracking deliveryId={riderId} /></div>}
+                    {activeTab === 'AI Insights' && <AIReportSummary />}
+                    {activeTab === 'Analytics' && <Analytics />}
+                    {activeTab === 'Safety Zones' && <RouteMap />}
+                    {activeTab === 'Alerts' && (
+                        <div className="premium-card p-6">
+                            <h3 className="text-lg font-bold mb-4">Recent Alerts</h3>
+                            <div className="bg-amber-50 border border-amber-200 text-amber-700 p-4 rounded-xl flex items-center gap-3">
+                                <FiAlertTriangle className="text-xl" />
+                                <div>
+                                    <p className="font-bold">Heavy Traffic at Velachery</p>
+                                    <p className="text-xs opacity-80">Rerouting recommended for active deliveries.</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {activeTab === 'Feedback' && <FeedbackForm riderId={riderId} routeId="last_route" />}
+                    {activeTab === 'Settings' && (
+                        <div className="premium-card p-8 text-center space-y-4">
+                            <FiSettings size={48} className="mx-auto text-slate-400" />
+                            <h3 className="text-lg font-bold text-slate-800">Account Settings</h3>
+                            <p className="text-slate-500 max-w-sm mx-auto">Configure your vehicle type, notification preferences, and emergency contacts.</p>
+                            <button className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all">
+                                Update Profile
+                            </button>
+                        </div>
+                    )}
                 </main >
             </div >
         </div >
