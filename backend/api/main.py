@@ -5,6 +5,10 @@ from api.routes import (
     training, users, deliveries, tracking, 
     dashboard, monitoring, experiments, ai_reports
 )
+from api.utils.limiter import limiter
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from config.config import settings
 import os
 from dotenv import load_dotenv
 
@@ -16,10 +20,14 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Add Limiter and Exception Handler
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust in production
+    allow_origins=settings.BACKEND_CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
