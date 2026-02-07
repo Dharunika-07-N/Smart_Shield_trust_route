@@ -28,12 +28,14 @@ from api.schemas.safety import (
 from api.schemas.delivery import Coordinate
 from api.models.safety_scorer import SafetyScorer
 from api.services.safety import SafetyService
+from api.services.crime_data import CrimeDataService
 from database.database import get_db
 from loguru import logger
 
 router = APIRouter()
 safety_scorer = SafetyScorer()
 safety_service = SafetyService()
+crime_data_service = CrimeDataService()
 
 @router.post("/safety/score", response_model=SafetyScoreResponse)
 async def calculate_safety_score(
@@ -65,7 +67,19 @@ async def get_safety_heatmap(
     max_lng: float,
     grid_size: Optional[int] = 15
 ):
-    return {"points": []}
+    """Get safety heatmap points for a bounding box."""
+    try:
+        bbox = {
+            "min_lat": min_lat,
+            "max_lat": max_lat,
+            "min_lon": min_lng,
+            "max_lon": max_lng
+        }
+        heatmap_points = crime_data_service.get_heatmap_data(bbox, resolution=grid_size)
+        return {"points": heatmap_points}
+    except Exception as e:
+        logger.error(f"Error generating heatmap: {e}")
+        return {"points": [], "error": str(e)}
 
 
 @router.post("/safety/panic-button", response_model=PanicButtonResponse)
