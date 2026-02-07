@@ -23,8 +23,8 @@ const SafetyHeatmap = ({ show = true }) => {
             };
 
             const response = await api.get('/safety/heatmap', { params });
-            if (response && response.data) {
-                setHeatmapData(response.data.points || []);
+            if (response && response.points) {
+                setHeatmapData(response.points || []);
             }
         } catch (error) {
             console.error("Error fetching heatmap:", error);
