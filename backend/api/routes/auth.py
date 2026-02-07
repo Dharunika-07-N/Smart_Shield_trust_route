@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from database.database import get_db
@@ -7,11 +7,13 @@ from api.schemas.auth import UserCreate, UserResponse, Token, UserLogin, TokenRe
 from api.services.security import get_password_hash, verify_password, create_access_token, create_refresh_token
 from loguru import logger
 from datetime import datetime, timedelta
+from api.utils.limiter import limiter
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 @router.post("/register", response_model=UserResponse)
-def register(user_in: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def register(request: Request, user_in: UserCreate, db: Session = Depends(get_db)):
     """Register a new user (Rider or Driver publicly, Others via restricted paths)."""
     try:
         # 1. Check if registration is allowed for this role publicly
@@ -93,7 +95,8 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
         )
 
 @router.post("/login", response_model=Token)
-def login(user_in: UserLogin, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login(request: Request, response: Response, user_in: UserLogin, db: Session = Depends(get_db)):
     """Login and status verification."""
     user = db.query(User).filter(
         (User.username == user_in.username) | (User.email == user_in.username)
@@ -150,6 +153,24 @@ def login(user_in: UserLogin, db: Session = Depends(get_db)):
     db.add(session)
     db.commit()
     
+    # Set HttpOnly Cookies
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=False, # Set to True in production with HTTPS
+        samesite="lax",
+        max_age=60 * 60 * 24 # 24 hours
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=False, # Set to True in production with HTTPS
+        samesite="lax",
+        max_age=60 * 60 * 24 * 7 # 7 days
+    )
+    
     logger.info(f"User logged in: {user.username} as {user.role}")
     return {
         "access_token": access_token, 
@@ -160,9 +181,13 @@ def login(user_in: UserLogin, db: Session = Depends(get_db)):
     }
 
 @router.post("/refresh", response_model=Token)
-def refresh(token_in: TokenRefresh, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def refresh(request: Request, response: Response, token_in: TokenRefresh, db: Session = Depends(get_db)):
     """Refresh access token using refresh token."""
-    session = db.query(UserSession).filter(UserSession.token == token_in.refresh_token).first()
+    # Try to get refresh token from cookie first, then from request body
+    refresh_token = request.cookies.get("refresh_token") or token_in.refresh_token
+    
+    session = db.query(UserSession).filter(UserSession.token == refresh_token).first()
     if not session or session.expires_at < datetime.utcnow():
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -177,6 +202,17 @@ def refresh(token_in: TokenRefresh, db: Session = Depends(get_db)):
         )
     
     access_token = create_access_token(data={"sub": user.username, "role": user.role})
+    
+    # Update Cookies
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        max_age=60 * 60 * 24
+    )
+    
     return {
         "access_token": access_token,
         "token_type": "bearer",
@@ -186,10 +222,16 @@ def refresh(token_in: TokenRefresh, db: Session = Depends(get_db)):
     }
 
 @router.post("/logout")
-def logout(token_in: TokenRefresh, db: Session = Depends(get_db)):
+def logout(request: Request, response: Response, token_in: TokenRefresh, db: Session = Depends(get_db)):
     """Logout and invalidate refresh token."""
-    session = db.query(UserSession).filter(UserSession.token == token_in.refresh_token).first()
+    refresh_token = request.cookies.get("refresh_token") or token_in.refresh_token
+    session = db.query(UserSession).filter(UserSession.token == refresh_token).first()
     if session:
         db.delete(session)
         db.commit()
+    
+    # Clear Cookies
+    response.delete_cookie("access_token")
+    response.delete_cookie("refresh_token")
+    
     return {"message": "Logged out successfully"}
