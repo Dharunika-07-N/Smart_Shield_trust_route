@@ -13,9 +13,9 @@ const NotificationDropdown = ({ userId }) => {
     const fetchNotifications = async () => {
         setLoading(true);
         try {
-            const response = await dashboardApi.getAlerts();
+            const response = await dashboardApi.getRecentAlerts();
             if (response && response.data) {
-                const alerts = response.data.alerts || [];
+                const alerts = response.data || [];
                 setNotifications(alerts);
                 setUnreadCount(alerts.filter(n => !n.read).length);
             }
