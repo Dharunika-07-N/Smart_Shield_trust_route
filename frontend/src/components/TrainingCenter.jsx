@@ -24,7 +24,7 @@ const TrainingCenter = () => {
         addLog("Initiating model retraining sequence...");
         try {
             const response = await api.post('/training/retrain');
-            addLog(`Success: ${response.data.message}`);
+            addLog(`Success: ${response.message}`);
             setStats(prev => ({
                 ...prev,
                 last_trained: new Date().toLocaleDateString(),
