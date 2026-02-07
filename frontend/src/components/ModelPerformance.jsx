@@ -30,7 +30,7 @@ const ModelPerformance = () => {
         setLoading(true);
         try {
             const response = await api.get(`/monitoring/report/${selectedModel}`);
-            setReport(response.data);
+            setReport(response);
         } catch (error) {
             console.error("Error fetching report:", error);
         } finally {
