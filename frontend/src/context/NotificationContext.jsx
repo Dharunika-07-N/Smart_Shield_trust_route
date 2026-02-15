@@ -14,10 +14,11 @@ export const NotificationProvider = ({ children }) => {
     useEffect(() => {
         if (isAuthenticated) {
             // Notifications WebSocket
-            const wsUrl = `${API_ROOT_URL}/ws/notifications`.replace('http', 'ws');
+            const endpoint = '/ws/notifications';
 
             socketRef.current = createWebSocket(
-                wsUrl,
+                endpoint,
+                // onMessage
                 (data) => {
                     // Message handler
                     setNotifications(prev => [data, ...prev].slice(0, 20));
@@ -30,6 +31,19 @@ export const NotificationProvider = ({ children }) => {
                             icon: '/shield-icon.png'
                         });
                     }
+                },
+                // onOpen
+                () => {
+                    console.log('[Notifications] WebSocket connected successfully');
+                },
+                // onClose
+                () => {
+                    console.log('[Notifications] WebSocket disconnected');
+                },
+                // onError
+                (error) => {
+                    console.warn('[Notifications] WebSocket error - notifications will not be real-time');
+                    // App continues to work without WebSocket notifications
                 }
             );
 
