@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents, useMap, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
 import { api } from '../services/api';
-import { FiNavigation, FiClock, FiShield, FiMapPin, FiChevronRight } from 'react-icons/fi';
+import { FiNavigation, FiSearch, FiMenu, FiX, FiClock, FiShield, FiAlertTriangle, FiCloud, FiLayers } from 'react-icons/fi';
+import TrafficWeatherOverlay from './TrafficWeatherOverlay';
+import 'leaflet-routing-machine';
 import useLocation from '../hooks/useLocation';
 import SafetyHeatmap from './SafetyHeatmap';
 
@@ -68,7 +70,7 @@ const SafetyGauge = ({ score }) => {
   );
 };
 
-const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerClick }) => {
+const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerClick, showSafeZones = false }) => {
   const { location, loading: locationLoading, error: locationError } = useLocation();
   const [currentPos, setCurrentPos] = useState(null);
   const [destPos, setDestPos] = useState(null);
@@ -83,6 +85,8 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
   const [destQuery, setDestQuery] = useState('');
   const [searching, setSearching] = useState(null); // 'start' or 'destination' or null
   const [results, setResults] = useState([]);
+  const [showTraffic, setShowTraffic] = useState(false);
+  const [showWeather, setShowWeather] = useState(false);
   const [safetyOverlay, setSafetyOverlay] = useState(null);
   const [showSafetyOverlay, setShowSafetyOverlay] = useState(true);
 
@@ -99,6 +103,10 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
   const [eta, setEta] = useState(null);
   const [distanceRemaining, setDistanceRemaining] = useState(null);
 
+
+  // Safe Zones State
+  const [safeZones, setSafeZones] = useState([]);
+  const [loadingSafeZones, setLoadingSafeZones] = useState(false);
 
   // Fallback to New York
   const baseLat = location?.latitude || 40.7128;
@@ -211,6 +219,31 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
       return `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
     }
   };
+
+  // Fetch safe zones if enabled
+  useEffect(() => {
+    if (showSafeZones && currentPos) {
+      const fetchSafeZones = async () => {
+        setLoadingSafeZones(true);
+        try {
+          // Default to looking for all types
+          const zones = await api.getSafeZones({
+            location: { latitude: currentPos[0], longitude: currentPos[1] },
+            radius_meters: 5000,
+            zone_types: ["police_station", "hospital", "shop_24hr", "well_lit_area"]
+          });
+          if (Array.isArray(zones)) {
+            setSafeZones(zones);
+          }
+        } catch (err) {
+          console.error("Failed to fetch safe zones:", err);
+        } finally {
+          setLoadingSafeZones(false);
+        }
+      };
+      fetchSafeZones();
+    }
+  }, [showSafeZones, currentPos]);
 
   // Fetch alerts on mount and every 30s
   useEffect(() => {
@@ -557,7 +590,32 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
     const mapZoom = zoom || 13;
 
     return (
-      <div className="w-full h-full">
+      <div className="w-full h-full relative">
+        {/* Map Layers Controls */}
+        <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
+          <button
+            onClick={() => setShowSafetyOverlay(!showSafetyOverlay)}
+            className={`p-3 rounded-full shadow-lg transition-colors ${showSafetyOverlay ? 'bg-emerald-600 text-white' : 'bg-white text-gray-700'}`}
+            title="Toggle Safety Heatmap"
+          >
+            <FiShield className="w-6 h-6" />
+          </button>
+          <button
+            onClick={() => setShowTraffic(!showTraffic)}
+            className={`p-3 rounded-full shadow-lg transition-colors ${showTraffic ? 'bg-yellow-500 text-white' : 'bg-white text-gray-700'}`}
+            title="Toggle Traffic"
+          >
+            <FiLayers className="w-6 h-6" />
+          </button>
+          <button
+            onClick={() => setShowWeather(!showWeather)}
+            className={`p-3 rounded-full shadow-lg transition-colors ${showWeather ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+            title="Toggle Weather"
+          >
+            <FiCloud className="w-6 h-6" />
+          </button>
+        </div>
+
         <MapContainer
           center={mapCenter}
           zoom={mapZoom}
@@ -1111,6 +1169,69 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
                     ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
                     : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   }
+                />
+
+                {/* Safe Zones Markers */}
+                {showSafeZones && safeZones.map((zone) => (
+                  <Marker
+                    key={zone.id}
+                    position={[zone.location.lat, zone.location.lng]}
+                    icon={L.divIcon({
+                      className: 'safe-zone-marker',
+                      html: `<div style="
+                        background: ${zone.zone_type === 'hospital' ? '#ef4444' : zone.zone_type === 'police_station' ? '#3b82f6' : '#10b981'};
+                        color: white;
+                        width: 32px;
+                        height: 32px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        border: 2px solid white;
+                        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+                        font-size: 16px;
+                      ">
+                        ${zone.zone_type === 'hospital' ? '🏥' : zone.zone_type === 'police_station' ? '👮' : '🛡️'}
+                      </div>`,
+                      iconSize: [32, 32],
+                      iconAnchor: [16, 16]
+                    })}
+                  >
+                    <Popup>
+                      <div className="p-2 min-w-[200px]">
+                        <div className="font-bold text-base mb-1">{zone.name}</div>
+                        <div className="text-xs text-gray-500 mb-2 capitalize">{zone.zone_type.replace('_', ' ')}</div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                            Safe Zone
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            {(zone.distance_meters / 1000).toFixed(1)} km away
+                          </span>
+                        </div>
+                        {zone.address && (
+                          <div className="text-xs text-gray-600 border-t pt-2 mt-2">
+                            {zone.address}
+                          </div>
+                        )}
+                        <button
+                          className="w-full mt-3 bg-blue-600 text-white text-xs py-2 rounded-md hover:bg-blue-700 transition-colors"
+                          onClick={() => {
+                            setDestPos([zone.location.lat, zone.location.lng]);
+                            setDestQuery(zone.name);
+                          }}
+                        >
+                          Navigate Here
+                        </button>
+                      </div>
+                    </Popup>
+                  </Marker>
+                ))}
+
+                <TrafficWeatherOverlay
+                  showTraffic={showTraffic}
+                  showWeather={showWeather}
+                  center={currentPos || center || [baseLat, baseLon]}
                 />
 
                 <SafetyHeatmap show={showSafetyOverlay} />
