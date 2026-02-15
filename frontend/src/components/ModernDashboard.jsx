@@ -35,6 +35,9 @@ const ModernDashboard = () => {
     const [zoneSafety, setZoneSafety] = useState([]);
     const [weather, setWeather] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [mapZoom, setMapZoom] = useState(13);
+    const [showMapLayers, setShowMapLayers] = useState(false);
+    const [deliveryPartnerMarkers, setDeliveryPartnerMarkers] = useState([]);
 
     const sideBarItems = [
         { name: 'Dashboard', icon: FiActivity, badge: null },
@@ -130,6 +133,98 @@ const ModernDashboard = () => {
         return () => clearInterval(interval);
     }, [riderId]);
 
+    // Generate simulated delivery partner locations based on delivery queue
+    const generateDeliveryPartnerLocations = () => {
+        if (deliveryQueue.length === 0) return;
+
+        // Base coordinates for Chennai area
+        const baseCoords = {
+            lat: 13.0827,
+            lng: 80.2707
+        };
+
+        const markers = deliveryQueue.map((delivery, index) => {
+            // Generate random offset within ~10km radius
+            const latOffset = (Math.random() - 0.5) * 0.15;
+            const lngOffset = (Math.random() - 0.5) * 0.15;
+
+            const lat = baseCoords.lat + latOffset;
+            const lng = baseCoords.lng + lngOffset;
+
+            // Determine color based on status
+            let color = '#10b981'; // green for normal
+            if (delivery.status === 'urgent') color = '#ef4444'; // red
+            else if (delivery.status === 'normal') color = '#f59e0b'; // amber
+            else if (delivery.status === 'scheduled') color = '#3b82f6'; // blue
+
+            return {
+                position: [lat, lng],
+                color: color,
+                popup: `
+                    <div style="min-width: 200px;">
+                        <div style="font-weight: bold; font-size: 14px; margin-bottom: 4px;">${delivery.name}</div>
+                        <div style="font-size: 12px; color: #64748b; margin-bottom: 8px;">${delivery.location}</div>
+                        <div style="display: flex; gap: 8px; margin-bottom: 4px;">
+                            <span style="background: ${color}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold;">${delivery.status.toUpperCase()}</span>
+                            <span style="background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold;">Score: ${delivery.score}</span>
+                        </div>
+                        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">
+                            <div>📍 ${delivery.distance}</div>
+                            <div>⏱️ ${delivery.time}</div>
+                        </div>
+                    </div>
+                `,
+                icon: L.divIcon({
+                    className: 'delivery-partner-marker',
+                    html: `
+                        <div style="position: relative;">
+                            <div style="
+                                width: 32px;
+                                height: 32px;
+                                background: ${color};
+                                border: 3px solid white;
+                                border-radius: 50%;
+                                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                font-size: 16px;
+                                animation: pulse 2s infinite;
+                            ">🏍️</div>
+                            <div style="
+                                position: absolute;
+                                top: -8px;
+                                right: -8px;
+                                background: white;
+                                border: 2px solid ${color};
+                                border-radius: 50%;
+                                width: 20px;
+                                height: 20px;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                font-size: 10px;
+                                font-weight: bold;
+                                color: ${color};
+                            ">${delivery.score}</div>
+                        </div>
+                    `,
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 16]
+                })
+            };
+        });
+
+        setDeliveryPartnerMarkers(markers);
+    };
+
+    // Update delivery partner locations when delivery queue changes
+    useEffect(() => {
+        if (deliveryQueue.length > 0) {
+            generateDeliveryPartnerLocations();
+        }
+    }, [deliveryQueue]);
+
     const handleOptimizeRoute = async () => {
         try {
             const deliveryIds = deliveryQueue.map(d => d.id);
@@ -142,6 +237,58 @@ const ModernDashboard = () => {
             console.error('Error optimizing route:', error);
             alert('Failed to optimize route. Please try again.');
         }
+    };
+
+    const handleFindSafeZone = () => {
+        // Navigate to Safety Zones tab to show safe zones on map
+        setActiveTab('Safety Zones');
+    };
+
+    const handleReportIssue = () => {
+        // Navigate to Feedback tab to report safety concerns
+        setActiveTab('Feedback');
+    };
+
+    const handleEmergency = () => {
+        // Emergency contact numbers
+        const emergencyNumbers = [
+            { name: 'Police', number: '100' },
+            { name: 'Ambulance', number: '108' },
+            { name: 'Women Helpline', number: '1091' },
+            { name: 'Company Support', number: '1800-XXX-XXXX' }
+        ];
+
+        const message = emergencyNumbers
+            .map(contact => `${contact.name}: ${contact.number}`)
+            .join('\n');
+
+        if (window.confirm(`Emergency Contacts:\n\n${message}\n\nWould you like to call Police (100)?`)) {
+            window.location.href = 'tel:100';
+        }
+    };
+
+    const handleZoomIn = () => {
+        setMapZoom(prev => Math.min(prev + 1, 18));
+    };
+
+    const handleZoomOut = () => {
+        setMapZoom(prev => Math.max(prev - 1, 3));
+    };
+
+    const handleRecenter = () => {
+        if (currentLocation) {
+            // Reset to current location
+            setMapZoom(13);
+        }
+    };
+
+    const handleToggleLayers = () => {
+        setShowMapLayers(!showMapLayers);
+    };
+
+    const handleZoneClick = (zoneName) => {
+        // Navigate to Safety Zones tab with the selected zone
+        setActiveTab('Safety Zones');
     };
 
 
@@ -275,21 +422,24 @@ const ModernDashboard = () => {
                                         {/* Map Visualization */}
                                         <div className="flex-1 rounded-2xl overflow-hidden border border-slate-100 relative bg-slate-50">
                                             <div className="absolute inset-0 z-0">
-                                                <RouteMap variant="light-minimal" />
+                                                <RouteMap
+                                                    variant="light-minimal"
+                                                    markers={deliveryPartnerMarkers}
+                                                />
                                             </div>
 
                                             {/* Map Controls */}
                                             <div className="absolute right-4 top-4 flex flex-col gap-2 z-10">
-                                                <button className="w-10 h-10 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-all shadow-md">
+                                                <button onClick={handleZoomIn} title="Zoom In" className="w-10 h-10 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-all shadow-md">
                                                     <FiPlus />
                                                 </button>
-                                                <button className="w-10 h-10 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-all shadow-md">
+                                                <button onClick={handleZoomOut} title="Zoom Out" className="w-10 h-10 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-all shadow-md">
                                                     <FiMinus />
                                                 </button>
-                                                <button className="w-10 h-10 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-all shadow-md">
+                                                <button onClick={handleRecenter} title="Recenter" className="w-10 h-10 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-all shadow-md">
                                                     <FiTarget />
                                                 </button>
-                                                <button className="mt-4 w-10 h-10 bg-indigo-600 border border-indigo-500 rounded-lg flex items-center justify-center text-white hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20">
+                                                <button onClick={handleToggleLayers} title="Toggle Layers" className={`mt-4 w-10 h-10 border rounded-lg flex items-center justify-center text-white transition-all shadow-lg ${showMapLayers ? 'bg-indigo-700 border-indigo-600' : 'bg-indigo-600 border-indigo-500'} hover:bg-indigo-700 shadow-indigo-500/20`}>
                                                     <FiLayers />
                                                 </button>
                                             </div>
@@ -394,17 +544,17 @@ const ModernDashboard = () => {
                                                 <span className="text-[10px] font-black uppercase tracking-tight">Optimize Route</span>
                                                 <span className="text-[8px] opacity-70">AI-powered</span>
                                             </button>
-                                            <button className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-50 border border-slate-200 hover:border-indigo-500/30 text-indigo-600 transition-all group">
+                                            <button onClick={handleFindSafeZone} className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-50 border border-slate-200 hover:border-indigo-500/30 text-indigo-600 transition-all group">
                                                 <FiShield className="text-2xl mb-2 group-hover:scale-110 transition-transform" />
                                                 <span className="text-[10px] font-black uppercase tracking-tight text-slate-800">Find Safe Zone</span>
                                                 <span className="text-[8px] text-slate-500">Nearest spot</span>
                                             </button>
-                                            <button className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-50 border border-slate-200 hover:border-indigo-500/30 text-indigo-600 transition-all group">
+                                            <button onClick={handleReportIssue} className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-50 border border-slate-200 hover:border-indigo-500/30 text-indigo-600 transition-all group">
                                                 <FiAlertTriangle className="text-2xl mb-2 group-hover:scale-110 transition-transform" />
                                                 <span className="text-[10px] font-black uppercase tracking-tight text-slate-800">Report Issue</span>
                                                 <span className="text-[8px] text-slate-500">Safety concern</span>
                                             </button>
-                                            <button className="flex flex-col items-center justify-center p-4 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white transition-all group shadow-md shadow-orange-600/10">
+                                            <button onClick={handleEmergency} className="flex flex-col items-center justify-center p-4 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white transition-all group shadow-md shadow-orange-600/10">
                                                 <FiPhone className="text-2xl mb-2 group-hover:scale-110 transition-transform" />
                                                 <span className="text-[10px] font-black uppercase tracking-tight">Emergency</span>
                                                 <span className="text-[8px] opacity-70">Quick dial</span>
@@ -437,7 +587,7 @@ const ModernDashboard = () => {
                                                     };
 
                                                     return (
-                                                        <div key={idx} className="space-y-2">
+                                                        <div key={idx} className="space-y-2 cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors" onClick={() => handleZoneClick(zone.name)}>
                                                             <div className="flex justify-between items-end">
                                                                 <div>
                                                                     <h4 className="text-sm font-bold text-slate-800 leading-none">{zone.name}</h4>
