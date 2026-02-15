@@ -579,24 +579,26 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
           )}
 
           {/* Custom Markers from Props */}
-          {markers && markers.map((marker, idx) => (
-            <Marker
-              key={idx}
-              position={marker.position}
-              icon={marker.icon || L.divIcon({
-                className: 'map-marker',
-                html: `<div style="background:${marker.color || '#10b981'};width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.2)"></div>`
-              })}
-              eventHandlers={{
-                click: () => onMarkerClick && onMarkerClick(marker)
-              }}
-            >
-              {marker.popup && <Popup>{marker.popup}</Popup>}
-            </Marker>
-          ))}
+          {markers && markers
+            .filter(marker => marker.position && Array.isArray(marker.position) && marker.position.length === 2 && !isNaN(marker.position[0]) && !isNaN(marker.position[1]))
+            .map((marker, idx) => (
+              <Marker
+                key={idx}
+                position={marker.position}
+                icon={marker.icon || L.divIcon({
+                  className: 'map-marker',
+                  html: `<div style="background:${marker.color || '#10b981'};width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.2)"></div>`
+                })}
+                eventHandlers={{
+                  click: () => onMarkerClick && onMarkerClick(marker)
+                }}
+              >
+                {marker.popup && <Popup>{marker.popup}</Popup>}
+              </Marker>
+            ))}
 
           {/* Route Polyline from Props */}
-          {route && route.length > 0 && (
+          {route && route.length > 0 && route.every(pos => Array.isArray(pos) && pos.length === 2 && !isNaN(pos[0]) && !isNaN(pos[1])) && (
             <Polyline
               positions={route}
               pathOptions={{
@@ -608,39 +610,7 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
             />
           )}
 
-          {/* Fallback Mock Data if no route/markers provided (for compatibility/demo) */}
-          {!route && !markers && (
-            <>
-              <Marker
-                position={[mapCenter[0], mapCenter[1] - 0.02]}
-                icon={L.divIcon({
-                  className: 'map-num-marker',
-                  html: `<div style="width:24px;height:24px;background:#10b981;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:12px;border:2px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'white'};box-shadow:0 2px 4px rgba(0,0,0,0.1)">1</div>`
-                })}
-              />
-              <Marker
-                position={[mapCenter[0] + 0.01, mapCenter[1] - 0.01]}
-                icon={L.divIcon({
-                  className: 'map-num-marker',
-                  html: `<div style="width:24px;height:24px;background:#10b981;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:12px;border:2px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'white'};box-shadow:0 2px 4px rgba(0,0,0,0.1)">2</div>`
-                })}
-              />
-              <Polyline
-                positions={[
-                  [mapCenter[0], mapCenter[1] - 0.02],
-                  [mapCenter[0] + 0.01, mapCenter[1] - 0.01],
-                  [mapCenter[0] - 0.01, mapCenter[1] + 0.01],
-                  [mapCenter[0], mapCenter[1] + 0.02],
-                ]}
-                pathOptions={{
-                  color: '#10b981',
-                  weight: 5,
-                  opacity: 0.8,
-                  dashArray: '10, 10'
-                }}
-              />
-            </>
-          )}
+          {/* No fallback mock data - only show routes when explicitly provided */}
 
           <MapUpdater center={mapCenter} />
         </MapContainer>
