@@ -60,18 +60,20 @@ const SafetyHeatmap = ({ show = true }) => {
 
     return (
         <>
-            {heatmapData.map((point, idx) => (
-                <Circle
-                    key={idx}
-                    center={[point.lat, point.lng]}
-                    radius={500} // meters
-                    pathOptions={{
-                        fillColor: getColor(point.intensity),
-                        fillOpacity: 0.15,
-                        stroke: false
-                    }}
-                />
-            ))}
+            {heatmapData
+                .filter(point => point && typeof point.lat === 'number' && typeof point.lng === 'number' && !isNaN(point.lat) && !isNaN(point.lng))
+                .map((point, idx) => (
+                    <Circle
+                        key={idx}
+                        center={[point.lat, point.lng]}
+                        radius={500} // meters
+                        pathOptions={{
+                            fillColor: getColor(point.intensity || 0.5),
+                            fillOpacity: 0.15,
+                            stroke: false
+                        }}
+                    />
+                ))}
         </>
     );
 };
