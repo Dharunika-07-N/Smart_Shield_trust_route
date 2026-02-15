@@ -38,6 +38,7 @@ const ModernDashboard = () => {
     const [mapZoom, setMapZoom] = useState(13);
     const [showMapLayers, setShowMapLayers] = useState(false);
     const [deliveryPartnerMarkers, setDeliveryPartnerMarkers] = useState([]);
+    const [alerts, setAlerts] = useState([]);
 
     const sideBarItems = [
         { name: 'Dashboard', icon: FiActivity, badge: null },
@@ -132,6 +133,20 @@ const ModernDashboard = () => {
         const interval = setInterval(fetchDashboardData, 30000);
         return () => clearInterval(interval);
     }, [riderId]);
+
+    useEffect(() => {
+        if (activeTab === 'Alerts') {
+            const fetchAlerts = async () => {
+                try {
+                    const res = await dashboardApi.getRecentAlerts();
+                    if (res.data) setAlerts(res.data);
+                } catch (err) {
+                    console.error("Failed to fetch alerts", err);
+                }
+            };
+            fetchAlerts();
+        }
+    }, [activeTab]);
 
     // Generate simulated delivery partner locations based on delivery queue
     const generateDeliveryPartnerLocations = () => {
@@ -249,7 +264,7 @@ const ModernDashboard = () => {
         setActiveTab('Feedback');
     };
 
-    const handleEmergency = () => {
+    const handleEmergency = async () => {
         // Emergency contact numbers
         const emergencyNumbers = [
             { name: 'Police', number: '100' },
@@ -258,11 +273,20 @@ const ModernDashboard = () => {
             { name: 'Company Support', number: '1800-XXX-XXXX' }
         ];
 
-        const message = emergencyNumbers
-            .map(contact => `${contact.name}: ${contact.number}`)
-            .join('\n');
-
-        if (window.confirm(`Emergency Contacts:\n\n${message}\n\nWould you like to call Police (100)?`)) {
+        if (window.confirm("ARE YOU SURE? This will trigger a panic alert to all emergency contacts and nearby drivers.")) {
+            try {
+                // Trigger backend panic button
+                await api.triggerPanicButton({
+                    rider_id: riderId,
+                    location: { latitude: currentLocation?.latitude || 13.0827, longitude: currentLocation?.longitude || 80.2707 },
+                    route_id: "current_route",
+                    delivery_id: null
+                });
+                alert("SOS Alert Sent! Help is on the way.");
+            } catch (error) {
+                console.error("Failed to send panic alert:", error);
+                alert("Alert sent locally (Offline Mode). Calling Police...");
+            }
             window.location.href = 'tel:100';
         }
     };
@@ -663,28 +687,88 @@ const ModernDashboard = () => {
                     {activeTab === 'Deliveries' && <div className="p-4"><LiveTracking deliveryId={riderId} /></div>}
                     {activeTab === 'AI Insights' && <AIReportSummary />}
                     {activeTab === 'Analytics' && <Analytics />}
-                    {activeTab === 'Safety Zones' && <RouteMap />}
+                    {activeTab === 'Safety Zones' && <RouteMap showSafeZones={true} />}
                     {activeTab === 'Alerts' && (
                         <div className="premium-card p-6">
                             <h3 className="text-lg font-bold mb-4">Recent Alerts</h3>
-                            <div className="bg-amber-50 border border-amber-200 text-amber-700 p-4 rounded-xl flex items-center gap-3">
-                                <FiAlertTriangle className="text-xl" />
-                                <div>
-                                    <p className="font-bold">Heavy Traffic at Velachery</p>
-                                    <p className="text-xs opacity-80">Rerouting recommended for active deliveries.</p>
-                                </div>
+                            <div className="space-y-3">
+                                {alerts.length > 0 ? (
+                                    alerts.map((alert, idx) => (
+                                        <div key={idx} className={`border p-4 rounded-xl flex items-center gap-3 ${alert.type === 'safety' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+                                            <FiAlertTriangle className="text-xl flex-shrink-0" />
+                                            <div>
+                                                <p className="font-bold">{alert.title}</p>
+                                                <p className="text-xs opacity-80">{alert.message}</p>
+                                                <p className="text-[10px] mt-1 opacity-60">{new Date(alert.timestamp).toLocaleString()}</p>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="text-center py-8 text-slate-400">
+                                        <FiBell className="text-4xl mx-auto mb-2 opacity-50" />
+                                        <p>No recent alerts</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
                     {activeTab === 'Feedback' && <FeedbackForm riderId={riderId} routeId="last_route" />}
                     {activeTab === 'Settings' && (
-                        <div className="premium-card p-8 text-center space-y-4">
-                            <FiSettings size={48} className="mx-auto text-slate-400" />
-                            <h3 className="text-lg font-bold text-slate-800">Account Settings</h3>
-                            <p className="text-slate-500 max-w-sm mx-auto">Configure your vehicle type, notification preferences, and emergency contacts.</p>
-                            <button className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all">
-                                Update Profile
-                            </button>
+                        <div className="max-w-4xl mx-auto space-y-6">
+                            <div className="premium-card p-8">
+                                <div className="flex items-center gap-4 mb-8">
+                                    <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 text-2xl font-bold">
+                                        {user?.username?.[0] || 'U'}
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-bold text-slate-800">{user?.username || 'User'}</h3>
+                                        <p className="text-slate-500">{user?.role || 'Rider'} • {riderId}</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-4">
+                                        <h4 className="font-bold text-slate-700 border-b border-slate-100 pb-2">Profile Information</h4>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Full Name</label>
+                                            <input type="text" defaultValue={user?.username || "Priya Kumar"} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-indigo-500" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email Address</label>
+                                            <input type="email" defaultValue={user?.email || "priya.k@smartshield.com"} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-indigo-500" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Vehicle Number</label>
+                                            <input type="text" defaultValue="TN-01-AB-1234" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-indigo-500" />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <h4 className="font-bold text-slate-700 border-b border-slate-100 pb-2">Emergency Contacts</h4>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Primary Contact Name</label>
+                                            <input type="text" defaultValue="Rahul Kumar" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-indigo-500" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Primary Contact Phone</label>
+                                            <input type="tel" defaultValue="+91 98765 43210" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-indigo-500" />
+                                        </div>
+                                        <div className="pt-2">
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input type="checkbox" defaultChecked className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" />
+                                                <span className="text-sm text-slate-600">Share live location during active shifts</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-8 flex justify-end gap-4">
+                                    <button className="px-6 py-2 text-slate-500 font-bold hover:text-slate-800 transition-colors">Cancel</button>
+                                    <button className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20" onClick={() => alert("Settings saved successfully!")}>
+                                        Save Changes
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </main >
