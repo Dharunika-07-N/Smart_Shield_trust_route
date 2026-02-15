@@ -65,7 +65,7 @@ export const getTrafficSegments = async (bounds) => {
  */
 export const getRouteTraffic = async (coordinates) => {
     try {
-        const response = await axios.post(`${API_BASE_URL}/api/traffic/route`, {
+        const response = await axios.post(`${API_BASE_URL}/api/traffic/route/analysis`, {
             coordinates
         });
 
