@@ -94,6 +94,15 @@ class Settings(BaseSettings):
     SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "True").lower() == "true"
     FROM_EMAIL: str = os.getenv("FROM_EMAIL", "dharunikaktm@gmail.com")
     EMERGENCY_EMAIL: str = os.getenv("EMERGENCY_EMAIL", "dharunikaktm@gmail.com")
+
+    # Twilio Configuration (for SMS alerts)
+    TWILIO_ACCOUNT_SID: str = os.getenv("TWILIO_ACCOUNT_SID", "")
+    TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "")
+    TWILIO_PHONE_NUMBER: str = os.getenv("TWILIO_PHONE_NUMBER", "")
+    EMERGENCY_PHONE: str = os.getenv("EMERGENCY_PHONE", "") # Admin/Emergency contact phone
+    
+    # Monitoring (Sentry)
+    SENTRY_DSN: str = os.getenv("SENTRY_DSN", "")
     
     model_config = {
         "env_file": str(Path(__file__).parent.parent / ".env"),
