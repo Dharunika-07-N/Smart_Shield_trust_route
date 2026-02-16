@@ -152,6 +152,7 @@ export const api = {
 
   // Safety Features
   triggerPanicButton: (data) => apiClient.post('/safety/panic-button', data),
+  resolvePanicButton: (data) => apiClient.post('/safety/panic-button/resolve', data),
   checkIn: (data) => apiClient.post('/safety/check-in', data),
   getSafeZones: (data) => apiClient.post('/safety/safe-zones', data),
   createRideAlong: (data) => apiClient.post('/safety/ride-along', data),
