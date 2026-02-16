@@ -173,6 +173,33 @@ def update_database_schema():
     """)
     print("Ensured model_performance table exists")
 
+    # 7. Safety Feedback - Ensure columns for Phase 2
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS safety_feedback (
+        id TEXT PRIMARY KEY,
+        route_id TEXT NOT NULL,
+        rider_id TEXT,
+        feedback_type TEXT NOT NULL,
+        rating INTEGER NOT NULL,
+        location JSON,
+        comments TEXT,
+        incident_type TEXT,
+        time_of_day TEXT DEFAULT 'day',
+        date_submitted DATETIME DEFAULT CURRENT_TIMESTAMP,
+        processed BOOLEAN DEFAULT 0
+    );
+    """)
+    
+    # Try adding columns if they might be missing in an existing table
+    for col, col_type in [("processed", "BOOLEAN DEFAULT 0"), ("time_of_day", "TEXT DEFAULT 'day'")]:
+        try:
+            cursor.execute(f"ALTER TABLE safety_feedback ADD COLUMN {col} {col_type}")
+            print(f"Added column {col} to safety_feedback")
+        except sqlite3.OperationalError:
+            pass
+
+    conn.commit()
+
     conn.commit()
     conn.close()
     print("Database schema update complete.")
