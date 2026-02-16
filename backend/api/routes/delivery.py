@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 import json
 from datetime import datetime
+import asyncio
 
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
@@ -49,7 +50,10 @@ async def optimize_route_simple(
     logger.info(f"Optimize route request: origin={origin}, destination={destination}")
     
     # Get multiple route alternatives using OSRM (FREE!)
-    directions = maps_service_instance.get_directions(origin, destination, alternatives=True)
+    if hasattr(maps_service_instance, 'get_directions') and asyncio.iscoroutinefunction(maps_service_instance.get_directions):
+        directions = await maps_service_instance.get_directions(origin, destination, alternatives=True)
+    else:
+        directions = maps_service_instance.get_directions(origin, destination, alternatives=True)
     
     if not directions:
         logger.error(f"Failed to get directions for {origin} to {destination}")

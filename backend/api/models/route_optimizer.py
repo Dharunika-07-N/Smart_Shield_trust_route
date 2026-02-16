@@ -160,17 +160,6 @@ class RouteOptimizer:
         # Create distance matrix
         distance_matrix = self._create_distance_matrix(all_points)
         
-        # Create cost matrix based on objectives
-        cost_matrix = self._create_cost_matrix(
-            all_points,
-            distance_matrix,
-            optimize_for,
-            rider_info,
-            stops,
-            departure_time,
-            active_alerts
-        )
-        
         # Optimize using multiple algorithms
         if len(stops) == 1:
             # For finding alternatives between A and B
@@ -181,10 +170,23 @@ class RouteOptimizer:
                 rider_info,
                 departure_time
             )
-        elif settings.OPTIMIZATION_ALGORITHM == "astar" and HAS_ASTAR:
+
+        # Create cost matrix based on objectives only if needed for multi-stop optimization
+        cost_matrix = await self._create_cost_matrix(
+            all_points,
+            distance_matrix,
+            optimize_for,
+            rider_info,
+            stops,
+            departure_time,
+            active_alerts
+        )
+
+        sequence = []
+        if settings.OPTIMIZATION_ALGORITHM == "astar" and HAS_ASTAR:
             # Use A* algorithm for optimal pathfinding
             logger.info("Using A* algorithm for route optimization")
-            sequence = self._optimize_astar(starting_point, stops, rider_info, departure_time)
+            sequence = await self._optimize_astar(starting_point, stops, rider_info, departure_time)
         elif settings.OPTIMIZATION_ALGORITHM == "genetic":
             sequence = self._optimize_genetic(cost_matrix, len(stops))
         elif settings.OPTIMIZATION_ALGORITHM == "nearest_neighbor":
@@ -246,7 +248,7 @@ class RouteOptimizer:
         
         return matrix
     
-    def _create_cost_matrix(
+    async def _create_cost_matrix(
         self,
         points: List[Coordinate],
         distance_matrix: List[List[float]],
@@ -343,9 +345,15 @@ class RouteOptimizer:
                     # Traffic cost (considering current traffic conditions)
                     if "traffic" in objectives or "time" in objectives:
                         try:
-                            traffic_level, _, traffic_duration = self.traffic_service.get_traffic_level(
-                                points[i], points[j]
-                            )
+                            # Use await for async traffic service
+                            if hasattr(self.traffic_service, 'get_traffic_level') and asyncio.iscoroutinefunction(self.traffic_service.get_traffic_level):
+                                traffic_level, _, traffic_duration = await self.traffic_service.get_traffic_level(
+                                    points[i], points[j]
+                                )
+                            else:
+                                traffic_level, _, traffic_duration = self.traffic_service.get_traffic_level(
+                                    points[i], points[j]
+                                )
                             # Add traffic penalty to cost
                             if traffic_level == 'high':
                                 cost += traffic_duration / 60.0 * 0.3  # 30% penalty for high traffic
@@ -454,7 +462,7 @@ class RouteOptimizer:
         
         return route
 
-    def _optimize_astar(
+    async def _optimize_astar(
         self,
         starting_point: Coordinate,
         stops: List[DeliveryStop],
@@ -484,9 +492,14 @@ class RouteOptimizer:
         for stop in stops:
             coord = (stop.coordinates.latitude, stop.coordinates.longitude)
             try:
-                traffic_level, _, _ = self.traffic_service.get_traffic_level(
-                    starting_point, stop.coordinates
-                )
+                if hasattr(self.traffic_service, 'get_traffic_level') and asyncio.iscoroutinefunction(self.traffic_service.get_traffic_level):
+                    traffic_level, _, _ = await self.traffic_service.get_traffic_level(
+                        starting_point, stop.coordinates
+                    )
+                else:
+                    traffic_level, _, _ = self.traffic_service.get_traffic_level(
+                        starting_point, stop.coordinates
+                    )
                 traffic_data[coord] = traffic_level
             except:
                 traffic_data[coord] = 'medium'
@@ -575,13 +588,22 @@ class RouteOptimizer:
             next_point = stop.coordinates
             
             # Get traffic-aware directions
-            directions = self.maps_service.get_directions(
-                origin=current_point,
-                destination=next_point,
-                mode="driving",
-                departure_time=dep_timestamp,
-                traffic_model="best_guess"
-            )
+            if hasattr(self.maps_service, 'get_directions') and asyncio.iscoroutinefunction(self.maps_service.get_directions):
+                directions = await self.maps_service.get_directions(
+                    origin=current_point,
+                    destination=next_point,
+                    mode="driving",
+                    departure_time=dep_timestamp,
+                    traffic_model="best_guess"
+                )
+            else:
+                directions = self.maps_service.get_directions(
+                    origin=current_point,
+                    destination=next_point,
+                    mode="driving",
+                    departure_time=dep_timestamp,
+                    traffic_model="best_guess"
+                )
             
             # Extract route geometry if available
             route_coords = None
@@ -595,9 +617,14 @@ class RouteOptimizer:
             # Get traffic-aware duration
             traffic_level = "low"
             try:
-                traffic_level, _, duration = self.traffic_service.get_traffic_level(
-                    current_point, next_point
-                )
+                if hasattr(self.traffic_service, 'get_traffic_level') and asyncio.iscoroutinefunction(self.traffic_service.get_traffic_level):
+                    traffic_level, _, duration = await self.traffic_service.get_traffic_level(
+                        current_point, next_point
+                    )
+                else:
+                    traffic_level, _, duration = self.traffic_service.get_traffic_level(
+                        current_point, next_point
+                    )
             except Exception:
                 # Fallback to average speed if traffic service fails
                 duration = distance / 8.33
@@ -714,9 +741,14 @@ class RouteOptimizer:
             # Get traffic level for this segment
             traffic_level = "low"
             try:
-                traffic_level, _, _ = self.traffic_service.get_traffic_level(
-                    current_point, next_point
-                )
+                if hasattr(self.traffic_service, 'get_traffic_level') and asyncio.iscoroutinefunction(self.traffic_service.get_traffic_level):
+                    traffic_level, _, _ = await self.traffic_service.get_traffic_level(
+                        current_point, next_point
+                    )
+                else:
+                    traffic_level, _, _ = self.traffic_service.get_traffic_level(
+                        current_point, next_point
+                    )
             except Exception:
                 pass
             
@@ -786,13 +818,22 @@ class RouteOptimizer:
         dep_timestamp = int(departure_time.timestamp()) if departure_time else None
         
         # Get all route variations
-        all_directions = self.maps_service.get_all_directions(
-            origin=starting_point,
-            destination=stop.coordinates,
-            mode="driving",
-            departure_time=dep_timestamp,
-            traffic_model="best_guess"
-        )
+        if hasattr(self.maps_service, 'get_all_directions') and asyncio.iscoroutinefunction(self.maps_service.get_all_directions):
+            all_directions = await self.maps_service.get_all_directions(
+                origin=starting_point,
+                destination=stop.coordinates,
+                mode="driving",
+                departure_time=dep_timestamp,
+                traffic_model="best_guess"
+            )
+        else:
+            all_directions = self.maps_service.get_all_directions(
+                origin=starting_point,
+                destination=stop.coordinates,
+                mode="driving",
+                departure_time=dep_timestamp,
+                traffic_model="best_guess"
+            )
         
         candidates = []
         
