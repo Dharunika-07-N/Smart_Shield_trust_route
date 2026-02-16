@@ -2,12 +2,13 @@
 OSRM (Open Source Routing Machine) Service - FREE Alternative to Google Maps
 No API key required, no billing, completely free!
 """
-import requests
+import httpx
 from typing import List, Dict, Optional, Tuple
 import polyline
 from datetime import datetime
 import sys
 from pathlib import Path
+import asyncio
 
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
@@ -36,7 +37,7 @@ class OSRMService:
                 return (point['latitude'], point['longitude'])
         return point
     
-    def get_directions(
+    async def get_directions(
         self,
         origin: any,
         destination: any,
@@ -73,7 +74,8 @@ class OSRMService:
                 'alternatives': 'true' if alternatives else 'false'
             }
             
-            response = requests.get(url, params=params, timeout=10)
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                response = await client.get(url, params=params)
             
             if response.status_code == 200:
                 data = response.json()
@@ -216,7 +218,7 @@ class OSRMService:
         
         return [route]
     
-    def geocode_address(self, address: str) -> Optional[Dict[str, float]]:
+    async def geocode_address(self, address: str) -> Optional[Dict[str, float]]:
         """
         Geocode address using Nominatim (OpenStreetMap) - FREE!
         No API key needed!
@@ -232,7 +234,8 @@ class OSRMService:
                 'User-Agent': 'SmartShield/1.0'  # Required by Nominatim
             }
             
-            response = requests.get(url, params=params, headers=headers, timeout=5)
+            async with httpx.AsyncClient(timeout=5.0, headers=headers) as client:
+                response = await client.get(url, params=params)
             
             if response.status_code == 200:
                 data = response.json()
@@ -249,7 +252,7 @@ class OSRMService:
             logger.error(f"Geocoding error: {e}")
             return None
     
-    def reverse_geocode(self, lat: float, lng: float) -> Optional[str]:
+    async def reverse_geocode(self, lat: float, lng: float) -> Optional[str]:
         """
         Reverse geocode coordinates using Nominatim - FREE!
         """
@@ -264,7 +267,8 @@ class OSRMService:
                 'User-Agent': 'SmartShield/1.0'
             }
             
-            response = requests.get(url, params=params, headers=headers, timeout=5)
+            async with httpx.AsyncClient(timeout=5.0, headers=headers) as client:
+                response = await client.get(url, params=params)
             
             if response.status_code == 200:
                 data = response.json()
@@ -291,9 +295,9 @@ class OSRMService:
         
         return R * c
     
-    def get_all_directions(self, origin: any, destination: any, **kwargs) -> List[Dict]:
+    async def get_all_directions(self, origin: any, destination: any, **kwargs) -> List[Dict]:
         """Get all route variations (for RouteOptimizer compatibility)"""
-        return self.get_directions(origin, destination, alternatives=True, **kwargs)
+        return await self.get_directions(origin, destination, alternatives=True, **kwargs)
     
     def geocode(self, address: str) -> Optional[Coordinate]:
         """Geocode an address (for compatibility)"""

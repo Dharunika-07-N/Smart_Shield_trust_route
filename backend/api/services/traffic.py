@@ -14,6 +14,8 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 from enum import Enum
+import asyncio
+import httpx
 
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
@@ -52,7 +54,7 @@ class TrafficSegment:
 class TrafficDataProvider:
     """Base class for traffic data providers"""
     
-    def get_traffic_data(self, bbox: Tuple[float, float, float, float]) -> List[TrafficSegment]:
+    async def get_traffic_data(self, bbox: Tuple[float, float, float, float]) -> List[TrafficSegment]:
         """Get traffic data for a bounding box: (min_lat, min_lng, max_lat, max_lng)"""
         raise NotImplementedError
 
@@ -64,14 +66,15 @@ class OpenTrafficProvider(TrafficDataProvider):
         self.api_url = api_url
         self.session = requests.Session()
     
-    def get_traffic_data(self, bbox: Tuple[float, float, float, float]) -> List[TrafficSegment]:
+    async def get_traffic_data(self, bbox: Tuple[float, float, float, float]) -> List[TrafficSegment]:
         try:
             min_lat, min_lng, max_lat, max_lng = bbox
             endpoint = f"{self.api_url}/tiles/speeds"
             params = {'bbox': f"{min_lng},{min_lat},{max_lng},{max_lat}", 'format': 'json'}
             
             # Short timeout to not block
-            response = self.session.get(endpoint, params=params, timeout=2)
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                response = await client.get(endpoint, params=params)
             
             if response.status_code == 200:
                 return self._parse_opentraffic_response(response.json())
@@ -119,18 +122,20 @@ class OSMTrafficEstimator(TrafficDataProvider):
         self.overpass_url = "https://overpass-api.de/api/interpreter"
         self.session = requests.Session()
     
-    def get_traffic_data(self, bbox: Tuple[float, float, float, float]) -> List[TrafficSegment]:
+    async def get_traffic_data(self, bbox: Tuple[float, float, float, float]) -> List[TrafficSegment]:
         try:
-            return self._estimate_traffic(self._fetch_osm_roads(bbox))
+            roads = await self._fetch_osm_roads(bbox)
+            return self._estimate_traffic(roads)
         except Exception as e:
             logger.warning(f"OSM estimation failed: {e}")
             return []
     
-    def _fetch_osm_roads(self, bbox: Tuple[float, float, float, float]) -> List[Dict]:
+    async def _fetch_osm_roads(self, bbox: Tuple[float, float, float, float]) -> List[Dict]:
         min_lat, min_lng, max_lat, max_lng = bbox
-        query = f"""[out:json][timeout:10];(way["highway"~"motorway|trunk|primary|secondary"]({min_lat},{min_lng},{max_lat},{max_lng}););out geom;"""
+        query = f"""[out:json][timeout:3];(way["highway"~"motorway|trunk|primary|secondary"]({min_lat},{min_lng},{max_lat},{max_lng}););out geom;"""
         try:
-            resp = self.session.post(self.overpass_url, data={'data': query}, timeout=10)
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                resp = await client.post(self.overpass_url, data={'data': query})
             return resp.json().get('elements', []) if resp.status_code == 200 else []
         except Exception: return []
 
@@ -188,14 +193,14 @@ class TrafficDataAggregator:
         self.providers.append((priority, provider))
         self.providers.sort(key=lambda x: x[0], reverse=True)
 
-    def get_traffic_data(self, bbox: Tuple[float, float, float, float]) -> List[TrafficSegment]:
+    async def get_traffic_data(self, bbox: Tuple[float, float, float, float]) -> List[TrafficSegment]:
         key = f"{bbox}"
         if key in self.cache:
             t, data = self.cache[key]
             if datetime.now() - t < self.cache_duration: return data
         
         for _, p in self.providers:
-            data = p.get_traffic_data(bbox)
+            data = await p.get_traffic_data(bbox)
             if data:
                 self.cache[key] = (datetime.now(), data)
                 return data
@@ -246,7 +251,7 @@ class TrafficService:
             for s in segments
         ]
 
-    def get_traffic_level(self, start: Coordinate, end: Coordinate, use_api: bool = False) -> Tuple[str, float, float]:
+    async def get_traffic_level(self, start: Coordinate, end: Coordinate, use_api: bool = False) -> Tuple[str, float, float]:
         """Get traffic level for a segment (start->end)."""
         # Try to use aggregator for real data along this path
         # Construct a small bbox around the segment
@@ -258,7 +263,7 @@ class TrafficService:
             max(start.longitude, end.longitude) + margin
         )
         
-        segments = aggregator.get_traffic_data(bbox)
+        segments = await aggregator.get_traffic_data(bbox)
         
         # Simple match: if any segment in bbox is congested, report it
         # This is a simplification; ideal would be geospatial matching
