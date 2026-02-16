@@ -12,6 +12,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 from api.schemas.delivery import Coordinate
 from api.services.maps import MapsService
 from api.services.email import EmailService
+from api.services.sms import SMSService
 from database.models import (
     Rider, PanicAlert, RiderCheckIn, SafeZone, RideAlong,
     DeliveryCompany, DeliveryStatus, BuddyPair, User
@@ -28,6 +29,7 @@ class SafetyService:
     def __init__(self):
         self.maps_service = MapsService()
         self.email_service = EmailService()
+        self.sms_service = SMSService()
         self.hospitals = self._load_hospitals()
     
     def _load_hospitals(self) -> List[Dict]:
@@ -44,7 +46,7 @@ class SafetyService:
             logger.error(f"Error loading hospitals in SafetyService: {e}")
         return []
     
-    def trigger_panic_button(
+    async def trigger_panic_button(
         self,
         db: Session,
         rider_id: str,
@@ -95,7 +97,7 @@ class SafetyService:
             
             for contact in emergency_contacts:
                 try:
-                    success = self._notify_emergency_contact(contact, rider, alert)
+                    success = await self._notify_emergency_contact(contact, rider, alert)
                     if success:
                         alerted_contacts.append({
                             "name": contact.get("name"),
@@ -117,11 +119,29 @@ class SafetyService:
             except Exception as email_err:
                 logger.error(f"Critical error sending system SOS email: {email_err}")
             
+            # Send SMS to system emergency phone as a critical backup (Phase 2)
+            system_sms_sent = False
+            try:
+                rider_name = "Unknown Rider"
+                if rider:
+                    rider_name = getattr(rider, 'full_name', getattr(rider, 'name', "Rider"))
+                
+                loc_str = f"{location.latitude}, {location.longitude}"
+                import asyncio
+                # Since this is an async operation in an async function (usually), we handle it
+                # trigger_panic_button is called from an async route
+                system_sms_sent = await self.sms_service.send_emergency_alert(
+                    rider_name=rider_name,
+                    location_str=loc_str
+                )
+            except Exception as sms_err:
+                logger.error(f"Critical error sending system SOS SMS: {sms_err}")
+            
             # Notify company
             company_notified = False
             try:
                 if rider:
-                    company_notified = self._notify_company(db, rider, alert)
+                    company_notified = await self._notify_company(db, rider, alert)
             except Exception as company_err:
                 logger.error(f"Error notifying company: {company_err}")
             
@@ -142,6 +162,7 @@ class SafetyService:
                 "alert_id": alert.id,
                 "status": "active",
                 "email_sent": emails_sent > 0 or system_email_sent,
+                "sms_sent": system_sms_sent,
                 "company_notified": company_notified,
                 "emergency_contacts_notified": len(alerted_contacts),
                 "location": {
@@ -228,7 +249,7 @@ class SafetyService:
             logger.error(f"Error sending SOS email: {e}")
             return False
     
-    def _notify_company(self, db: Session, rider: Rider, alert: PanicAlert) -> bool:
+    async def _notify_company(self, db: Session, rider: Rider, alert: PanicAlert) -> bool:
         """Notify delivery company about panic alert."""
         try:
             if rider.company_id:
@@ -249,7 +270,7 @@ class SafetyService:
             logger.error(f"Error notifying company: {e}")
             return False
     
-    def _notify_emergency_contact(
+    async def _notify_emergency_contact(
         self,
         contact: Dict,
         rider: Rider,
@@ -270,16 +291,22 @@ class SafetyService:
                 if email_success:
                     success = True
             
-            # Log SMS notification (Placeholder for actual SMS service like Twilio)
+            # Send SMS if available
             if contact_phone:
-                logger.warning(
-                    f"SMS NOTIFICATION (MOCK): Sending SOS to {contact_name} ({contact_phone}) "
-                    f"for rider {rider.name}. Location: {alert.location}"
-                )
-                success = True # Consider SMS notification "sent" in mock mode
+                logger.info(f"Sending SOS SMS to {contact_name} at {contact_phone}")
+                # We need to make this async or run it properly
+                import asyncio
+                sms_body = f"🚨 SOS! {rider.full_name if hasattr(rider, 'full_name') else 'A rider'} needs help! Location: https://maps.google.com/?q={alert.location['latitude']},{alert.location['longitude']}"
                 
-            if not contact_email and not contact_phone:
-                logger.warning(f"No contact info (email/phone) for emergency contact: {contact_name}")
+                # Note: this is inside a sync-style helper or should we make it async?
+                # _notify_emergency_contact is called from trigger_panic_button which is async
+                # but trigger_panic_button is not await-ing this currently in the loop.
+                # Let's see if we can await it.
+                # I'll update the caller in trigger_panic_button to be async-friendly.
+                
+                sms_success = await self.sms_service.send_sms(contact_phone, sms_body)
+                if sms_success:
+                    success = True
                 
             return success
         except Exception as e:
