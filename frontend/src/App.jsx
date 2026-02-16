@@ -5,6 +5,7 @@ import Auth from './components/Auth';
 import LandingPage from './components/LandingPage';
 import NotFound from './components/NotFound';
 import Unauthorized from './components/Unauthorized';
+import ErrorBoundary from './components/ErrorBoundary';
 import { useAuth } from './context/AuthContext';
 import './App.css';
 
@@ -35,33 +36,35 @@ function App() {
   const { isAuthenticated, login } = useAuth();
 
   return (
-    <Router>
-      <div className="App min-h-screen bg-slate-50">
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<LandingPage />} />
-          <Route
-            path="/login"
-            element={!isAuthenticated ? <Auth setAuth={login} /> : <Navigate to="/dashboard" replace />}
-          />
-          <Route path="/unauthorized" element={<Unauthorized />} />
+    <ErrorBoundary>
+      <Router>
+        <div className="App min-h-screen bg-slate-50">
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<LandingPage />} />
+            <Route
+              path="/login"
+              element={!isAuthenticated ? <Auth setAuth={login} /> : <Navigate to="/dashboard" replace />}
+            />
+            <Route path="/unauthorized" element={<Unauthorized />} />
 
-          {/* Protected Dashboard Routes */}
-          <Route
-            path="/dashboard/*"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
+            {/* Protected Dashboard Routes */}
+            <Route
+              path="/dashboard/*"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Fallback */}
-          <Route path="/404" element={<NotFound />} />
-          <Route path="*" element={<Navigate to="/404" replace />} />
-        </Routes>
-      </div>
-    </Router>
+            {/* Fallback */}
+            <Route path="/404" element={<NotFound />} />
+            <Route path="*" element={<Navigate to="/404" replace />} />
+          </Routes>
+        </div>
+      </Router>
+    </ErrorBoundary>
   );
 }
 
