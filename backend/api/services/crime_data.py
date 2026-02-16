@@ -11,7 +11,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from api.schemas.delivery import Coordinate
 from loguru import logger
-
+import functools
 
 class CrimeDataService:
     """Service for accessing Tamil Nadu crime data."""
@@ -19,16 +19,55 @@ class CrimeDataService:
     # Tamil Nadu district coordinates (approximate centers)
     # Source: https://www.data.opencity.in/dataset/tamil-nadu-crime-data-2022
     DISTRICT_COORDS = {
+        "Ariyalur": (11.1370, 79.0680),
         "Chennai": (13.0827, 80.2707),
+        "Chengalpattu": (12.6841, 79.9836),
         "Coimbatore": (11.0168, 76.9558),
-        "Madurai": (9.9252, 78.1198),
-        "Tiruchirappalli": (10.7905, 78.7047),
-        "Salem": (11.6643, 78.1460),
-        "Tirunelveli": (8.7139, 77.7567),
+        "Coimbatore City": (11.0168, 76.9558),
+        "Cuddalore": (11.7480, 79.7714),
+        "Dharmapuri": (12.1273, 78.1582),
+        "Dindigul": (10.3673, 77.9803),
         "Erode": (11.3410, 77.7172),
-        "Thanjavur": (10.7869, 79.1378),
+        "Kallakurichi": (11.7371, 78.9626),
+        "Kanchipuram": (12.8342, 79.7036),
+        "Kanyakumari": (8.0883, 77.5385),
+        "Karur": (10.9504, 78.0844),
+        "Krishnagiri": (12.5186, 78.2137),
+        "Madurai": (9.9252, 78.1198),
+        "Madurai City": (9.9252, 78.1198),
+        "Nagapattinam": (10.7672, 79.8444),
+        "Namakkal": (11.2189, 78.1672),
+        "Nilgiris": (11.4102, 76.6991),
+        "Perambalur": (11.2342, 78.8820),
+        "Pudukkottai": (10.3792, 78.8202),
+        "Ramanathapuram": (9.3639, 78.8395),
+        "Ramnathapuram": (9.3639, 78.8395),
+        "Ranipet": (12.9272, 79.3331),
+        "Salem": (11.6643, 78.1460),
+        "Salem City": (11.6643, 78.1460),
+        "Sivagangai": (9.8433, 78.4809),
+        "Tenkasi": (8.9591, 77.3117),
+        "Thanjavur": (10.7870, 79.1378),
+        "Theni": (10.0104, 77.4768),
+        "Thirunelveli": (8.7139, 77.7567),
+        "Thirunelveli City": (8.7139, 77.7567),
+        "Tirunelveli": (8.7139, 77.7567),
+        "Thiruvallur": (13.1231, 79.9120),
+        "Thiruvannamalai": (12.2253, 79.0747),
+        "Thiruvarur": (10.7672, 79.6425),
+        "Thoothukudi": (8.7642, 78.1348),
         "Tiruppur": (11.1085, 77.3411),
-        "Dindigul": (10.3629, 77.9750),
+        "Tiruppur City": (11.1085, 77.3411),
+        "Tiruchirappalli": (10.7905, 78.7047),
+        "Trichy": (10.7905, 78.7047),
+        "Trichy City": (10.7905, 78.7047),
+        "Vellore": (12.9165, 79.1325),
+        "Villupuram": (11.9401, 79.4861),
+        "Virudhunagar": (9.5850, 77.9515),
+        "Tirupattur": (12.4939, 78.5678),
+        "Tiruppattur": (12.4939, 78.5678),
+        "Avadi": (13.1206, 80.1012),
+        "Tambaram": (12.9239, 80.1336),
     }
     
     def __init__(self):
@@ -203,11 +242,10 @@ class CrimeDataService:
         
         self.crime_data = default_data
     
-    def get_crime_score(self, coord: Coordinate, radius_km: float = 10.0) -> float:
-        """
-        Get crime risk score (0-100) for a location.
-        Higher score = more crime = lower safety.
-        """
+    @functools.lru_cache(maxsize=1024)
+    def _get_cached_crime_score(self, lat_rounded: float, lng_rounded: float, radius_km: float) -> float:
+        """Internal cached version of crime score calculation."""
+        coord = Coordinate(latitude=lat_rounded, longitude=lng_rounded)
         min_score = 0
         max_crime_density = 0
         
@@ -236,14 +274,22 @@ class CrimeDataService:
                 max_crime_density = max(max_crime_density, crime_density)
         
         # Normalize to 0-100 scale (inverse safety score)
-        # Higher crime density = lower safety
         if max_crime_density == 0:
-            return 0  # No crime data = safe
+            return 0.0
         
-        # Normalize based on observed max values
-        normalized_score = min(100, (max_crime_density / 50000) * 100)
+        normalized_score = min(100.0, (max_crime_density / 50000) * 100)
+        return float(normalized_score)
+
+    def get_crime_score(self, coord: Coordinate, radius_km: float = 10.0) -> float:
+        """
+        Get crime risk score (0-100) for a location.
+        Uses caching with rounded coordinates (~1km precision).
+        """
+        # Round to 2 decimal places (~1.1km at equator) for effective caching
+        lat_rounded = round(float(coord.latitude), 2)
+        lng_rounded = round(float(coord.longitude), 2)
         
-        return normalized_score
+        return self._get_cached_crime_score(lat_rounded, lng_rounded, radius_km)
     
     def get_crime_data_for_location(self, coord: Coordinate) -> Dict:
         """Get detailed crime data for a specific location."""
