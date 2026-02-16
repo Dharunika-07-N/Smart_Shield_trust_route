@@ -200,7 +200,8 @@ class EnhancedSARSAAgent:
         episode_reward = 0
         transitions = []
         
-        for i, exp in enumerate(experiences[:-1]):
+        # Loop through all experiences
+        for i, exp in enumerate(experiences):
             # Discretize states
             state = self.discretize_state(exp['state'])
             next_state = self.discretize_state(exp['next_state'])
@@ -208,11 +209,12 @@ class EnhancedSARSAAgent:
             action = exp['action']
             reward = exp['reward']
             
-            # Get next action
+            # Get next action for SARSA
             if i + 1 < len(experiences):
                 next_action = experiences[i + 1]['action']
             else:
-                next_action = self.choose_action(next_state, explore=False)
+                # Terminal state approximation
+                next_action = action # assume same policy or use choose_action
             
             # Update Q-value
             self.update_q_value(state, action, reward, next_state, next_action)
