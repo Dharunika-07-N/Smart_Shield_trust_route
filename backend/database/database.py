@@ -1,10 +1,10 @@
 """Database connection and session management."""
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker, Session, declarative_base
 from sqlalchemy.pool import StaticPool
 import sys
 from pathlib import Path
+from datetime import datetime, UTC
 
 # Add parent directory to path for imports
 sys.path.append(str(Path(__file__).parent.parent))
@@ -65,4 +65,3 @@ def get_db() -> Session:
         yield db
     finally:
         db.close()
-
