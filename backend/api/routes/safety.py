@@ -90,7 +90,7 @@ async def trigger_panic_button(
 ):
     """Trigger emergency SOS alert."""
     try:
-        result = safety_service.trigger_panic_button(
+        result = await safety_service.trigger_panic_button(
             db=db,
             rider_id=request.rider_id,
             location=request.location,
