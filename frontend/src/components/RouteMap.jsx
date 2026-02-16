@@ -874,7 +874,7 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
               )}
 
               {/* Safety overlay toggle */}
-              {(fastest || safest || shortest) && (
+              {(fastest || safest || shortest || showSafeZones) && (
                 <div className="mt-3 flex items-center space-x-2">
                   <input
                     type="checkbox"
