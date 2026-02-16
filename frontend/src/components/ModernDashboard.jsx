@@ -7,6 +7,7 @@ import {
     FiPlus, FiMinus, FiTarget, FiPhone, FiMapPin, FiLogOut
 } from 'react-icons/fi';
 import RouteMap from './RouteMap';
+import L from 'leaflet';
 import { api } from '../services/api';
 import dashboardApi from '../services/dashboardApi';
 import useLocation from '../hooks/useLocation';
@@ -39,6 +40,11 @@ const ModernDashboard = () => {
     const [showMapLayers, setShowMapLayers] = useState(false);
     const [deliveryPartnerMarkers, setDeliveryPartnerMarkers] = useState([]);
     const [alerts, setAlerts] = useState([]);
+
+    // SOS State
+    const [sosActive, setSosActive] = useState(false);
+    const [activeAlertId, setActiveAlertId] = useState(null);
+
 
     const sideBarItems = [
         { name: 'Dashboard', icon: FiActivity, badge: null },
@@ -276,18 +282,46 @@ const ModernDashboard = () => {
         if (window.confirm("ARE YOU SURE? This will trigger a panic alert to all emergency contacts and nearby drivers.")) {
             try {
                 // Trigger backend panic button
-                await api.triggerPanicButton({
+                const result = await api.triggerPanicButton({
                     rider_id: riderId,
                     location: { latitude: currentLocation?.latitude || 13.0827, longitude: currentLocation?.longitude || 80.2707 },
                     route_id: "current_route",
                     delivery_id: null
                 });
-                alert("SOS Alert Sent! Help is on the way.");
+
+                setSosActive(true);
+                if (result && result.alert_id) {
+                    setActiveAlertId(result.alert_id);
+                }
+
+                alert("SOS ALARM ACTIVATED! Emergency contacts notified. Police are being dialed.");
             } catch (error) {
                 console.error("Failed to send panic alert:", error);
+                setSosActive(true); // Still show active state locally
                 alert("Alert sent locally (Offline Mode). Calling Police...");
             }
             window.location.href = 'tel:100';
+        }
+    };
+
+    const handleResolveSOS = async () => {
+        if (window.confirm("Are you safe now? This will resolve the SOS alert.")) {
+            try {
+                if (activeAlertId) {
+                    await api.resolvePanicButton({
+                        alert_id: activeAlertId,
+                        rider_id: riderId,
+                        resolution_notes: "Rider marked as safe"
+                    });
+                }
+                setSosActive(false);
+                setActiveAlertId(null);
+                alert("SOS Alert Resolved. Stay safe!");
+            } catch (error) {
+                console.error("Error resolving SOS:", error);
+                // Force resolve locally if backend fails
+                setSosActive(false);
+            }
         }
     };
 
@@ -558,9 +592,9 @@ const ModernDashboard = () => {
 
                                 {/* Right Section: Quick Actions & Weather & Zone Safety */}
 
-                                < div className="space-y-6" >
+                                <div className="space-y-6">
                                     {/* Quick Actions */}
-                                    < div className="premium-card p-6" >
+                                    <div className="premium-card p-6">
                                         <h3 className="text-lg font-bold text-slate-800 mb-6">Quick Actions</h3>
                                         <div className="grid grid-cols-2 gap-4">
                                             <button onClick={handleOptimizeRoute} className="flex flex-col items-center justify-center p-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white transition-all group shadow-md shadow-indigo-600/10">
@@ -578,13 +612,9 @@ const ModernDashboard = () => {
                                                 <span className="text-[10px] font-black uppercase tracking-tight text-slate-800">Report Issue</span>
                                                 <span className="text-[8px] text-slate-500">Safety concern</span>
                                             </button>
-                                            <button onClick={handleEmergency} className="flex flex-col items-center justify-center p-4 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white transition-all group shadow-md shadow-orange-600/10">
-                                                <FiPhone className="text-2xl mb-2 group-hover:scale-110 transition-transform" />
-                                                <span className="text-[10px] font-black uppercase tracking-tight">Emergency</span>
-                                                <span className="text-[8px] opacity-70">Quick dial</span>
-                                            </button>
+
                                         </div>
-                                    </div >
+                                    </div>
 
                                     {/* Zone Safety */}
                                     <div className="premium-card p-6">
