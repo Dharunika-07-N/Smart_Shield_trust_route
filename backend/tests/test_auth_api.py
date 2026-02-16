@@ -14,35 +14,9 @@ from database.models import (
     UserSession, Delivery, DeliveryBatch, DeliveryProof, Customer, BuddyPair
 )
 
-# Use in-memory SQLite for testing
-SQLALCHEMY_DATABASE_URL = "sqlite://"
+# Test fixtures are now in conftest.py
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-def override_get_db():
-    try:
-        db = TestingSessionLocal()
-        yield db
-    finally:
-        db.close()
-
-app.dependency_overrides[get_db] = override_get_db
-
-client = TestClient(app)
-
-@pytest.fixture(autouse=True)
-def setup_db():
-    print(f"DEBUG: Tables in metadata before create: {list(Base.metadata.tables.keys())}")
-    Base.metadata.create_all(bind=engine)
-    print(f"DEBUG: Tables created in engine.")
-    yield
-
-def test_register_user():
+def test_register_user(client):
     response = client.post(
         "/api/v1/auth/register",
         json={
@@ -59,7 +33,7 @@ def test_register_user():
     assert data["username"] == "testuser"
     assert data["role"] == "rider"
 
-def test_login_user():
+def test_login_user(client):
     # First register
     client.post(
         "/api/v1/auth/register",
@@ -90,7 +64,7 @@ def test_login_user():
     assert "access_token" in response.cookies
     assert "refresh_token" in response.cookies
     
-def test_access_protected_with_cookie():
+def test_access_protected_with_cookie(client):
     # First register
     client.post(
         "/api/v1/auth/register",
@@ -124,7 +98,7 @@ def test_access_protected_with_cookie():
     assert response.status_code == 200
     assert response.json()["username"] == "testuser_cookie"
 
-def test_login_invalid_credentials():
+def test_login_invalid_credentials(client):
     response = client.post(
         "/api/v1/auth/login",
         json={
@@ -136,7 +110,7 @@ def test_login_invalid_credentials():
     assert response.status_code == 401
     assert response.json()["detail"] == "Invalid credentials"
 
-def test_protected_route_unauthorized():
+def test_protected_route_unauthorized(client):
     client.cookies.clear()
     response = client.get("/api/v1/users/profile")
     assert response.status_code == 401
