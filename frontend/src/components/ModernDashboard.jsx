@@ -794,7 +794,25 @@ const ModernDashboard = () => {
 
                                 <div className="mt-8 flex justify-end gap-4">
                                     <button className="px-6 py-2 text-slate-500 font-bold hover:text-slate-800 transition-colors">Cancel</button>
-                                    <button className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20" onClick={() => alert("Settings saved successfully!")}>
+                                    <button
+                                        className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-50"
+                                        onClick={async () => {
+                                            try {
+                                                const settings = {
+                                                    notifications: true,
+                                                    location_sharing: true,
+                                                    emergency_contacts: [],
+                                                    theme: 'light'
+                                                };
+                                                // Using the existing api service which prepends /api/v1
+                                                await api.post('/users/settings', settings);
+                                                alert("Settings saved successfully!");
+                                            } catch (error) {
+                                                console.error("Failed to save settings:", error);
+                                                alert("Failed to save settings. Please try again.");
+                                            }
+                                        }}
+                                    >
                                         Save Changes
                                     </button>
                                 </div>
