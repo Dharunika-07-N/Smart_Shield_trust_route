@@ -156,6 +156,45 @@ class SafetyService:
             db.rollback()
             raise
     
+    
+    def resolve_panic_button(
+        self,
+        db: Session,
+        alert_id: str,
+        rider_id: str,
+        resolution_notes: Optional[str] = None
+    ) -> Dict:
+        """Resolve a panic/SOS alert."""
+        try:
+            alert = db.query(PanicAlert).filter(
+                PanicAlert.id == alert_id,
+                PanicAlert.rider_id == rider_id
+            ).first()
+            
+            if not alert:
+                raise ValueError("Alert not found or access denied")
+                
+            alert.status = "resolved"
+            alert.resolved_at = datetime.utcnow()
+            # In a real app, we would store resolution notes in a separate field or JSON
+            
+            db.commit()
+            
+            logger.info(f"Panic alert {alert_id} resolved by rider {rider_id}")
+            
+            # TODO: Notify contacts that rider is safe
+            
+            return {
+                "success": True,
+                "alert_id": alert.id,
+                "status": "resolved",
+                "resolved_at": alert.resolved_at.isoformat()
+            }
+        except Exception as e:
+            logger.error(f"Error resolving panic alert: {e}")
+            db.rollback()
+            raise
+    
     def _send_sos_email(self, rider: Optional[User] = None, alert: Optional[PanicAlert] = None, to_email: Optional[str] = None) -> bool:
         """Send SOS alert email to emergency contact."""
         try:

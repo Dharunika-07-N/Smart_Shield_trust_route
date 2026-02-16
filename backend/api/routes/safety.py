@@ -18,6 +18,7 @@ from api.schemas.safety import (
     SafetyConditionsResponse,
     PanicButtonRequest,
     PanicButtonResponse,
+    PanicButtonResolveRequest,
     CheckInRequest,
     CheckInResponse,
     SafeZonesRequest,
@@ -99,6 +100,24 @@ async def trigger_panic_button(
         return PanicButtonResponse(**result)
     except Exception as e:
         logger.error(f"Error triggering panic button: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/safety/panic-button/resolve")
+async def resolve_panic_button(
+    request: PanicButtonResolveRequest,
+    db: Session = Depends(get_db)
+):
+    """Resolve an active emergency SOS alert."""
+    try:
+        return safety_service.resolve_panic_button(
+            db=db,
+            alert_id=request.alert_id,
+            rider_id=request.rider_id,
+            resolution_notes=request.resolution_notes
+        )
+    except Exception as e:
+        logger.error(f"Error resolving panic button: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

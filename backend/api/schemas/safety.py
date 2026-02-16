@@ -92,6 +92,13 @@ class PanicButtonResponse(BaseModel):
     timestamp: str
 
 
+class PanicButtonResolveRequest(BaseModel):
+    """Request to resolve a panic alert."""
+    alert_id: str
+    rider_id: str
+    resolution_notes: Optional[str] = None
+
+
 class CheckInRequest(BaseModel):
     """Request for rider check-in."""
     rider_id: str
@@ -140,4 +147,3 @@ class RideAlongResponse(BaseModel):
 class BuddyRequest(BaseModel):
     rider_id: str
     route_id: Optional[str] = None
-
