@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents, useMap, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
 import { api } from '../services/api';
-import { FiNavigation, FiSearch, FiMenu, FiX, FiClock, FiShield, FiAlertTriangle, FiCloud, FiLayers } from 'react-icons/fi';
+import { FiNavigation, FiSearch, FiMenu, FiX, FiClock, FiShield, FiAlertTriangle, FiCloud, FiLayers, FiMapPin } from 'react-icons/fi';
 import TrafficWeatherOverlay from './TrafficWeatherOverlay';
 import 'leaflet-routing-machine';
 import useLocation from '../hooks/useLocation';
