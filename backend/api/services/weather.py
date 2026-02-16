@@ -40,7 +40,7 @@ class WeatherService:
         try:
             # Try OpenWeatherMap first
             if self.api_key:
-                async with httpx.AsyncClient(timeout=10.0) as client:
+                async with httpx.AsyncClient(timeout=3.0) as client:
                     url = f"{self.base_url}/weather"
                     params = {
                         "lat": coord.latitude,
@@ -154,12 +154,17 @@ class WeatherService:
         }
     
     async def get_route_weather(self, coordinates: List[Coordinate]) -> List[Dict]:
-        """Get weather data for multiple points along a route."""
-        results = []
+        """Get weather data for multiple points along a route concurrently."""
+        tasks = []
         for coord in coordinates:
-            weather = await self.get_weather(coord)
+            tasks.append(self.get_weather(coord))
+        
+        weather_results = await asyncio.gather(*tasks)
+        
+        results = []
+        for i, weather in enumerate(weather_results):
             results.append({
-                "coordinates": coord,
+                "coordinates": coordinates[i],
                 "weather": weather
             })
         return results
