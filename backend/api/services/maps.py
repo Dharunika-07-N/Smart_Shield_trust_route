@@ -16,6 +16,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 from config.config import settings
 from api.schemas.delivery import Coordinate
 from loguru import logger
+import functools
 try:
     from geopy.distance import distance as geopy_distance
 except ImportError:
@@ -602,8 +603,9 @@ class MapsService:
             return Coordinate(latitude=res['lat'], longitude=res['lng'])
         return None
 
+    @functools.lru_cache(maxsize=512)
     def geocode_address(self, address: str) -> Optional[Dict[str, float]]:
-        """Convert address to coordinates"""
+        """Convert address to coordinates with caching."""
         if not self.gmaps: return None
         try:
             result = self.gmaps.geocode(address)
@@ -611,12 +613,23 @@ class MapsService:
                 location = result[0]['geometry']['location']
                 return {'lat': location['lat'], 'lng': location['lng']}
         except Exception as e:
-            print(f"Geocoding error: {e}")
+            logger.error(f"Geocoding error for '{address}': {e}")
         return None
     
-    def reverse_geocode(self, lat_or_coord: any, lng: Optional[float] = None) -> Optional[str]:
-        """Convert coordinates to address (Supports both signatures)"""
+    @functools.lru_cache(maxsize=512)
+    def _reverse_geocode_cached(self, lat: float, lng: float) -> str:
+        """Internal cached reverse geocoding."""
         if not self.gmaps: return "Unknown Address"
+        try:
+            result = self.gmaps.reverse_geocode((lat, lng))
+            if result:
+                return result[0]['formatted_address']
+        except Exception as e:
+            logger.error(f"Reverse geocoding error at ({lat}, {lng}): {e}")
+        return "Unknown Address"
+
+    def reverse_geocode(self, lat_or_coord: any, lng: Optional[float] = None) -> Optional[str]:
+        """Convert coordinates to address (Supports both signatures) with caching."""
         try:
             if hasattr(lat_or_coord, 'latitude'):
                 lat, lng = lat_or_coord.latitude, lat_or_coord.longitude
@@ -624,13 +637,12 @@ class MapsService:
                 lat, lng = lat_or_coord, lng
             else:
                 return "Unknown Address"
-                
-            result = self.gmaps.reverse_geocode((lat, lng))
-            if result:
-                return result[0]['formatted_address']
+            
+            # Round coordinates to ~10m precision for cache hits on nearby points
+            return self._reverse_geocode_cached(round(lat, 4), round(lng, 4))
         except Exception as e:
-            print(f"Reverse geocoding error: {e}")
-        return "Unknown Address"
+            logger.error(f"Error in reverse_geocode wrapper: {e}")
+            return "Unknown Address"
 
     def get_all_directions(self, origin: any, destination: any, **kwargs) -> List[Dict]:
         """Get all route variations (Required by RouteOptimizer)"""
