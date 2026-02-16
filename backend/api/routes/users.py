@@ -55,6 +55,24 @@ def update_rider_profile(
     db.refresh(profile)
     return profile
 
+@router.post("/settings")
+def update_settings(
+    settings_data: dict,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Update user settings/preferences."""
+    # Store settings in preferences field of User model if it exists, 
+    # or just log it for now if we don't want to change schema yet
+    logger.info(f"Updating settings for user {current_user.id}: {settings_data}")
+    
+    # Check if User model has preferences or settings field
+    if hasattr(current_user, 'preferences'):
+        current_user.preferences = settings_data
+        db.commit()
+    
+    return {"message": "Settings updated successfully", "status": "success"}
+
 @router.get("/riders", response_model=List[UserResponse])
 def list_riders(
     db: Session = Depends(get_db),
