@@ -53,6 +53,9 @@ class SARSARouteAgent:
 
     def _discretize_traffic(self, traffic_level):
         """Discretize traffic level"""
+        if isinstance(traffic_level, str):
+            return traffic_level.lower()
+        
         if traffic_level < 0.3:
             return "low"
         elif traffic_level < 0.7:
