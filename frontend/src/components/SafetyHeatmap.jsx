@@ -61,19 +61,26 @@ const SafetyHeatmap = ({ show = true }) => {
     return (
         <>
             {heatmapData
-                .filter(point => point && typeof point.lat === 'number' && typeof point.lng === 'number' && !isNaN(point.lat) && !isNaN(point.lng))
-                .map((point, idx) => (
-                    <Circle
-                        key={idx}
-                        center={[point.lat, point.lng]}
-                        radius={500} // meters
-                        pathOptions={{
-                            fillColor: getColor(point.intensity || 0.5),
-                            fillOpacity: 0.15,
-                            stroke: false
-                        }}
-                    />
-                ))}
+                .map((point, idx) => {
+                    const lat = point.coordinates?.latitude || point.lat;
+                    const lng = point.coordinates?.longitude || point.lng;
+                    const intensity = point.crime_score ? (100 - point.crime_score) / 100 : (point.intensity || 0.5); // Invert crime score for safety (high crime = low safety)
+
+                    if (!lat || !lng) return null;
+
+                    return (
+                        <Circle
+                            key={idx}
+                            center={[lat, lng]}
+                            radius={500} // meters
+                            pathOptions={{
+                                fillColor: getColor(intensity),
+                                fillOpacity: 0.15,
+                                stroke: false
+                            }}
+                        />
+                    );
+                })}
         </>
     );
 };
