@@ -1,6 +1,7 @@
 """Weather service for real-time weather data."""
 import httpx
 import os
+import asyncio
 from typing import Dict, Optional, List
 from datetime import datetime
 import sys
