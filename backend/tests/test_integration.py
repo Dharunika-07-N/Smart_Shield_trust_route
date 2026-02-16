@@ -151,35 +151,65 @@ class TestEndToEndWorkflow:
             classifier = EnhancedSafetyClassifier(model_path=tmpdir + os.sep)
             agent = EnhancedSARSAAgent(model_path=tmpdir + os.sep)
             
-            # Generate training data
+            # Generate more training data to avoid stratification errors
+            n_samples = 300
             time_data = pd.DataFrame({
-                'route_distance': np.random.uniform(5, 50, 100),
-                'traffic_level': np.random.uniform(0, 1, 100),
-                'timestamp': pd.date_range('2024-01-01', periods=100, freq='H'),
-                'weather_condition': np.random.choice(['clear', 'rain'], 100),
-                'num_stops': np.random.randint(1, 5, 100),
-                'actual_time': np.random.uniform(20, 90, 100)
+                'route_distance': np.random.uniform(5, 50, n_samples),
+                'traffic_level': np.random.uniform(0, 1, n_samples),
+                'timestamp': pd.date_range('2024-01-01', periods=n_samples, freq='h'),
+                'weather_condition': np.random.choice(['clear', 'rain'], n_samples),
+                'num_stops': np.random.randint(1, 5, n_samples),
+                'actual_time': np.random.uniform(20, 90, n_samples)
             })
             
             safety_data = pd.DataFrame({
-                'crime_rate': np.random.uniform(0, 1, 100),
-                'lighting': np.random.uniform(0, 1, 100),
-                'patrol_frequency': np.random.uniform(0, 1, 100),
-                'traffic_density': np.random.uniform(0, 1, 100),
-                'police_proximity': np.random.uniform(0.5, 5, 100),
-                'hospital_proximity': np.random.uniform(0.5, 10, 100),
-                'timestamp': pd.date_range('2024-01-01', periods=100, freq='H'),
-                'population_density': np.random.uniform(100, 10000, 100),
-                'commercial_area': np.random.randint(0, 2, 100),
-                'residential_area': np.random.randint(0, 2, 100),
-                'street_width': np.random.uniform(5, 20, 100),
-                'cctv_coverage': np.random.uniform(0, 1, 100),
-                'emergency_response_time': np.random.uniform(5, 30, 100)
+                'crime_rate': np.random.uniform(0, 1, n_samples),
+                'lighting': np.random.uniform(0, 1, n_samples),
+                'patrol_frequency': np.random.uniform(0, 1, n_samples),
+                'traffic_density': np.random.uniform(0, 1, n_samples),
+                'police_proximity': np.random.uniform(0.5, 5, n_samples),
+                'hospital_proximity': np.random.uniform(0.5, 10, n_samples),
+                'timestamp': pd.date_range('2024-01-01', periods=n_samples, freq='h'),
+                'population_density': np.random.uniform(100, 10000, n_samples),
+                'commercial_area': np.random.randint(0, 2, n_samples),
+                'residential_area': np.random.randint(0, 2, n_samples),
+                'street_width': np.random.uniform(5, 20, n_samples),
+                'cctv_coverage': np.random.uniform(0, 1, n_samples),
+                'emergency_response_time': np.random.uniform(5, 30, n_samples)
             })
             
             # Add targets
             df = classifier.engineer_features(safety_data)
             safety_data['safety_class'] = classifier.create_safety_score(df)
+            
+            # Ensure at least 2 members for EACH class to satisfy stratified split
+            for c in range(5):
+                 # Create a record that should fall into class c
+                 extra_record = safety_data.iloc[0:1].copy()
+                 if c == 0: # Very Unsafe: high crime, low lighting
+                     extra_record['crime_rate'] = 0.99
+                     extra_record['lighting'] = 0.01
+                     extra_record['patrol_frequency'] = 0.01
+                 elif c == 4: # Very Safe: low crime, high lighting
+                     extra_record['crime_rate'] = 0.01
+                     extra_record['lighting'] = 0.99
+                     extra_record['patrol_frequency'] = 0.99
+                 elif c == 1: # Unsafe: high crime, med lighting
+                     extra_record['crime_rate'] = 0.8
+                     extra_record['lighting'] = 0.2
+                 elif c == 3: # Safe: low crime, med lighting
+                     extra_record['crime_rate'] = 0.2
+                     extra_record['lighting'] = 0.8
+                 else: # Moderate
+                     extra_record['crime_rate'] = 0.5
+                     extra_record['lighting'] = 0.5
+                 
+                 # Re-label the extra records
+                 ed_df = classifier.engineer_features(extra_record)
+                 extra_record['safety_class'] = classifier.create_safety_score(ed_df)
+                 
+                 # Append twice for each class just to be safe
+                 safety_data = pd.concat([safety_data, extra_record, extra_record], ignore_index=True)
             
             # Train
             X_time, y_time, _ = predictor.prepare_data(time_data, 'actual_time')
