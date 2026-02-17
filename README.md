@@ -259,7 +259,7 @@ Smart Shield is designed to work seamlessly with [Render](https://render.com).
    - FastAPI Backend (Web Service)
    - React Frontend (Static Site)
 
-2. **Manual Setup**: See [RENDER_DEPLOY_GUIDE.md](./RENDER_DEPLOY_GUIDE.md) for step-by-step manual instructions.
+2. **Manual Setup**: Manually configure the web service and static site on Render following their documentation.
 
 ### 3. CI/CD
 GitHub Actions is configured to:
