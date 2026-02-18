@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
   FiShield, FiActivity, FiUsers, FiCpu, FiBarChart2,
   FiAlertTriangle, FiNavigation, FiSettings, FiLogOut,
-  FiBell, FiSearch, FiMonitor, FiMap, FiCheckCircle
+  FiBell, FiSearch, FiMonitor, FiMap, FiCheckCircle,
+  FiTrash2, FiToggleLeft, FiToggleRight, FiRefreshCw,
+  FiUserCheck, FiUserX, FiFilter
 } from 'react-icons/fi';
 import Analytics from './Analytics';
 import RouteMap from './RouteMap';
@@ -11,15 +13,81 @@ import TrainingCenter from './TrainingCenter';
 import ModelPerformance from './ModelPerformance';
 import AIReportSummary from './AIReportSummary';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
-const AdminDashboard = ({ setAuth }) => {
+const AdminDashboard = () => {
+  const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('Overview');
-  const [systemHealth, setSystemHealth] = useState('stable'); // stable, warning, critical
+  const [systemHealth, setSystemHealth] = useState('stable');
   const [stats, setStats] = useState({
     activeDrivers: 42,
     fleetUtilization: '89%',
     safetyScore: 94,
     activeAlerts: 3
+  });
+
+  // User Management state
+  const [allUsers, setAllUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState('');
+  const [userSearch, setUserSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+
+  const fetchAllUsers = async () => {
+    setUsersLoading(true);
+    setUsersError('');
+    try {
+      // api interceptor already unwraps response.data
+      const data = await api.get('/users/all');
+      setAllUsers(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setUsersError(e.response?.data?.detail || 'Failed to load users. Make sure you are logged in as Admin.');
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'Users') fetchAllUsers();
+  }, [activeTab]);
+
+  const handleToggleStatus = async (u) => {
+    const newStatus = u.status === 'active' ? 'inactive' : 'active';
+    try {
+      await api.patch(`/users/${u.id}/status`, { status: newStatus });
+      setAllUsers(prev => prev.map(x => x.id === u.id ? { ...x, status: newStatus } : x));
+    } catch (e) {
+      alert(e.response?.data?.detail || 'Failed to update status');
+    }
+  };
+
+  const handleDeleteUser = async (u) => {
+    if (!window.confirm(`Delete user "${u.full_name || u.username}"? This cannot be undone.`)) return;
+    try {
+      await api.delete(`/users/${u.id}`);
+      setAllUsers(prev => prev.filter(x => x.id !== u.id));
+    } catch (e) {
+      alert(e.response?.data?.detail || 'Failed to delete user');
+    }
+  };
+
+  const ROLE_COLORS = {
+    admin: 'bg-purple-100 text-purple-700 border-purple-200',
+    super_admin: 'bg-rose-100   text-rose-700   border-rose-200',
+    dispatcher: 'bg-blue-100   text-blue-700   border-blue-200',
+    driver: 'bg-amber-100  text-amber-700  border-amber-200',
+    rider: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+    customer: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  };
+
+  const filteredUsers = allUsers.filter(u => {
+    const matchRole = roleFilter === 'all' || u.role === roleFilter;
+    const q = userSearch.toLowerCase();
+    const matchSearch = !q ||
+      (u.full_name || '').toLowerCase().includes(q) ||
+      (u.email || '').toLowerCase().includes(q) ||
+      (u.role || '').toLowerCase().includes(q);
+    return matchRole && matchSearch;
   });
 
   const menuItems = [
@@ -65,6 +133,10 @@ const AdminDashboard = ({ setAuth }) => {
         </nav>
 
         <div className="p-6 mt-auto">
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 mb-4">
+            <p className="text-xs font-bold text-slate-800 truncate">{user?.full_name || user?.username}</p>
+            <p className="text-[10px] text-indigo-600 font-bold uppercase tracking-wider mt-0.5">{user?.role?.replace('_', ' ')}</p>
+          </div>
           <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
             <div className="flex items-center justify-between mb-3">
               <span className="text-[10px] font-bold text-slate-400 uppercase">System Status</span>
@@ -77,10 +149,7 @@ const AdminDashboard = ({ setAuth }) => {
           </div>
 
           <button
-            onClick={() => {
-              localStorage.removeItem('auth_token');
-              setAuth(false);
-            }}
+            onClick={logout}
             className="w-full flex items-center gap-3 px-4 py-3 mt-4 text-slate-400 hover:text-rose-500 transition-colors text-sm font-semibold"
           >
             <FiLogOut /> Sign Out
@@ -115,11 +184,11 @@ const AdminDashboard = ({ setAuth }) => {
             <div className="w-px h-8 bg-slate-200"></div>
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold text-slate-900 leading-none">Admin Control</p>
-                <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-tight">Root Authority</p>
+                <p className="text-sm font-bold text-slate-900 leading-none">{user?.full_name || user?.username || 'Admin'}</p>
+                <p className="text-[10px] text-indigo-600 mt-1 uppercase font-bold tracking-tight">{user?.role?.replace('_', ' ') || 'Admin'}</p>
               </div>
-              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-400 border border-slate-200 shadow-sm">
-                <FiSettings />
+              <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 border border-indigo-200 shadow-sm font-bold">
+                {(user?.full_name || user?.username || 'A')[0].toUpperCase()}
               </div>
             </div>
           </div>
@@ -298,16 +367,168 @@ const AdminDashboard = ({ setAuth }) => {
             </div>
           )}
 
-          {(activeTab === 'Users' || activeTab === 'Reports') && (
-            <div className="h-full flex flex-col items-center justify-center text-center">
-              <div className="p-8 bg-white rounded-[3rem] border border-slate-200 shadow-xl">
-                <FiMonitor size={48} className="text-slate-200 mx-auto mb-6" />
-                <h3 className="text-2xl font-black text-slate-900">{activeTab} Interface</h3>
-                <p className="text-slate-500 mt-2 max-w-xs font-medium">Connecting to secure data stream... Full panel deployment in progress.</p>
-                <button className="mt-8 px-8 py-3 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-500/20 active:scale-95 transition-all">Retry Link</button>
+          {activeTab === 'Users' && (
+            <div className="space-y-6">
+              {/* Header row */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-black text-slate-900">User Management</h2>
+                  <p className="text-slate-500 text-sm mt-1">{allUsers.length} total accounts across all roles</p>
+                </div>
+                <button
+                  onClick={fetchAllUsers}
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
+                >
+                  <FiRefreshCw size={14} className={usersLoading ? 'animate-spin' : ''} /> Refresh
+                </button>
+              </div>
+
+              {/* Filters */}
+              <div className="flex flex-wrap gap-3">
+                <div className="relative flex-1 min-w-[200px]">
+                  <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                  <input
+                    type="text"
+                    placeholder="Search by name or email..."
+                    value={userSearch}
+                    onChange={e => setUserSearch(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500 shadow-sm"
+                  />
+                </div>
+                <select
+                  value={roleFilter}
+                  onChange={e => setRoleFilter(e.target.value)}
+                  className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:border-indigo-500 shadow-sm"
+                >
+                  <option value="all">All Roles</option>
+                  <option value="admin">Admin</option>
+                  <option value="dispatcher">Dispatcher</option>
+                  <option value="driver">Driver</option>
+                  <option value="rider">Rider</option>
+                  <option value="customer">Customer</option>
+                </select>
+              </div>
+
+              {/* Error */}
+              {usersError && (
+                <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-sm font-medium">
+                  ⚠️ {usersError}
+                </div>
+              )}
+
+              {/* Table */}
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                {usersLoading ? (
+                  <div className="flex items-center justify-center py-20">
+                    <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : filteredUsers.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                    <FiUsers size={40} className="mb-4 opacity-30" />
+                    <p className="font-bold">No users found</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100 bg-slate-50">
+                        <th className="text-left px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">User</th>
+                        <th className="text-left px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Role</th>
+                        <th className="text-left px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                        <th className="text-left px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest hidden md:table-cell">Joined</th>
+                        <th className="text-right px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {filteredUsers.map(u => (
+                        <tr key={u.id} className="hover:bg-slate-50/50 transition-colors group">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm border ${ROLE_COLORS[u.role] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                                {(u.full_name || u.username || '?')[0].toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="font-bold text-slate-900 leading-none">{u.full_name || '—'}</p>
+                                <p className="text-xs text-slate-400 mt-0.5">{u.email}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${ROLE_COLORS[u.role] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                              {u.role?.replace('_', ' ')}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${u.status === 'active'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-slate-100 text-slate-500 border-slate-200'
+                              }`}>
+                              {u.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 hidden md:table-cell">
+                            <span className="text-xs text-slate-400">
+                              {u.created_at ? new Date(u.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => handleToggleStatus(u)}
+                                title={u.status === 'active' ? 'Deactivate' : 'Activate'}
+                                className={`p-2 rounded-xl border transition-all ${u.status === 'active'
+                                  ? 'bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100'
+                                  : 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100'
+                                  }`}
+                              >
+                                {u.status === 'active' ? <FiUserX size={14} /> : <FiUserCheck size={14} />}
+                              </button>
+                              <button
+                                onClick={() => handleDeleteUser(u)}
+                                title="Delete user"
+                                className="p-2 rounded-xl border bg-rose-50 border-rose-200 text-rose-500 hover:bg-rose-100 transition-all"
+                              >
+                                <FiTrash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              {/* Summary cards */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                {['admin', 'dispatcher', 'driver', 'rider', 'customer'].map(role => {
+                  const count = allUsers.filter(u => u.role === role).length;
+                  return (
+                    <div
+                      key={role}
+                      onClick={() => setRoleFilter(role)}
+                      className={`p-4 bg-white rounded-2xl border cursor-pointer hover:shadow-md transition-all ${roleFilter === role ? 'border-indigo-400 shadow-md shadow-indigo-100' : 'border-slate-200'
+                        }`}
+                    >
+                      <p className="text-2xl font-black text-slate-900">{count}</p>
+                      <p className={`text-[10px] font-black uppercase tracking-widest mt-1 ${ROLE_COLORS[role]?.split(' ')[1] || 'text-slate-500'
+                        }`}>{role}</p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
+
+          {activeTab === 'Reports' && (
+            <div className="h-full flex flex-col items-center justify-center text-center">
+              <div className="p-8 bg-white rounded-[3rem] border border-slate-200 shadow-xl">
+                <FiMonitor size={48} className="text-slate-200 mx-auto mb-6" />
+                <h3 className="text-2xl font-black text-slate-900">Incident Reports</h3>
+                <p className="text-slate-500 mt-2 max-w-xs font-medium">Full incident report panel coming soon.</p>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'Performance' && <ModelPerformance />}
           {activeTab === 'AIReports' && <AIReportSummary />}
         </main>
