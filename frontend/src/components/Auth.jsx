@@ -10,6 +10,7 @@ import {
 
 import { API_BASE_URL as API_URL } from '../utils/constants';
 import { ROLE_OPTIONS, LOGIN_PAGE_CONFIG } from '../utils/authConfig';
+import { ROLE_ROUTES } from '../context/AuthContext';
 
 const Auth = ({ setAuth }) => {
     const [isLogin, setIsLogin] = useState(true);
@@ -148,17 +149,19 @@ const Auth = ({ setAuth }) => {
             const response = await axios.post(`${API_URL}${endpoint}`, payload);
 
             if (isLogin) {
-                // The setAuth prop is now the login function from AuthContext
-                setAuth({
+                const loginData = {
                     access_token: response.data.access_token,
                     username: response.data.username,
                     role: response.data.role,
-                    user_id: response.data.user_id
-                });
+                    user_id: response.data.user_id,
+                    full_name: response.data.full_name,
+                    email: response.data.email,
+                };
+                setAuth(loginData);
 
-                // Navigate based on role default route
-                const configRole = ROLE_OPTIONS.find(r => r.value === response.data.role);
-                navigate(configRole?.defaultRoute || '/dashboard');
+                // Navigate to role-specific dashboard
+                const roleRoute = ROLE_ROUTES[response.data.role] || '/rider/dashboard';
+                navigate(roleRoute);
             } else {
                 setIsLogin(true);
                 setGlobalError('Success! Please sign in with your new credentials.');
@@ -170,15 +173,42 @@ const Auth = ({ setAuth }) => {
         }
     };
 
-    const handleDevBypass = () => {
-        setAuth({
-            access_token: 'dev_token',
-            username: 'Dev_User',
-            role: role || 'rider',
-            user_id: 'DEV_001'
-        });
-        navigate('/dashboard');
+    const handleDevBypass = async () => {
+        setLoading(true);
+        try {
+            const payload = {
+                username: 'dharunikaktm@gmail.com',
+                password: 'password123',
+                role: 'rider'
+            };
+            const response = await axios.post(`${API_URL}/auth/login`, payload);
+            const loginData = {
+                access_token: response.data.access_token,
+                username: response.data.username,
+                role: response.data.role,
+                user_id: response.data.user_id,
+                full_name: response.data.full_name,
+            };
+            setAuth(loginData);
+            const roleRoute = ROLE_ROUTES[response.data.role] || '/rider/dashboard';
+            navigate(roleRoute);
+        } catch (err) {
+            console.error("Dev bypass failed, using mock session:", err);
+            // Fallback: use the selected role in the form
+            const mockRole = role || 'rider';
+            setAuth({
+                access_token: 'dev_token',
+                username: 'Dev_User',
+                role: mockRole,
+                user_id: 'DEV_001',
+                full_name: 'Dev User',
+            });
+            navigate(ROLE_ROUTES[mockRole] || '/rider/dashboard');
+        } finally {
+            setLoading(false);
+        }
     };
+
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-12 relative overflow-hidden">
