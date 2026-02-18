@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from database.database import get_db
 from database.models import User, RiderProfile
 from api.schemas.auth import UserResponse, RiderProfileSchema
-from api.deps import get_current_active_user, get_current_dispatcher
+from api.deps import get_current_active_user, get_current_dispatcher, get_current_admin
 from loguru import logger
 from typing import List
 
@@ -62,16 +62,50 @@ def update_settings(
     db: Session = Depends(get_db)
 ):
     """Update user settings/preferences."""
-    # Store settings in preferences field of User model if it exists, 
-    # or just log it for now if we don't want to change schema yet
     logger.info(f"Updating settings for user {current_user.id}: {settings_data}")
-    
-    # Check if User model has preferences or settings field
-    if hasattr(current_user, 'preferences'):
-        current_user.preferences = settings_data
-        db.commit()
-    
+
+    # 1. Update User level info if provided in 'profile' key
+    profile_data = settings_data.get('profile', {})
+    if profile_data:
+        if 'full_name' in profile_data:
+            current_user.full_name = profile_data['full_name']
+        if 'phone' in profile_data:
+            current_user.phone = profile_data['phone']
+        if 'email' in profile_data:
+            current_user.email = profile_data['email']
+        
+    # 2. Update Emergency Contacts
+    if 'emergency_contacts' in settings_data:
+        current_user.emergency_contacts = settings_data['emergency_contacts']
+
+    # 3. Update Rider Profile preferences
+    if current_user.role == "rider":
+        # Check if RiderProfile exists
+        from database.models import RiderProfile
+        profile = db.query(RiderProfile).filter(RiderProfile.user_id == current_user.id).first()
+        
+        if not profile:
+            profile = RiderProfile(user_id=current_user.id)
+            db.add(profile)
+            
+        # Update preferences
+        prefs = profile.preferences or {}
+        if 'location_sharing' in settings_data:
+            prefs['location_sharing'] = settings_data['location_sharing']
+        if 'notifications' in settings_data:
+            prefs['notifications'] = settings_data['notifications']
+        if 'theme' in settings_data:
+            prefs['theme'] = settings_data['theme']
+            
+        profile.preferences = prefs
+        
+        # Update vehicle type if provided
+        if profile_data.get('vehicle_type'):
+            profile.vehicle_type = profile_data['vehicle_type']
+
+    db.commit()
     return {"message": "Settings updated successfully", "status": "success"}
+
 
 @router.get("/riders", response_model=List[UserResponse])
 def list_riders(
@@ -81,3 +115,61 @@ def list_riders(
     """List all riders (Admin/Dispatcher only)."""
     riders = db.query(User).filter(User.role == "rider").all()
     return riders
+
+
+@router.get("/all")
+def list_all_users(
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """List ALL users across every role (Admin only)."""
+    users = db.query(User).order_by(User.role, User.created_at.desc()).all()
+    return [
+        {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "full_name": u.full_name,
+            "role": u.role,
+            "status": u.status,
+            "phone": u.phone,
+            "created_at": u.created_at.isoformat() if u.created_at else None,
+        }
+        for u in users
+    ]
+
+
+@router.patch("/{user_id}/status")
+def toggle_user_status(
+    user_id: int,
+    payload: dict,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Activate or deactivate a user (Admin only)."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.id == admin.id:
+        raise HTTPException(status_code=400, detail="Cannot change your own status")
+    user.status = payload.get("status", user.status)
+    db.commit()
+    return {"message": f"User {user.username} status set to {user.status}"}
+
+
+@router.delete("/{user_id}")
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Delete a user (Admin only)."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.id == admin.id:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+    db.delete(user)
+    db.commit()
+    return {"message": f"User {user.username} deleted"}
+
