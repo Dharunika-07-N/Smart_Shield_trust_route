@@ -105,6 +105,40 @@ async def root():
         "version": "1.0.0"
     }
 
+@app.on_event("startup")
+async def startup_event():
+    """Run startup tasks like seeding the database."""
+    # Initialize database tables
+    from database.database import init_db, SessionLocal
+    from database.models import User
+    from api.services.security import get_password_hash
+
+    
+    await init_db()
+    
+    # Seed a default developer user if it doesn't exist
+    db = SessionLocal()
+    try:
+        default_username = "dharunikaktm@gmail.com"
+        user = db.query(User).filter(User.username == default_username).first()
+        if not user:
+            logger.info(f"Seeding default user: {default_username}")
+            new_user = User(
+                username=default_username,
+                email=default_username,
+                hashed_password=get_password_hash("password123"),
+                role="rider",
+                full_name="Dharunika K",
+                status="active"
+            )
+            db.add(new_user)
+            db.commit()
+    except Exception as e:
+        logger.error(f"Error seeding database: {e}")
+    finally:
+        db.close()
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True)
+
