@@ -8,11 +8,13 @@ import {
 import RouteMap from './RouteMap';
 import { api } from '../services/api';
 import useLocation from '../hooks/useLocation';
+import { useAuth } from '../context/AuthContext';
 
-const DriverDashboard = ({ setAuth }) => {
+const DriverDashboard = () => {
+    const { user, logout } = useAuth();
     const [activeTab, setActiveTab] = useState('Map');
     const [panicAlerting, setPanicAlerting] = useState(false);
-    const [driverId, setDriverId] = useState(localStorage.getItem('user_id') || 'DRIVER_001');
+    const [driverId, setDriverId] = useState(user?.id || localStorage.getItem('user_id') || 'DRIVER_001');
     const { location: currentLocation } = useLocation();
     const [isOnline, setIsOnline] = useState(true);
     const [isTripExpanded, setIsTripExpanded] = useState(true);
@@ -81,11 +83,12 @@ const DriverDashboard = ({ setAuth }) => {
                         <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full animate-pulse"></div>
                         <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Online</span>
                     </div>
+                    <div className="text-right hidden sm:block">
+                        <p className="text-sm font-bold text-slate-900 leading-none">{user?.full_name || user?.username || 'Driver'}</p>
+                        <p className="text-[10px] text-indigo-600 font-bold uppercase tracking-wider">Driver</p>
+                    </div>
                     <button
-                        onClick={() => {
-                            localStorage.removeItem('auth_token');
-                            setAuth(false);
-                        }}
+                        onClick={logout}
                         className="text-slate-500 hover:text-rose-500 transition-colors"
                     >
                         <FiLogOut size={20} />

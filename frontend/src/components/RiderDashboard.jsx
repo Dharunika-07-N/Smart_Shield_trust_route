@@ -6,11 +6,13 @@ import {
 import RouteMap from './RouteMap';
 import { api } from '../services/api';
 import useLocation from '../hooks/useLocation';
+import { useAuth } from '../context/AuthContext';
 
-const RiderDashboard = ({ setAuth }) => {
+const RiderDashboard = () => {
+    const { user, logout } = useAuth();
     const [activeTab, setActiveTab] = useState('route-map');
     const [panicAlerting, setPanicAlerting] = useState(false);
-    const [riderId, setRiderId] = useState(localStorage.getItem('user_id') || 'RIDER_402');
+    const [riderId, setRiderId] = useState(user?.id || localStorage.getItem('user_id') || 'RIDER_402');
     const { location: currentLocation } = useLocation();
     const [isOnline, setIsOnline] = useState(true);
     const [isTripInfoExpanded, setIsTripInfoExpanded] = useState(true);
@@ -80,7 +82,7 @@ const RiderDashboard = ({ setAuth }) => {
                             <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
                             {isOnline ? 'Online' : 'Offline'}
                         </button>
-                        <button onClick={() => setAuth(false)} className="text-gray-400 hover:text-red-500">
+                        <button onClick={logout} className="text-gray-400 hover:text-red-500">
                             <FiLogOut size={20} />
                         </button>
                     </div>

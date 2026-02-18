@@ -7,8 +7,10 @@ import {
 import RouteMap from './RouteMap';
 import { api } from '../services/api';
 import dashboardApi from '../services/dashboardApi';
+import { useAuth } from '../context/AuthContext';
 
-const CustomerDashboard = ({ setAuth }) => {
+const CustomerDashboard = () => {
+    const { user, logout } = useAuth();
     const [trackingId, setTrackingId] = useState('');
     const [isTracking, setIsTracking] = useState(false);
     const [orderData, setOrderData] = useState(null);
@@ -84,11 +86,12 @@ const CustomerDashboard = ({ setAuth }) => {
                 </div>
 
                 <div className="flex items-center gap-4">
+                    <div className="text-right hidden sm:block">
+                        <p className="text-sm font-bold text-slate-800 leading-none">{user?.full_name || user?.username || 'Customer'}</p>
+                        <p className="text-[10px] text-indigo-600 font-bold uppercase tracking-wider mt-0.5">Customer</p>
+                    </div>
                     <button
-                        onClick={() => {
-                            localStorage.removeItem('auth_token');
-                            setAuth(false);
-                        }}
+                        onClick={logout}
                         className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-red-500 transition-colors"
                     >
                         <FiLogOut /> Sign Out

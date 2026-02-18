@@ -9,8 +9,10 @@ import Analytics from './Analytics';
 import RouteMap from './RouteMap';
 import LiveTracking from './LiveTracking';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
-const DispatcherDashboard = ({ setAuth }) => {
+const DispatcherDashboard = () => {
+    const { user, logout } = useAuth();
     const [activeTab, setActiveTab] = useState('Overview');
     const [isNetworkStable, setIsNetworkStable] = useState(true);
 
@@ -60,11 +62,12 @@ const DispatcherDashboard = ({ setAuth }) => {
                 </nav>
 
                 <div className="p-6 mt-auto">
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 mb-4">
+                        <p className="text-xs font-bold text-slate-800 truncate">{user?.full_name || user?.username}</p>
+                        <p className="text-[10px] text-indigo-600 font-bold uppercase tracking-wider mt-0.5">Dispatcher</p>
+                    </div>
                     <button
-                        onClick={() => {
-                            localStorage.removeItem('auth_token');
-                            setAuth(false);
-                        }}
+                        onClick={logout}
                         className="w-full flex items-center gap-3 px-4 py-3 text-slate-500 hover:text-rose-400 transition-colors text-sm font-semibold"
                     >
                         <FiLogOut /> Disconnect
@@ -93,11 +96,11 @@ const DispatcherDashboard = ({ setAuth }) => {
                         <div className="w-px h-8 bg-slate-800"></div>
                         <div className="flex items-center gap-3">
                             <div className="text-right hidden sm:block">
-                                <p className="text-sm font-bold text-slate-900 leading-none">Dispatcher 402</p>
-                                <p className="text-[10px] text-slate-500 mt-1 uppercase">Sector Chennai</p>
+                                <p className="text-sm font-bold text-slate-900 leading-none">{user?.full_name || user?.username || 'Dispatcher'}</p>
+                                <p className="text-[10px] text-indigo-600 mt-1 uppercase font-bold">Dispatch Ops</p>
                             </div>
-                            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-400 border border-slate-200 shadow-sm">
-                                <FiHeadphones />
+                            <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 border border-indigo-200 shadow-sm font-bold">
+                                {(user?.full_name || user?.username || 'D')[0].toUpperCase()}
                             </div>
                         </div>
                     </div>

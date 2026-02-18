@@ -45,6 +45,57 @@ const ModernDashboard = () => {
     const [sosActive, setSosActive] = useState(false);
     const [activeAlertId, setActiveAlertId] = useState(null);
 
+    // Settings State
+    const [settingsForm, setSettingsForm] = useState({
+        full_name: user?.full_name || user?.username || 'Priya Kumar',
+        email: user?.email || 'priya.k@smartshield.com',
+
+        vehicle_number: 'TN-01-AB-1234',
+        emergency_contact_name: 'Rahul Kumar',
+        emergency_contact_phone: '+91 98765 43210',
+        share_location: true
+    });
+
+    const handleSettingsChange = (e) => {
+        const { name, value, type, checked } = e.target;
+        setSettingsForm(prev => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value
+        }));
+    };
+
+    const handleSaveSettings = async () => {
+        try {
+            setLoading(true);
+            const payload = {
+                notifications: true,
+                location_sharing: settingsForm.share_location,
+                emergency_contacts: [
+                    {
+                        name: settingsForm.emergency_contact_name,
+                        phone: settingsForm.emergency_contact_phone
+                    }
+                ],
+                theme: 'light',
+                profile: {
+                    full_name: settingsForm.full_name,
+                    email: settingsForm.email,
+                    vehicle_number: settingsForm.vehicle_number
+                }
+            };
+
+            await api.post('/users/settings', payload);
+            alert("Settings saved successfully!");
+        } catch (error) {
+            console.error("Failed to save settings:", error);
+            // More descriptive error message
+            const details = error.response?.data?.detail || error.message;
+            alert(`Failed to save settings: ${details}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
 
     const sideBarItems = [
         { name: 'Dashboard', icon: FiActivity, badge: null },
@@ -761,15 +812,33 @@ const ModernDashboard = () => {
                                         <h4 className="font-bold text-slate-700 border-b border-slate-100 pb-2">Profile Information</h4>
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Full Name</label>
-                                            <input type="text" defaultValue={user?.username || "Priya Kumar"} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-indigo-500" />
+                                            <input
+                                                type="text"
+                                                name="full_name"
+                                                value={settingsForm.full_name}
+                                                onChange={handleSettingsChange}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                                            />
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email Address</label>
-                                            <input type="email" defaultValue={user?.email || "priya.k@smartshield.com"} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-indigo-500" />
+                                            <input
+                                                type="email"
+                                                name="email"
+                                                value={settingsForm.email}
+                                                onChange={handleSettingsChange}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                                            />
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Vehicle Number</label>
-                                            <input type="text" defaultValue="TN-01-AB-1234" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-indigo-500" />
+                                            <input
+                                                type="text"
+                                                name="vehicle_number"
+                                                value={settingsForm.vehicle_number}
+                                                onChange={handleSettingsChange}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                                            />
                                         </div>
                                     </div>
 
@@ -777,15 +846,33 @@ const ModernDashboard = () => {
                                         <h4 className="font-bold text-slate-700 border-b border-slate-100 pb-2">Emergency Contacts</h4>
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Primary Contact Name</label>
-                                            <input type="text" defaultValue="Rahul Kumar" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-indigo-500" />
+                                            <input
+                                                type="text"
+                                                name="emergency_contact_name"
+                                                value={settingsForm.emergency_contact_name}
+                                                onChange={handleSettingsChange}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                                            />
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Primary Contact Phone</label>
-                                            <input type="tel" defaultValue="+91 98765 43210" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-indigo-500" />
+                                            <input
+                                                type="tel"
+                                                name="emergency_contact_phone"
+                                                value={settingsForm.emergency_contact_phone}
+                                                onChange={handleSettingsChange}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                                            />
                                         </div>
                                         <div className="pt-2">
                                             <label className="flex items-center gap-2 cursor-pointer">
-                                                <input type="checkbox" defaultChecked className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" />
+                                                <input
+                                                    type="checkbox"
+                                                    name="share_location"
+                                                    checked={settingsForm.share_location}
+                                                    onChange={handleSettingsChange}
+                                                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                                />
                                                 <span className="text-sm text-slate-600">Share live location during active shifts</span>
                                             </label>
                                         </div>
@@ -796,22 +883,8 @@ const ModernDashboard = () => {
                                     <button className="px-6 py-2 text-slate-500 font-bold hover:text-slate-800 transition-colors">Cancel</button>
                                     <button
                                         className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-50"
-                                        onClick={async () => {
-                                            try {
-                                                const settings = {
-                                                    notifications: true,
-                                                    location_sharing: true,
-                                                    emergency_contacts: [],
-                                                    theme: 'light'
-                                                };
-                                                // Using the existing api service which prepends /api/v1
-                                                await api.post('/users/settings', settings);
-                                                alert("Settings saved successfully!");
-                                            } catch (error) {
-                                                console.error("Failed to save settings:", error);
-                                                alert("Failed to save settings. Please try again.");
-                                            }
-                                        }}
+                                        onClick={handleSaveSettings}
+                                        disabled={loading}
                                     >
                                         Save Changes
                                     </button>
@@ -820,6 +893,7 @@ const ModernDashboard = () => {
                         </div>
                     )}
                 </main >
+
             </div >
         </div >
     );
