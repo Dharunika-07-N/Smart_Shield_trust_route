@@ -14,6 +14,7 @@ const ModelPerformance = () => {
     const [selectedModel, setSelectedModel] = useState('safety');
     const [report, setReport] = useState(null);
     const [experiments, setExperiments] = useState([]);
+    const [isCreatingExp, setIsCreatingExp] = useState(false);
 
     const models = [
         { id: 'safety', label: 'Safety Classifier', icon: FiShield, color: '#4f46e5' },
@@ -201,7 +202,10 @@ const ModelPerformance = () => {
                             Compare performance between different model versions in production. Safely roll out enhancements with data-driven confidence.
                         </p>
                     </div>
-                    <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-2xl transition-all shadow-lg shadow-indigo-500/20 active:scale-95">
+                    <button
+                        onClick={() => setIsCreatingExp(true)}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-2xl transition-all shadow-lg shadow-indigo-500/20 active:scale-95"
+                    >
                         New Experiment
                     </button>
                 </div>
@@ -275,6 +279,48 @@ const ModelPerformance = () => {
                     </div>
                 </div>
             </div>
+            {/* New Experiment Modal */}
+            {isCreatingExp && (
+                <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-6">
+                    <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95">
+                        <h3 className="text-2xl font-black text-slate-900 mb-2">Configure A/B Test</h3>
+                        <p className="text-sm text-slate-500 mb-8 font-medium">Define parameters for your next model optimization experiment.</p>
+
+                        <div className="space-y-6 mb-10">
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Experiment Name</label>
+                                <input type="text" placeholder="e.g. Weather-Aware-Routing-v4" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Primary Metric</label>
+                                    <select className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 font-bold text-slate-800 outline-none">
+                                        <option>MAE (Mean Error)</option>
+                                        <option>R² Score</option>
+                                        <option>Confidence Score</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Traffic Allocation</label>
+                                    <select className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 font-bold text-slate-800 outline-none">
+                                        <option>5% (Canary)</option>
+                                        <option>50% (A/B)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-4">
+                            <button onClick={() => { setIsCreatingExp(false); alert("Experiment deployment initiated. Monitoring will start in 5 minutes."); }} className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-500/20 active:scale-95 transition-all">
+                                Deploy Experiment
+                            </button>
+                            <button onClick={() => setIsCreatingExp(false)} className="flex-1 py-4 bg-slate-50 text-slate-400 rounded-2xl font-bold hover:bg-slate-100 transition-all">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
