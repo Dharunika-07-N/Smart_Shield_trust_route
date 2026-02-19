@@ -7,6 +7,15 @@ import {
  */
 export const ROLE_OPTIONS = [
     {
+        value: 'customer',
+        label: 'Customer',
+        icon: FiUser,
+        needsLogin: true,
+        canSelfRegister: true,
+        defaultRoute: '/customer/dashboard',
+        permissions: ['view_shipments', 'track_orders', 'view_analytics']
+    },
+    {
         value: 'rider',
         label: 'Rider',
         icon: FiUser,
@@ -62,6 +71,7 @@ export const LOGIN_PAGE_CONFIG = {
     showRoleSelection: true,
 
     visibleRoles: [
+        'customer',
         'rider',
         'driver',
         'dispatcher',
@@ -69,6 +79,7 @@ export const LOGIN_PAGE_CONFIG = {
     ],
 
     allowRegistration: {
+        customer: true,
         rider: true,
         driver: true,
         dispatcher: false,
@@ -77,6 +88,7 @@ export const LOGIN_PAGE_CONFIG = {
     },
 
     requiresVerification: {
+        customer: false,
         rider: false,
         driver: true,
         dispatcher: false,
