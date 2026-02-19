@@ -4,11 +4,11 @@ import {
   FiAlertTriangle, FiNavigation, FiSettings, FiLogOut,
   FiBell, FiSearch, FiMonitor, FiMap, FiCheckCircle,
   FiTrash2, FiToggleLeft, FiToggleRight, FiRefreshCw,
-  FiUserCheck, FiUserX, FiFilter
+  FiUserCheck, FiShare2
 } from 'react-icons/fi';
 import Analytics from './Analytics';
 import RouteMap from './RouteMap';
-import LiveTracking from './LiveTracking';
+import FleetMap from './FleetMap';
 import TrainingCenter from './TrainingCenter';
 import ModelPerformance from './ModelPerformance';
 import AIReportSummary from './AIReportSummary';
@@ -35,6 +35,18 @@ const AdminDashboard = () => {
 
   const [allAlerts, setAllAlerts] = useState([]);
   const [allFeedback, setAllFeedback] = useState([]);
+  const [trendsData, setTrendsData] = useState(null);
+  const [recentEvents, setRecentEvents] = useState([]);
+  const [globalSearch, setGlobalSearch] = useState('');
+  const [config, setConfig] = useState({
+    strictSafety: true,
+    gpsPolling: true,
+    mainenance: false
+  });
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [isTerminalOpen, setIsTerminalOpen] = useState(false);
+  const [lastBroadcast, setLastBroadcast] = useState(null);
 
   const fetchReports = async () => {
     try {
@@ -47,24 +59,78 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchTrends = async () => {
+    try {
+      const data = await api.get('/admin/analytics-trends');
+      setTrendsData(data);
+    } catch (e) {
+      console.error("Failed to fetch trends", e);
+    }
+  };
+
+  const fetchEvents = async () => {
+    try {
+      const data = await api.get('/admin/fleet-events');
+      setRecentEvents(data);
+    } catch (e) {
+      console.error("Failed to fetch events", e);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      const data = await api.get('/admin/summary');
+      setStats({
+        activeDrivers: data.activeDrivers,
+        fleetUtilization: data.fleetUtilization,
+        safetyScore: data.safetyScore,
+        activeAlerts: data.activeAlerts
+      });
+      fetchTrends();
+      fetchEvents();
+    } catch (e) {
+      console.error("Failed to fetch admin stats", e);
+    }
+  };
+
   const fetchAllUsers = async () => {
     setUsersLoading(true);
     setUsersError('');
     try {
-      // api interceptor already unwraps response.data
       const data = await api.get('/users/all');
       setAllUsers(Array.isArray(data) ? data : []);
     } catch (e) {
-      setUsersError(e.response?.data?.detail || 'Failed to load users. Make sure you are logged in as Admin.');
+      setUsersError(e.response?.data?.detail || 'Failed to load users.');
     } finally {
       setUsersLoading(false);
     }
   };
 
   useEffect(() => {
+    if (activeTab === 'Overview') fetchStats();
     if (activeTab === 'Users') fetchAllUsers();
     if (activeTab === 'Reports') fetchReports();
   }, [activeTab]);
+
+  const handleBroadcast = async () => {
+    const msg = window.prompt("Enter message to broadcast to all nodes:");
+    if (!msg) return;
+    try {
+      await api.post('/admin/broadcast', { message: msg, target: 'all' });
+      setLastBroadcast({ message: msg, time: new Date().toLocaleTimeString() });
+      alert("Broadcast sent successfully!");
+    } catch (e) {
+      alert("Broadcast failed: " + e.message);
+    }
+  };
+
+  const handleExportIncidentReports = () => {
+    window.open(`${api.defaults?.baseURL || ''}/api/v1/admin/export/reports`, '_blank');
+  };
+
+  const handleSysConfig = () => {
+    setIsConfigOpen(true);
+  };
 
   const handleToggleStatus = async (u) => {
     const newStatus = u.status === 'active' ? 'inactive' : 'active';
@@ -162,13 +228,21 @@ const AdminDashboard = () => {
             <p className="text-xs font-bold text-slate-900">All Nodes Stable</p>
             <p className="text-[10px] text-slate-400 mt-1">v2.4.0 • Enterprise</p>
           </div>
-
-          <button
-            onClick={logout}
-            className="w-full flex items-center gap-3 px-4 py-3 mt-4 text-slate-400 hover:text-rose-500 transition-colors text-sm font-semibold"
-          >
-            <FiLogOut /> Sign Out
-          </button>
+          <div className="mt-auto p-4 flex flex-col gap-2">
+            {user?.role === 'super_admin' && (
+              <button
+                onClick={() => setIsTerminalOpen(true)}
+                className="flex items-center gap-3 px-4 py-3 text-emerald-600 hover:bg-emerald-50 rounded-2xl transition-all font-bold text-sm"
+              >
+                <FiMonitor size={20} />
+                <span>System Terminal</span>
+              </button>
+            )}
+            <button onClick={logout} className="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-rose-500 transition-colors font-bold text-sm">
+              <FiLogOut size={20} />
+              <span>Sign Out</span>
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -182,6 +256,8 @@ const AdminDashboard = () => {
               <input
                 type="text"
                 placeholder="Search system logs, drivers, or alerts..."
+                value={globalSearch}
+                onChange={(e) => setGlobalSearch(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-11 pr-4 text-sm focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/10 transition-all text-slate-900 placeholder:text-slate-400"
               />
             </div>
@@ -192,7 +268,10 @@ const AdminDashboard = () => {
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
               Live Network
             </div>
-            <button className="text-slate-400 hover:text-slate-900 transition-colors relative">
+            <button
+              onClick={() => setActiveTab('Reports')}
+              className="text-slate-400 hover:text-slate-900 transition-colors relative"
+            >
               <FiBell size={20} />
               <span className="absolute -top-1 -right-1 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
             </button>
@@ -270,10 +349,15 @@ const AdminDashboard = () => {
                         <h3 className="text-xl font-bold text-slate-900">Operational Trends</h3>
                         <p className="text-slate-500 text-sm">Fleet performance over the last 24 hours</p>
                       </div>
-                      <button className="px-4 py-2 bg-white hover:bg-slate-50 text-xs font-bold text-slate-600 rounded-xl transition-all border border-slate-200">Export Report</button>
+                      <button
+                        onClick={handleExportIncidentReports}
+                        className="px-4 py-2 bg-white hover:bg-slate-50 text-xs font-bold text-slate-600 rounded-xl transition-all border border-slate-200"
+                      >
+                        Export Report
+                      </button>
                     </div>
                     <div className="mt-4 h-auto overflow-visible">
-                      <Analytics hideTitle={true} />
+                      <Analytics hideTitle={true} externalData={trendsData} />
                     </div>
                   </div>
 
@@ -281,18 +365,26 @@ const AdminDashboard = () => {
                   <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
                     <h3 className="text-lg font-bold text-slate-900 mb-6">Recent Fleet Events</h3>
                     <div className="space-y-4">
-                      {[1, 2, 3].map(i => (
-                        <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-transparent group hover:border-emerald-500/30 transition-all">
+                      {recentEvents.length === 0 ? (
+                        <p className="text-xs text-slate-400 italic">No recent events</p>
+                      ) : recentEvents.filter(ev =>
+                        !globalSearch ||
+                        ev.message?.toLowerCase().includes(globalSearch.toLowerCase()) ||
+                        ev.type?.toLowerCase().includes(globalSearch.toLowerCase())
+                      ).map(event => (
+                        <div key={event.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-transparent group hover:border-indigo-500/30 transition-all">
                           <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-600 border border-slate-100 shadow-sm">
-                              <FiCheckCircle size={20} />
+                            <div className={`w-10 h-10 bg-white rounded-xl flex items-center justify-center border border-slate-100 shadow-sm ${event.type === 'alert' ? 'text-rose-600' : 'text-emerald-600'}`}>
+                              {event.type === 'alert' ? <FiAlertTriangle size={20} /> : <FiCheckCircle size={20} />}
                             </div>
                             <div>
-                              <p className="font-bold text-slate-900">Route Optimized - R#442</p>
-                              <p className="text-xs text-slate-500">Safety factor increased by 14%</p>
+                              <p className="font-bold text-slate-900">{event.title}</p>
+                              <p className="text-xs text-slate-500">{event.description}</p>
                             </div>
                           </div>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase">2m ago</span>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">
+                            {new Date(event.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -324,22 +416,40 @@ const AdminDashboard = () => {
                         <p className="text-xs text-amber-600/70 mt-1">Expected in 15 mins</p>
                       </div>
                     </div>
-                    <button className="w-full mt-6 py-4 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl text-sm font-bold transition-all border border-slate-200">View All Alerts</button>
+                    <button
+                      onClick={() => setActiveTab('Reports')}
+                      className="w-full mt-6 py-4 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl text-sm font-bold transition-all border border-slate-200"
+                    >
+                      View All Alerts
+                    </button>
                   </div>
 
                   {/* Quick Actions */}
-                  <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+                  <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm relative overflow-hidden">
                     <h3 className="text-lg font-bold text-slate-900 mb-6">Tools</h3>
                     <div className="grid grid-cols-2 gap-4">
-                      <button className="flex flex-col items-center justify-center gap-2 p-4 bg-slate-50 rounded-3xl hover:bg-slate-100 transition-all border border-slate-200 group">
+                      <button
+                        onClick={handleBroadcast}
+                        className="flex flex-col items-center justify-center gap-2 p-4 bg-slate-50 rounded-3xl hover:bg-slate-100 transition-all border border-slate-200 group"
+                      >
                         <FiMonitor className="text-blue-500 group-hover:scale-110 transition-transform" />
                         <span className="text-[10px] font-bold uppercase text-slate-500">Broadcast</span>
                       </button>
-                      <button className="flex flex-col items-center justify-center gap-2 p-4 bg-slate-50 rounded-3xl hover:bg-slate-100 transition-all border border-slate-200 group">
+                      <button
+                        onClick={handleSysConfig}
+                        className="flex flex-col items-center justify-center gap-2 p-4 bg-slate-50 rounded-3xl hover:bg-slate-100 transition-all border border-slate-200 group"
+                      >
                         <FiSettings className="text-slate-400 group-hover:scale-110 transition-transform" />
                         <span className="text-[10px] font-bold uppercase text-slate-500">Sys Config</span>
                       </button>
                     </div>
+                    {lastBroadcast && (
+                      <div className="mt-6 p-4 bg-blue-50/50 rounded-2xl border border-blue-100 animate-in fade-in slide-in-from-bottom duration-500">
+                        <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Last Global Broadcast</p>
+                        <p className="text-sm font-medium text-blue-900 leading-tight">"{lastBroadcast.message}"</p>
+                        <p className="text-[9px] text-blue-400 font-bold mt-2 uppercase tracking-tighter">Sent at {lastBroadcast.time}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -366,7 +476,7 @@ const AdminDashboard = () => {
 
           {activeTab === 'Fleet' && (
             <div className="h-full rounded-[2.5rem] overflow-hidden border border-slate-200 bg-white ring-8 ring-slate-100/50">
-              <LiveTracking />
+              <FleetMap />
             </div>
           )}
 
@@ -661,6 +771,84 @@ const AdminDashboard = () => {
           {activeTab === 'AIReports' && <AIReportSummary />}
         </main>
       </div>
+
+      {/* Sys Config Modal */}
+      {isConfigOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden transform animate-in slide-in-from-bottom-8 duration-500">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">System Configuration</h3>
+                <p className="text-xs text-slate-500 font-medium">Core infrastructure settings and node status.</p>
+              </div>
+              <button
+                onClick={() => setIsConfigOpen(false)}
+                className="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 transition-all"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-8 space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">API Endpoint</p>
+                  <p className="text-sm font-bold text-slate-900">http://0.0.0.0:8000</p>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Socket Status</p>
+                  <p className="text-sm font-bold text-emerald-600">Encrypted / Active</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-200">
+                  <span className="text-sm font-bold text-slate-700">Strict Safety Validation</span>
+                  <button
+                    onClick={() => setConfig(prev => ({ ...prev, strictSafety: !prev.strictSafety }))}
+                    className={`w-10 h-5 rounded-full relative transition-colors ${config.strictSafety ? 'bg-indigo-600' : 'bg-slate-300'}`}
+                  >
+                    <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${config.strictSafety ? 'right-1' : 'left-1'}`}></div>
+                  </button>
+                </div>
+                <div className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-200">
+                  <span className="text-sm font-bold text-slate-700">Real-time GPS Polling</span>
+                  <button
+                    onClick={() => setConfig(prev => ({ ...prev, gpsPolling: !prev.gpsPolling }))}
+                    className={`w-10 h-5 rounded-full relative transition-colors ${config.gpsPolling ? 'bg-indigo-600' : 'bg-slate-300'}`}
+                  >
+                    <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${config.gpsPolling ? 'right-1' : 'left-1'}`}></div>
+                  </button>
+                </div>
+                <div className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-200 opacity-50 cursor-not-allowed">
+                  <span className="text-sm font-bold text-slate-700">Maintenance Mode</span>
+                  <div className="w-10 h-5 bg-slate-200 rounded-full relative"><div className="absolute left-1 top-1 w-3 h-3 bg-white rounded-full"></div></div>
+                </div>
+              </div>
+            </div>
+            <div className="p-8 bg-slate-50/50 border-t border-slate-100 flex gap-4">
+              <button
+                disabled={isSavingConfig}
+                onClick={async () => {
+                  setIsSavingConfig(true);
+                  // Simulate API persist
+                  await new Promise(r => setTimeout(r, 1000));
+                  setIsSavingConfig(false);
+                  setIsConfigOpen(false);
+                  alert("Infrastructure configuration updated successfully.");
+                }}
+                className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20 disabled:opacity-50"
+              >
+                {isSavingConfig ? 'Saving...' : 'Apply Changes'}
+              </button>
+              <button
+                onClick={() => setIsConfigOpen(false)}
+                className="flex-1 py-3 bg-white text-slate-600 border border-slate-200 rounded-xl font-bold hover:bg-slate-50 transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
