@@ -49,11 +49,30 @@ def list_deliveries(
 ):
     """List deliveries (filtered for rider if applicable)."""
     query = db.query(Delivery)
-    if current_user.role == "rider":
+    
+    # Riders only see their own
+    if current_user.role in ["rider", "driver"]:
         query = query.filter(Delivery.assigned_rider_id == current_user.id)
+    
+    # Filter by status if provided
     if status:
         query = query.filter(Delivery.status == status)
-    return [{"id": d.id, "order_id": d.order_id, "status": d.status} for d in query.all()]
+    
+    deliveries = query.order_by(Delivery.created_at.desc()).all()
+    
+    return [
+        {
+            "id": d.id,
+            "order_id": d.order_id,
+            "customer_id": d.customer_id,
+            "status": d.status,
+            "pickup_location": d.pickup_location,
+            "dropoff_location": d.dropoff_location,
+            "assigned_rider_id": d.assigned_rider_id,
+            "safety_score": d.safety_score,
+            "created_at": d.created_at.isoformat() if d.created_at else None
+        } for d in deliveries
+    ]
 
 @router.put("/{delivery_id}/status")
 def update_delivery_status(
@@ -137,3 +156,37 @@ async def upload_proof(
     
     db.commit()
     return {"success": True, "photo_url": photo_url, "signature_url": signature_url}
+
+@router.get("/search/{order_id}")
+def search_delivery(
+    order_id: str,
+    db: Session = Depends(get_db)
+):
+    """Search for a delivery by order ID (for customers)."""
+    delivery = db.query(Delivery).filter(Delivery.order_id == order_id).first()
+    if not delivery:
+        raise HTTPException(status_code=404, detail="Booking ID not found")
+    
+    # Get assigned rider info if any
+    rider_info = None
+    if delivery.assigned_rider_id:
+        rider = db.query(User).filter(User.id == delivery.assigned_rider_id).first()
+        if rider:
+            rider_info = {
+                "name": rider.full_name or rider.username,
+                "phone": rider.phone,
+                "role": rider.role
+            }
+
+    return {
+        "id": delivery.id,
+        "order_id": delivery.order_id,
+        "status": delivery.status,
+        "pickup_location": delivery.pickup_location,
+        "dropoff_location": delivery.dropoff_location,
+        "estimated_distance": delivery.estimated_distance,
+        "estimated_duration": delivery.estimated_duration,
+        "safety_score": delivery.safety_score,
+        "created_at": delivery.created_at.isoformat() if delivery.created_at else None,
+        "rider": rider_info
+    }
