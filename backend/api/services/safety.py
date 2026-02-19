@@ -659,3 +659,17 @@ class SafetyService:
         return None
 
 
+    def get_all_panic_alerts(self, db: Session, limit: int = 50) -> List[Dict]:
+        """Get all panic alerts for admin dashboard."""
+        alerts = db.query(PanicAlert).order_by(PanicAlert.created_at.desc()).limit(limit).all()
+        return [
+            {
+                "id": a.id,
+                "rider_id": a.rider_id,
+                "location": a.location,
+                "status": a.status,
+                "created_at": a.created_at.isoformat(),
+                "resolved_at": a.resolved_at.isoformat() if a.resolved_at else None,
+                "alerted_contacts": a.alerted_contacts
+            } for a in alerts
+        ]
