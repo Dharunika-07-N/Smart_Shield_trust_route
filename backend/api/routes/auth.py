@@ -17,7 +17,7 @@ def register(request: Request, user_in: UserCreate, db: Session = Depends(get_db
     """Register a new user (Rider or Driver publicly, Others via restricted paths)."""
     try:
         # 1. Check if registration is allowed for this role publicly
-        allowed_public_roles = ["rider", "driver"]
+        allowed_public_roles = ["customer", "rider", "driver"]
         if user_in.role not in allowed_public_roles and not user_in.admin_code:
              raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
