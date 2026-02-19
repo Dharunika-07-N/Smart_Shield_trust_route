@@ -3,7 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.routes import (
     delivery, safety, feedback, traffic, auth, 
     training, users, deliveries, tracking, 
-    dashboard, monitoring, experiments, ai_reports, system
+    dashboard, monitoring, experiments, ai_reports, system,
+    notifications
 )
 from api.utils.limiter import limiter
 from slowapi import _rate_limit_exceeded_handler
@@ -96,6 +97,9 @@ api_v1_router.include_router(system.router)
 
 # Register the versioned router to the app
 app.include_router(api_v1_router)
+
+# Register notifications websocket at root level (as expected by frontend)
+app.include_router(notifications.router)
 
 @app.get("/")
 async def root():
