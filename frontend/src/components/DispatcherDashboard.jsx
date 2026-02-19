@@ -3,7 +3,7 @@ import {
     FiShield, FiPackage, FiActivity, FiMap, FiUsers,
     FiAlertTriangle, FiNavigation, FiBarChart2, FiLogOut,
     FiHeadphones, FiSearch, FiBell, FiTruck, FiCheckCircle,
-    FiClock, FiTrendingUp
+    FiClock, FiTrendingUp, FiZap
 } from 'react-icons/fi';
 import Analytics from './Analytics';
 import RouteMap from './RouteMap';
