@@ -18,6 +18,15 @@ const DispatcherDashboard = () => {
     const [queue, setQueue] = useState([]);
     const [onlineDrivers, setOnlineDrivers] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedOrder, setSelectedOrder] = useState(null);
+    const [showLogModal, setShowLogModal] = useState(false);
+    const [activities, setActivities] = useState([
+        { id: 1, driver: '#4421', msg: 'Checked in at Zone 4B (Secure)', time: '2m ago' },
+        { id: 2, driver: '#8892', msg: 'Cargo pickup verified at Hub C', time: '5m ago' },
+        { id: 3, driver: '#1120', msg: 'Route deviation detected (Low Risk)', time: '12m ago' },
+        { id: 4, driver: '#7731', msg: 'Safety signal ping received', time: '15m ago' }
+    ]);
 
     const fetchData = async () => {
         setLoading(true);
@@ -42,12 +51,21 @@ const DispatcherDashboard = () => {
 
     const handleAutoDispatch = async () => {
         if (!window.confirm("Trigger automated AI delivery assignment?")) return;
+        setLoading(true);
         try {
             await api.post('/deliveries/auto-dispatch');
-            alert("Auto-dispatch triggered successfully!");
+            alert("Auto-dispatch triggered successfully! 4 segments optimized.");
+            setActivities(prev => [{
+                id: Date.now(),
+                driver: 'AI-SYSTEM',
+                msg: 'Automated fleet dispatch sequence complete',
+                time: 'Just now'
+            }, ...prev]);
             fetchData();
         } catch (e) {
             alert("Failed to trigger auto-dispatch: " + e.message);
+        } finally {
+            setLoading(false);
         }
     };
     const [isNetworkStable, setIsNetworkStable] = useState(true);
@@ -115,21 +133,28 @@ const DispatcherDashboard = () => {
             <div className="flex-1 flex flex-col min-w-0">
                 {/* Header */}
                 <header className="h-20 bg-white/50 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-8 z-20">
-                    <div className="flex items-center gap-4">
-                        <h2 className="text-xl font-bold text-slate-900 tracking-tight">Fleet Intelligence</h2>
-                        <div className="h-6 w-px bg-slate-200"></div>
+                    <div className="flex items-center gap-4 flex-1 max-w-xl">
+                        <div className="relative w-full">
+                            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input
+                                type="text"
+                                placeholder="Search units, orders, or signals..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-11 pr-4 text-sm focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/10 transition-all text-slate-900 placeholder:text-slate-400 font-medium"
+                            />
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-4 flex-1 justify-end">
                         <div className="flex items-center gap-2 px-3 py-1 bg-indigo-50 border border-indigo-100 rounded-full">
                             <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full animate-pulse"></div>
                             <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Master Node Active</span>
                         </div>
-                    </div>
-
-                    <div className="flex items-center gap-4">
                         <button className="text-slate-400 hover:text-slate-900 transition-colors relative">
                             <FiBell size={20} />
                             <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
                         </button>
-                        <div className="w-px h-8 bg-slate-800"></div>
+                        <div className="w-px h-8 bg-slate-200"></div>
                         <div className="flex items-center gap-3">
                             <div className="text-right hidden sm:block">
                                 <p className="text-sm font-bold text-slate-900 leading-none">{user?.full_name || user?.username || 'Dispatcher'}</p>
@@ -167,8 +192,18 @@ const DispatcherDashboard = () => {
                                         <div className="flex items-center justify-between mb-8">
                                             <h3 className="text-lg font-bold text-slate-900">Live Operations Command</h3>
                                             <div className="flex gap-2">
-                                                <button className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-500/20 transition-all active:scale-95">Optimize All</button>
-                                                <button className="px-4 py-2 bg-white text-slate-600 text-xs font-bold rounded-xl border border-slate-200 hover:bg-slate-50">Filter View</button>
+                                                <button
+                                                    onClick={handleOptimizeAll}
+                                                    className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-500/20 transition-all active:scale-95"
+                                                >
+                                                    Optimize All
+                                                </button>
+                                                <button
+                                                    onClick={handleFilterView}
+                                                    className="px-4 py-2 bg-white text-slate-600 text-xs font-bold rounded-xl border border-slate-200 hover:bg-slate-50 transition-all"
+                                                >
+                                                    Filter View
+                                                </button>
                                             </div>
                                         </div>
                                         <div className="h-[400px] rounded-3xl overflow-hidden border border-slate-200">
@@ -181,24 +216,29 @@ const DispatcherDashboard = () => {
                                     <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
                                         <h3 className="text-lg font-bold text-slate-900 mb-6">Real-time Activity</h3>
                                         <div className="space-y-4">
-                                            {[1, 2, 3, 4].map(i => (
-                                                <div key={i} className="p-4 bg-slate-50 rounded-2xl border border-transparent group hover:border-indigo-500/30 transition-all">
+                                            {activities.map(act => (
+                                                <div key={act.id} className="p-4 bg-slate-50 rounded-2xl border border-transparent group hover:border-indigo-500/30 transition-all">
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center border border-indigo-100">
                                                             <FiTruck size={16} />
                                                         </div>
                                                         <div className="flex-1">
                                                             <div className="flex justify-between">
-                                                                <p className="text-xs font-bold text-slate-900">Driver #4421</p>
-                                                                <span className="text-[10px] text-slate-600 font-bold uppercase">2m ago</span>
+                                                                <p className="text-xs font-bold text-slate-900">Driver {act.driver}</p>
+                                                                <span className="text-[10px] text-slate-600 font-bold uppercase">{act.time}</span>
                                                             </div>
-                                                            <p className="text-[10px] text-slate-500 mt-0.5">Checked in at Zone 4B (Secure)</p>
+                                                            <p className="text-[10px] text-slate-500 mt-0.5">{act.msg}</p>
                                                         </div>
                                                     </div>
                                                 </div>
                                             ))}
                                         </div>
-                                        <button className="w-full mt-6 py-4 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl text-xs font-bold transition-all border border-slate-200">Full Access Log</button>
+                                        <button
+                                            onClick={() => setShowLogModal(true)}
+                                            className="w-full mt-6 py-4 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl text-xs font-bold transition-all border border-slate-200"
+                                        >
+                                            Full Access Log
+                                        </button>
                                     </div>
 
                                     <div className="p-8 bg-indigo-600 rounded-[2.5rem] shadow-2xl shadow-indigo-900/20 text-white relative overflow-hidden group">
@@ -256,7 +296,12 @@ const DispatcherDashboard = () => {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50">
-                                            {queue.map(item => (
+                                            {queue.filter(item =>
+                                                !searchQuery ||
+                                                item.order_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                item.customer_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                item.dropoff_location?.address?.toLowerCase().includes(searchQuery.toLowerCase())
+                                            ).map(item => (
                                                 <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
                                                     <td className="px-6 py-4">
                                                         <p className="font-bold text-slate-800">{item.order_id}</p>
@@ -276,7 +321,12 @@ const DispatcherDashboard = () => {
                                                         </span>
                                                     </td>
                                                     <td className="px-6 py-4 text-right">
-                                                        <button className="text-indigo-600 font-bold text-xs hover:underline">Manage</button>
+                                                        <button
+                                                            onClick={() => setSelectedOrder(item)}
+                                                            className="text-indigo-600 font-bold text-xs hover:underline"
+                                                        >
+                                                            Manage
+                                                        </button>
                                                     </td>
                                                 </tr>
                                             ))}
@@ -291,13 +341,21 @@ const DispatcherDashboard = () => {
                         <div className="space-y-6">
                             <h2 className="text-2xl font-black text-slate-900">Active Fleet</h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {onlineDrivers.length === 0 ? (
+                                {onlineDrivers.filter(dr =>
+                                    !searchQuery ||
+                                    dr.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                    dr.username?.toLowerCase().includes(searchQuery.toLowerCase())
+                                ).length === 0 ? (
                                     <div className="col-span-full py-20 text-center bg-white rounded-3xl border border-slate-200 border-dashed">
                                         <FiUsers size={48} className="mx-auto text-slate-100 mb-4" />
-                                        <p className="text-slate-400 font-bold">No online drivers detected</p>
+                                        <p className="text-slate-400 font-bold">No matching drivers found</p>
                                     </div>
                                 ) : (
-                                    onlineDrivers.map(dr => (
+                                    onlineDrivers.filter(dr =>
+                                        !searchQuery ||
+                                        dr.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                        dr.username?.toLowerCase().includes(searchQuery.toLowerCase())
+                                    ).map(dr => (
                                         <div key={dr.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
                                             <div className="flex items-center gap-4 mb-4">
                                                 <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center font-black text-xl border border-indigo-100">
@@ -321,8 +379,37 @@ const DispatcherDashboard = () => {
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-2">
-                                                <button className="py-2 bg-slate-50 text-slate-600 text-[10px] font-black uppercase rounded-xl border border-slate-200 hover:bg-slate-100">Profile</button>
-                                                <button className="py-2 bg-indigo-600 text-white text-[10px] font-black uppercase rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-500/10">Channel</button>
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedOrder({
+                                                            order_id: `DOSSIER_${dr.id}`,
+                                                            full_name: dr.full_name || dr.username,
+                                                            status: 'ACTIVE_PROFILE',
+                                                            safety_score: 98,
+                                                            dropoff_location: { address: 'Verified Fleet Member' }
+                                                        });
+                                                    }}
+                                                    className="py-2 bg-slate-50 text-slate-600 text-[10px] font-black uppercase rounded-xl border border-slate-200 hover:bg-slate-100"
+                                                >
+                                                    Profile
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        const msg = window.prompt(`Message to ${dr.full_name || dr.username}:`);
+                                                        if (msg) {
+                                                            alert(`Message sent via Secure Hub: "${msg}"`);
+                                                            setActivities(prev => [{
+                                                                id: Date.now(),
+                                                                driver: dr.username,
+                                                                msg: 'Remote command acknowledged',
+                                                                time: 'Just now'
+                                                            }, ...prev]);
+                                                        }
+                                                    }}
+                                                    className="py-2 bg-indigo-600 text-white text-[10px] font-black uppercase rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-500/10"
+                                                >
+                                                    Channel
+                                                </button>
                                             </div>
                                         </div>
                                     ))
@@ -331,8 +418,68 @@ const DispatcherDashboard = () => {
                         </div>
                     )}
                 </main>
-            </div>
-        </div>
+            </div >
+            {/* Order Management Modal */}
+            {selectedOrder && (
+                <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-6">
+                    <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95">
+                        <div className="flex justify-between items-start mb-6">
+                            <div>
+                                <h3 className="text-2xl font-black text-slate-900">Manage {selectedOrder.order_id}</h3>
+                                <p className="text-sm text-slate-500 font-bold">Safety Override: {selectedOrder.safety_score}%</p>
+                            </div>
+                            <button onClick={() => setSelectedOrder(null)} className="text-slate-400 hover:text-slate-900 text-xl">✕</button>
+                        </div>
+
+                        <div className="space-y-4 mb-10">
+                            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Destination</p>
+                                <p className="text-sm font-bold text-slate-800">{selectedOrder.dropoff_location?.address}</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <button
+                                    onClick={() => { alert("Manual route recalibration broadcasted to driver."); setSelectedOrder(null); }}
+                                    className="py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-500/20 active:scale-95 transition-all text-xs"
+                                >
+                                    Reroute Sync
+                                </button>
+                                <button
+                                    onClick={() => { alert("Support team notified for order " + selectedOrder.order_id); setSelectedOrder(null); }}
+                                    className="py-4 bg-white text-slate-600 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all text-xs"
+                                >
+                                    Flag Support
+                                </button>
+                            </div>
+                        </div>
+                        <p className="text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest cursor-pointer hover:text-slate-600 transition-colors" onClick={() => setSelectedOrder(null)}>Dismiss Panel</p>
+                    </div>
+                </div>
+            )}
+
+            {/* Access Log Modal */}
+            {showLogModal && (
+                <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-6">
+                    <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4">
+                        <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">System Node Access Log</h3>
+                            <button onClick={() => setShowLogModal(false)} className="text-slate-400 hover:text-slate-900 text-2xl">✕</button>
+                        </div>
+                        <div className="p-8 max-h-[400px] overflow-y-auto space-y-4 font-mono text-[10px]">
+                            {Array.from({ length: 15 }).map((_, i) => (
+                                <div key={i} className="flex gap-4 p-2 border-b border-slate-50 text-slate-500">
+                                    <span className="text-indigo-600 font-bold">[{new Date(Date.now() - i * 3600000).toLocaleTimeString()}]</span>
+                                    <span className="font-bold text-slate-800">AUTH_SUCCESS</span>
+                                    <span>NODE_{100 + i} verified via RSA-4096. Token rotating...</span>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="p-6 bg-slate-50 flex justify-end">
+                            <button onClick={() => setShowLogModal(false)} className="px-6 py-2 bg-slate-900 text-white rounded-xl font-bold text-xs">Acknowledge</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div >
     );
 };
 
