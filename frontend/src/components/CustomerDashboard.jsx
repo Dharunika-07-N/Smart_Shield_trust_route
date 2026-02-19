@@ -48,23 +48,45 @@ const CustomerDashboard = () => {
     };
 
     const handleTrack = async (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
         if (!trackingId) return;
 
         setLoading(true);
         setError('');
 
         try {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 800));
-            setOrderData(mockOrder);
+            const data = await api.get(`/deliveries/search/${trackingId}`);
+            setOrderData(data);
             setIsTracking(true);
         } catch (err) {
-            setError('Booking ID not found. Please check and try again.');
+            setError(err.message || 'Booking ID not found. Please check and try again.');
+            setIsTracking(false);
         } finally {
             setLoading(false);
         }
     };
+
+    // Live tracking effect
+    useEffect(() => {
+        if (!isTracking || !orderData?.id) return;
+
+        const interval = setInterval(async () => {
+            try {
+                const trackingData = await api.get(`/delivery/${orderData.id}/track`);
+                if (trackingData.success && trackingData.data) {
+                    setOrderData(prev => ({
+                        ...prev,
+                        status: trackingData.data.status,
+                        current_location: trackingData.data.current_location
+                    }));
+                }
+            } catch (e) {
+                console.error("Tracking poll failed", e);
+            }
+        }, 10000);
+
+        return () => clearInterval(interval);
+    }, [isTracking, orderData?.id]);
 
     const getStatusStep = () => {
         const statuses = ['confirmed', 'assigned', 'picked_up', 'in_transit', 'delivered'];
@@ -180,23 +202,32 @@ const CustomerDashboard = () => {
                             {/* Driver Info */}
                             <div className="bg-white rounded-2xl p-4 border border-slate-200">
                                 <h3 className="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest">Delivery Partner</h3>
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 border border-slate-200">
-                                        <FiUser size={24} />
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="flex items-center justify-between">
-                                            <h4 className="font-bold text-slate-800">{orderData.driver.name}</h4>
-                                            <div className="flex items-center gap-1 text-xs font-bold text-amber-500 bg-amber-50 px-2 py-0.5 rounded-full">
-                                                <FiStar size={10} fill="currentColor" />
-                                                {orderData.driver.rating}
-                                            </div>
+                                {orderData.rider ? (
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 border border-slate-200">
+                                            <FiUser size={24} />
                                         </div>
-                                        <p className="text-xs text-slate-500 mt-0.5">{orderData.driver.vehicle}</p>
+                                        <div className="flex-1">
+                                            <div className="flex items-center justify-between">
+                                                <h4 className="font-bold text-slate-800">{orderData.rider.name}</h4>
+                                                <div className="flex items-center gap-1 text-xs font-bold text-amber-500 bg-amber-50 px-2 py-0.5 rounded-full">
+                                                    <FiStar size={10} fill="currentColor" />
+                                                    4.8
+                                                </div>
+                                            </div>
+                                            <p className="text-xs text-slate-500 mt-0.5">Verified Safety Professional</p>
+                                        </div>
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="p-4 bg-slate-50 rounded-xl text-center">
+                                        <p className="text-xs text-slate-400 font-bold">Assigning nearest partner...</p>
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-2 gap-2 mt-4">
-                                    <button className="flex items-center justify-center gap-2 py-2.5 bg-slate-50 hover:bg-slate-100 rounded-xl text-slate-700 text-sm font-bold transition-all border border-slate-200">
+                                    <button
+                                        onClick={() => orderData.rider?.phone && (window.location.href = `tel:${orderData.rider.phone}`)}
+                                        className="flex items-center justify-center gap-2 py-2.5 bg-slate-50 hover:bg-slate-100 rounded-xl text-slate-700 text-sm font-bold transition-all border border-slate-200"
+                                    >
                                         <FiPhone size={14} /> Call
                                     </button>
                                     <button className="flex items-center justify-center gap-2 py-2.5 bg-indigo-50 hover:bg-indigo-100 rounded-xl text-indigo-700 text-sm font-bold transition-all border border-indigo-100">
@@ -209,15 +240,17 @@ const CustomerDashboard = () => {
                             <div className="bg-white rounded-2xl p-4 border border-slate-200">
                                 <h3 className="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest">Order Details</h3>
                                 <div className="space-y-3">
-                                    {orderData.items.map((item, idx) => (
-                                        <div key={idx} className="flex justify-between text-sm">
-                                            <span className="text-slate-600">{item.qty}x {item.name}</span>
-                                            <span className="font-bold text-slate-800">{item.price}</span>
-                                        </div>
-                                    ))}
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-slate-600">Pickup</span>
+                                        <span className="font-bold text-slate-800 text-right max-w-[150px] truncate">{orderData.pickup_location?.address || 'Verified Hub'}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-slate-600">Dropoff</span>
+                                        <span className="font-bold text-slate-800 text-right max-w-[150px] truncate">{orderData.dropoff_location?.address || 'Your Address'}</span>
+                                    </div>
                                     <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
-                                        <span className="font-bold text-slate-800">Total</span>
-                                        <span className="text-lg font-extrabold text-indigo-600">{orderData.total}</span>
+                                        <span className="font-bold text-slate-800">Safety Score</span>
+                                        <span className="text-lg font-extrabold text-indigo-600">{orderData.safety_score || 85}%</span>
                                     </div>
                                 </div>
                             </div>
