@@ -4,7 +4,7 @@ from api.routes import (
     delivery, safety, feedback, traffic, auth, 
     training, users, deliveries, tracking, 
     dashboard, monitoring, experiments, ai_reports, system,
-    notifications
+    notifications, admin
 )
 from api.utils.limiter import limiter
 from slowapi import _rate_limit_exceeded_handler
@@ -94,6 +94,7 @@ api_v1_router.include_router(monitoring.router)
 api_v1_router.include_router(experiments.router)
 api_v1_router.include_router(ai_reports.router)
 api_v1_router.include_router(system.router)
+api_v1_router.include_router(admin.router)
 
 # Register the versioned router to the app
 app.include_router(api_v1_router)
