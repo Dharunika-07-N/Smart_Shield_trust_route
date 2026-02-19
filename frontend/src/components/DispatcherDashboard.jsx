@@ -14,6 +14,41 @@ import { useAuth } from '../context/AuthContext';
 const DispatcherDashboard = () => {
     const { user, logout } = useAuth();
     const [activeTab, setActiveTab] = useState('Overview');
+    const [queue, setQueue] = useState([]);
+    const [onlineDrivers, setOnlineDrivers] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            if (activeTab === 'Queue') {
+                const data = await api.get('/deliveries');
+                setQueue(Array.isArray(data) ? data : []);
+            } else if (activeTab === 'Drivers') {
+                const data = await api.get('/users/online');
+                setOnlineDrivers(Array.isArray(data) ? data : []);
+            }
+        } catch (e) {
+            console.error("Failed to fetch dispatcher data", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchData();
+    }, [activeTab]);
+
+    const handleAutoDispatch = async () => {
+        if (!window.confirm("Trigger automated AI delivery assignment?")) return;
+        try {
+            await api.post('/deliveries/auto-dispatch');
+            alert("Auto-dispatch triggered successfully!");
+            fetchData();
+        } catch (e) {
+            alert("Failed to trigger auto-dispatch: " + e.message);
+        }
+    };
     const [isNetworkStable, setIsNetworkStable] = useState(true);
 
     const stats = [
@@ -191,13 +226,106 @@ const DispatcherDashboard = () => {
                         </div>
                     )}
 
-                    {(activeTab === 'Queue' || activeTab === 'Drivers') && (
-                        <div className="h-full flex flex-col items-center justify-center text-center">
-                            <div className="p-12 bg-white rounded-[3rem] border border-slate-200 shadow-xl">
-                                <FiPackage size={48} className="text-slate-200 mx-auto mb-6" />
-                                <h3 className="text-2xl font-black text-slate-900">{activeTab} Interface</h3>
-                                <p className="text-slate-500 mt-2 max-w-xs mx-auto">Connecting to real-time sync engine... Sector updates arriving shortly.</p>
-                                <button className="mt-8 px-8 py-3 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-500/20 transition-all">Retry Handshake</button>
+                    {activeTab === 'Queue' && (
+                        <div className="space-y-6">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-2xl font-black text-slate-900">Delivery Queue</h2>
+                                <button
+                                    onClick={handleAutoDispatch}
+                                    className="px-6 py-2.5 bg-indigo-600 text-white text-sm font-black rounded-xl shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 transition-all active:scale-95 flex items-center gap-2"
+                                >
+                                    <FiZap size={16} /> AUTO-DISPATCH ALL
+                                </button>
+                            </div>
+                            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                                {queue.length === 0 ? (
+                                    <div className="py-20 text-center text-slate-400">
+                                        <FiPackage size={48} className="mx-auto mb-4 opacity-20" />
+                                        <p className="font-bold">Queue is empty</p>
+                                    </div>
+                                ) : (
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="bg-slate-50 border-b border-slate-100 uppercase text-[10px] font-black tracking-widest text-slate-400">
+                                                <th className="text-left px-6 py-4">Order info</th>
+                                                <th className="text-left px-4 py-4">Destination</th>
+                                                <th className="text-left px-4 py-4">Safety</th>
+                                                <th className="text-left px-4 py-4">Status</th>
+                                                <th className="text-right px-6 py-4">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50">
+                                            {queue.map(item => (
+                                                <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                                                    <td className="px-6 py-4">
+                                                        <p className="font-bold text-slate-800">{item.order_id}</p>
+                                                        <p className="text-[10px] text-slate-400 uppercase font-black">{item.id?.substring(0, 8)}</p>
+                                                    </td>
+                                                    <td className="px-4 py-4">
+                                                        <p className="text-xs text-slate-600 truncate max-w-[200px]">{item.dropoff_location?.address || 'N/A'}</p>
+                                                    </td>
+                                                    <td className="px-4 py-4">
+                                                        <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">
+                                                            {item.safety_score || 85}%
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-4">
+                                                        <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${item.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                                            {item.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <button className="text-indigo-600 font-bold text-xs hover:underline">Manage</button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'Drivers' && (
+                        <div className="space-y-6">
+                            <h2 className="text-2xl font-black text-slate-900">Active Fleet</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {onlineDrivers.length === 0 ? (
+                                    <div className="col-span-full py-20 text-center bg-white rounded-3xl border border-slate-200 border-dashed">
+                                        <FiUsers size={48} className="mx-auto text-slate-100 mb-4" />
+                                        <p className="text-slate-400 font-bold">No online drivers detected</p>
+                                    </div>
+                                ) : (
+                                    onlineDrivers.map(dr => (
+                                        <div key={dr.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
+                                            <div className="flex items-center gap-4 mb-4">
+                                                <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center font-black text-xl border border-indigo-100">
+                                                    {dr.full_name?.charAt(0) || dr.username?.charAt(0)}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="font-bold text-slate-900 truncate">{dr.full_name || dr.username}</h3>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                                                        <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Active Now</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2 mb-6">
+                                                <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase">
+                                                    <span>Signal Strength</span>
+                                                    <span className="text-slate-900">Optimal</span>
+                                                </div>
+                                                <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+                                                    <div className="h-full bg-indigo-500 w-[92%]"></div>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <button className="py-2 bg-slate-50 text-slate-600 text-[10px] font-black uppercase rounded-xl border border-slate-200 hover:bg-slate-100">Profile</button>
+                                                <button className="py-2 bg-indigo-600 text-white text-[10px] font-black uppercase rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-500/10">Channel</button>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
                             </div>
                         </div>
                     )}
