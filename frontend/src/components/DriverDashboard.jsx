@@ -23,6 +23,7 @@ const DriverDashboard = () => {
     const [isOnline, setIsOnline] = useState(true);
     const [isTripExpanded, setIsTripExpanded] = useState(true);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile sidebar toggle
+    const [searchTerm, setSearchTerm] = useState('');
 
     // Real Data States
     const [activeDelivery, setActiveDelivery] = useState(null);
@@ -304,14 +305,28 @@ const DriverDashboard = () => {
 
     const renderTasksView = () => (
         <main className="flex-1 overflow-y-auto p-6 bg-slate-50">
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-black text-slate-900">Delivery History</h2>
-                <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-500">
-                    {allDeliveries.length} Total
+            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
+                <div>
+                    <h2 className="text-2xl font-black text-slate-900 leading-tight">Delivery History</h2>
+                    <p className="text-xs text-slate-500 font-medium">{allDeliveries.length} Total Assignments</p>
+                </div>
+                <div className="relative">
+                    <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                        type="text"
+                        placeholder="Search order ID or address..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="bg-white border border-slate-200 rounded-2xl py-2 pl-12 pr-4 text-sm focus:outline-none focus:border-indigo-500 transition-all w-full md:w-64 shadow-sm"
+                    />
                 </div>
             </div>
             <div className="space-y-4">
-                {allDeliveries.length > 0 ? allDeliveries.map((delivery) => (
+                {allDeliveries.length > 0 ? allDeliveries.filter(d =>
+                    !searchTerm ||
+                    d.order_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    d.dropoff_location?.address?.toLowerCase().includes(searchTerm.toLowerCase())
+                ).map((delivery) => (
                     <div key={delivery.id} className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
                         <div className="flex justify-between items-start mb-4">
                             <div>
