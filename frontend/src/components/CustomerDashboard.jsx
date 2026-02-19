@@ -2,11 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
     FiPackage, FiMapPin, FiSearch, FiLogOut, FiShield,
     FiAlertCircle, FiClock, FiUser, FiPhone, FiCheckCircle,
-    FiMessageSquare, FiStar, FiFlag
+    FiMessageSquare, FiStar, FiFlag, FiArrowRight
 } from 'react-icons/fi';
 import RouteMap from './RouteMap';
 import { api } from '../services/api';
-import dashboardApi from '../services/dashboardApi';
 import { useAuth } from '../context/AuthContext';
 
 const CustomerDashboard = () => {
@@ -16,36 +15,12 @@ const CustomerDashboard = () => {
     const [orderData, setOrderData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-
-    // Mock order data for demonstration
-    const mockOrder = {
-        id: 'ORD-7742-XJ',
-        status: 'in_transit', // confirmed, assigned, picked_up, in_transit, delivered
-        eta: '14 mins',
-        driver: {
-            name: 'Karan Singh',
-            rating: 4.8,
-            phone: '+91 98765 43210',
-            vehicle: 'TVS Apache (TN 01 AB 1234)'
-        },
-        items: [
-            { name: 'Organic Grocery Bundle', qty: 1, price: '₹1,249' },
-            { name: 'Fresh Fruits Pack', qty: 1, price: '₹450' }
-        ],
-        total: '₹1,699',
-        address: 'Apartment 4B, Emerald Heights, T. Nagar, Chennai',
-        route: [
-            [13.0418, 80.2341], // Chennai start
-            [13.0450, 80.2380],
-            [13.0500, 80.2400],
-            [13.0520, 80.2450]  // End
-        ],
-        markers: [
-            { position: [13.0418, 80.2341], color: '#3b82f6', popup: 'Warehouse' },
-            { position: [13.0520, 80.2450], color: '#ef4444', popup: 'Your Location' },
-            { position: [13.0470, 80.2390], color: '#10b981', popup: 'Driver Current Location', icon: null }
-        ]
-    };
+    const [isChatOpen, setIsChatOpen] = useState(false);
+    const [isReporting, setIsReporting] = useState(false);
+    const [chatMessages, setChatMessages] = useState([
+        { sender: 'system', text: 'Secure channel established with your delivery partner.' }
+    ]);
+    const [newMessage, setNewMessage] = useState('');
 
     const handleTrack = async (e) => {
         if (e) e.preventDefault();
@@ -93,6 +68,16 @@ const CustomerDashboard = () => {
         return statuses.indexOf(orderData?.status || 'confirmed');
     };
 
+    const handleSendMessage = () => {
+        if (!newMessage.trim()) return;
+        setChatMessages([...chatMessages, { sender: 'user', text: newMessage }]);
+        setNewMessage('');
+        // Simulated auto-reply
+        setTimeout(() => {
+            setChatMessages(prev => [...prev, { sender: 'rider', text: 'Understood. I am following the safest route.' }]);
+        }, 1500);
+    };
+
     return (
         <div className="flex flex-col h-screen bg-slate-50 font-['Inter']">
             {/* Header */}
@@ -122,7 +107,7 @@ const CustomerDashboard = () => {
             </header>
 
             <main className="flex-1 flex flex-col md:flex-row overflow-hidden">
-                {/* Left Panel: Search & Details */}
+                {/* Left Panel */}
                 <div className="w-full md:w-[400px] bg-white border-r border-slate-200 flex flex-col p-6 overflow-y-auto">
                     <div className="mb-8">
                         <h2 className="text-2xl font-bold text-slate-800 mb-2">Track Your Route</h2>
@@ -159,7 +144,7 @@ const CustomerDashboard = () => {
                                 <div className="flex items-center justify-between mb-4">
                                     <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Live Status</span>
                                     <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full uppercase tracking-wider">
-                                        {orderData.status.replace('_', ' ')}
+                                        {orderData.status?.replace('_', ' ')}
                                     </span>
                                 </div>
 
@@ -230,7 +215,10 @@ const CustomerDashboard = () => {
                                     >
                                         <FiPhone size={14} /> Call
                                     </button>
-                                    <button className="flex items-center justify-center gap-2 py-2.5 bg-indigo-50 hover:bg-indigo-100 rounded-xl text-indigo-700 text-sm font-bold transition-all border border-indigo-100">
+                                    <button
+                                        onClick={() => setIsChatOpen(true)}
+                                        className="flex items-center justify-center gap-2 py-2.5 bg-indigo-50 hover:bg-indigo-100 rounded-xl text-indigo-700 text-sm font-bold transition-all border border-indigo-100"
+                                    >
                                         <FiMessageSquare size={14} /> Chat
                                     </button>
                                 </div>
@@ -268,7 +256,10 @@ const CustomerDashboard = () => {
 
                             {/* Actions */}
                             <div className="flex gap-2">
-                                <button className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-50 hover:bg-red-100 rounded-xl text-red-600 text-sm font-bold transition-all border border-red-100">
+                                <button
+                                    onClick={() => setIsReporting(true)}
+                                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-50 hover:bg-red-100 rounded-xl text-red-600 text-sm font-bold transition-all border border-red-100"
+                                >
                                     <FiFlag /> Report Issue
                                 </button>
                             </div>
@@ -292,7 +283,7 @@ const CustomerDashboard = () => {
                         variant="light-minimal"
                         route={orderData?.route}
                         markers={orderData?.markers}
-                        center={orderData?.markers[0]?.position}
+                        center={orderData?.markers?.[0]?.position}
                         zoom={15}
                     />
 
@@ -321,6 +312,70 @@ const CustomerDashboard = () => {
                     )}
                 </div>
             </main>
+
+            {/* Chat Modal */}
+            {isChatOpen && (
+                <div className="fixed bottom-6 right-6 z-[100] w-80 bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col animate-in slide-in-from-bottom-6">
+                    <div className="p-4 bg-indigo-600 text-white flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                            <span className="font-bold text-sm">Chat with {orderData?.rider?.name || 'Rider'}</span>
+                        </div>
+                        <button onClick={() => setIsChatOpen(false)} className="hover:bg-white/20 p-1 rounded-lg">✕</button>
+                    </div>
+                    <div className="h-64 overflow-y-auto p-4 space-y-3 bg-slate-50">
+                        {chatMessages.map((m, i) => (
+                            <div key={i} className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[80%] p-2.5 rounded-2xl text-xs font-medium ${m.sender === 'user' ? 'bg-indigo-600 text-white' : m.sender === 'system' ? 'bg-slate-200 text-slate-500 italic text-center w-full' : 'bg-white text-slate-700 border border-slate-200 shadow-sm'
+                                    }`}>
+                                    {m.text}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="p-3 border-t border-slate-100 flex gap-2">
+                        <input
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                            placeholder="Type a message..."
+                            className="flex-1 bg-slate-100 border-none rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-indigo-500"
+                        />
+                        <button
+                            onClick={handleSendMessage}
+                            className="p-2 bg-indigo-600 text-white rounded-xl"
+                        >
+                            <FiArrowRight />
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Report Modal */}
+            {isReporting && (
+                <div className="fixed inset-0 z-[101] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6">
+                    <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl animate-in fade-in zoom-in-95">
+                        <div className="text-center mb-6">
+                            <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-100">
+                                <FiFlag size={32} />
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-900">Report an Issue</h3>
+                            <p className="text-sm text-slate-500 mt-2">Our safety team will be notified immediately.</p>
+                        </div>
+                        <div className="space-y-4">
+                            <button onClick={() => { setIsReporting(false); alert("Emergency SOS active. Safety team is tracking your location via GPS."); }} className="w-full py-4 bg-rose-600 text-white rounded-2xl font-bold shadow-lg shadow-rose-500/20 active:scale-95 transition-all">
+                                EMERGENCY SOS
+                            </button>
+                            <button onClick={() => { setIsReporting(false); alert("Incident report created. Ticket ID: SS-" + Math.floor(Math.random() * 10000)); }} className="w-full py-3 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-2xl font-bold border border-slate-200 transition-all">
+                                Missing/Damaged Items
+                            </button>
+                            <button onClick={() => setIsReporting(false)} className="w-full py-3 text-slate-400 font-bold hover:text-slate-600 transition-all">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
