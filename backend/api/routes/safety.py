@@ -211,3 +211,10 @@ async def get_buddy_status(
         return {"status": "none"}
     return result
 
+@router.get("/safety/alerts", response_model=List[Dict])
+async def get_safety_alerts(
+    limit: int = 50,
+    db: Session = Depends(get_db)
+):
+    """Retrieve all safety alerts (Panic/SOS)."""
+    return safety_service.get_all_panic_alerts(db, limit)
