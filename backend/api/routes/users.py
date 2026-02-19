@@ -173,3 +173,34 @@ def delete_user(
     db.commit()
     return {"message": f"User {user.username} deleted"}
 
+@router.get("/online")
+def list_online_users(
+    db: Session = Depends(get_db),
+    dispatcher: User = Depends(get_current_dispatcher)
+):
+    """List users who are currently online (have recent tracking data)."""
+    from database.models import DeliveryStatus
+    from datetime import datetime, timedelta
+    
+    # Riders seen in the last 15 minutes are considered "online"
+    cutoff = datetime.utcnow() - timedelta(minutes=15)
+    
+    online_riders = db.query(DeliveryStatus.rider_id).filter(
+        DeliveryStatus.timestamp >= cutoff
+    ).distinct().all()
+    
+    online_ids = [r[0] for r in online_riders]
+    
+    users = db.query(User).filter(User.id.in_(online_ids)).all()
+    
+    return [
+        {
+            "id": u.id,
+            "username": u.username,
+            "full_name": u.full_name,
+            "role": u.role,
+            "status": "online", # Explicitly set as online for UI
+            "phone": u.phone
+        }
+        for u in users
+    ]
