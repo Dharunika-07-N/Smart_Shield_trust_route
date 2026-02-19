@@ -37,8 +37,8 @@ const DriverDashboard = () => {
 
     // Fetch deliveries on mount
     useEffect(() => {
-        fetchDeliveries();
-    }, [user]);
+        if (user) fetchDeliveries();
+    }, [user, driverId]);
 
     // Periodically send location updates if online and have active delivery
     useEffect(() => {
@@ -46,12 +46,16 @@ const DriverDashboard = () => {
 
         const interval = setInterval(async () => {
             try {
-                // Update general driver location
-                await api.post('/tracking/location', {
+                // Update general tracking location
+                await api.updateLocation({
+                    delivery_id: activeDelivery?.id || 'idle',
+                    route_id: activeDelivery?.route_id,
                     rider_id: driverId,
-                    latitude: currentLocation.latitude,
-                    longitude: currentLocation.longitude,
-                    status: activeDelivery ? 'on_delivery' : 'available'
+                    current_location: {
+                        latitude: currentLocation.latitude,
+                        longitude: currentLocation.longitude
+                    },
+                    status: activeDelivery ? activeDelivery.status : 'available'
                 });
             } catch (e) {
                 console.error("Location update failed", e);
@@ -64,14 +68,13 @@ const DriverDashboard = () => {
     const fetchDeliveries = async () => {
         setLoading(true);
         try {
-            const data = await api.get('/api/v1/deliveries');
+            // Updated to use the corrected endpoint
+            const data = await api.get('/deliveries');
             if (Array.isArray(data)) {
-                // Filter for assigned to this driver if possible, otherwise show all active
-                const driverDeliveries = data.filter(d => d.assigned_rider_id === driverId || !d.assigned_rider_id);
-                setAllDeliveries(driverDeliveries);
+                setAllDeliveries(data);
 
                 // Find first non-delivered delivery as active
-                const active = driverDeliveries.find(d => ['assigned', 'pending', 'picked_up', 'in_transit'].includes(d.status));
+                const active = data.find(d => ['assigned', 'pending', 'picked_up', 'in_transit'].includes(d.status));
                 if (active) {
                     setActiveDelivery(active);
                 } else {
@@ -99,12 +102,15 @@ const DriverDashboard = () => {
         try {
             await api.triggerPanicButton({
                 rider_id: driverId,
-                location: currentLocation,
+                location: {
+                    latitude: currentLocation.latitude,
+                    longitude: currentLocation.longitude
+                },
                 delivery_id: activeDelivery?.id
             });
             alert('Emergency SOS Signal Sent. Help is on the way.');
         } catch (error) {
-            alert('SOS Signal Error. Please use alternate contact.');
+            alert('SOS Signal Error: ' + (error.message || 'Please use alternate contact.'));
         } finally {
             setPanicAlerting(false);
         }
@@ -115,24 +121,27 @@ const DriverDashboard = () => {
         try {
             await api.checkIn({
                 rider_id: driverId,
-                location: currentLocation,
+                location: {
+                    latitude: currentLocation.latitude,
+                    longitude: currentLocation.longitude
+                },
                 delivery_id: activeDelivery?.id,
                 is_night_shift: new Date().getHours() >= 18 || new Date().getHours() < 6
             });
             alert("Location Shared Successfully with Dispatch");
         } catch (e) {
-            alert("Check-in Error");
+            alert("Check-in Error: " + e.message);
         }
     };
 
     const updateStatus = async (newStatus) => {
         if (!activeDelivery) return;
         try {
-            await api.post(`/api/v1/deliveries/${activeDelivery.id}/status`, { status: newStatus });
+            await api.put(`/deliveries/${activeDelivery.id}/status`, { status: newStatus });
             setActiveDelivery(prev => ({ ...prev, status: newStatus }));
             fetchDeliveries(); // Refresh list
         } catch (error) {
-            alert("Status update failed");
+            alert("Status update failed: " + error.message);
         }
     };
 
