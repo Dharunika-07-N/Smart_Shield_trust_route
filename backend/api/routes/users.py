@@ -204,3 +204,44 @@ def list_online_users(
         }
         for u in users
     ]
+@router.get("/fleet-locations")
+def get_fleet_locations(
+    db: Session = Depends(get_db),
+    dispatcher: User = Depends(get_current_dispatcher)
+):
+    """Get the latest location for all online riders."""
+    from database.models import DeliveryStatus
+    from datetime import datetime, timedelta
+    
+    # Seen in last 15 mins
+    cutoff = datetime.utcnow() - timedelta(minutes=15)
+    
+    # Subquery for latest status per rider
+    from sqlalchemy import func
+    subquery = db.query(
+        DeliveryStatus.rider_id,
+        func.max(DeliveryStatus.timestamp).label('max_ts')
+    ).filter(DeliveryStatus.timestamp >= cutoff).group_by(DeliveryStatus.rider_id).subquery()
+    
+    latest_statuses = db.query(DeliveryStatus).join(
+        subquery,
+        (DeliveryStatus.rider_id == subquery.c.rider_id) & (DeliveryStatus.timestamp == subquery.c.max_ts)
+    ).all()
+    
+    # Get user info for these statuses
+    rider_ids = [s.rider_id for s in latest_statuses]
+    users = db.query(User).filter(User.id.in_(rider_ids)).all()
+    user_map = {u.id: u for u in users}
+    
+    return [
+        {
+            "id": s.rider_id,
+            "full_name": user_map[s.rider_id].full_name if s.rider_id in user_map else "Unknown Driver",
+            "location": [s.current_location.get("latitude"), s.current_location.get("longitude")],
+            "status": s.status,
+            "speed": s.speed_kmh,
+            "heading": s.heading,
+            "last_update": s.timestamp.isoformat()
+        }
+        for s in latest_statuses
+    ]

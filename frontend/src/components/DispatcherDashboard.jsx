@@ -7,6 +7,7 @@ import {
 } from 'react-icons/fi';
 import Analytics from './Analytics';
 import RouteMap from './RouteMap';
+import FleetMap from './FleetMap';
 import LiveTracking from './LiveTracking';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -216,7 +217,7 @@ const DispatcherDashboard = () => {
 
                     {activeTab === 'Fleet' && (
                         <div className="h-full rounded-[2.5rem] overflow-hidden border border-slate-200 shadow-sm bg-white">
-                            <LiveTracking />
+                            <FleetMap />
                         </div>
                     )}
 
