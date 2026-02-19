@@ -26,16 +26,34 @@ ChartJS.register(
   Legend
 );
 
-const Analytics = ({ hideTitle = false }) => {
+const Analytics = ({ hideTitle = false, externalData = null }) => {
   const [timeRange, setTimeRange] = useState('7d');
 
-  // Mock data for demonstration
+  // Generator for dynamic mock data based on range
+  const generateData = (range) => {
+    const factor = range === '7d' ? 1 : range === '30d' ? 4 : 12;
+    const labels = range === '7d'
+      ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+      : range === '30d' ? ['Week 1', 'Week 2', 'Week 3', 'Week 4']
+        : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+
+    return {
+      labels,
+      deliveryTime: labels.map(() => 25 + Math.random() * 20),
+      fuelSavings: labels.map(() => 500 + Math.random() * 1000),
+      safetyDistribution: [60 + Math.random() * 10, 25 + Math.random() * 5, 5 + Math.random() * 5],
+      activeNodes: labels.map(() => 50 + Math.random() * 100)
+    };
+  };
+
+  const activeData = externalData || generateData(timeRange);
+
   const deliveryTimeData = {
-    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    labels: activeData.labels,
     datasets: [
       {
         label: 'Avg Delivery Time (min)',
-        data: [42, 38, 35, 32, 30, 28, 32],
+        data: activeData.deliveryTime,
         borderColor: 'rgb(79, 70, 229)', // indigo-600
         backgroundColor: 'rgba(79, 70, 229, 0.1)', // indigo-600 with transparency
         tension: 0.4,
@@ -44,11 +62,11 @@ const Analytics = ({ hideTitle = false }) => {
   };
 
   const fuelConsumptionData = {
-    labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+    labels: activeData.labels,
     datasets: [
       {
         label: 'Fuel Consumed (L)',
-        data: [1250, 1100, 980, 850],
+        data: activeData.fuelSavings,
         backgroundColor: 'rgba(34, 197, 94, 0.6)', // emerald-500
         borderColor: 'rgb(34, 197, 94)', // emerald-500
         borderWidth: 2,
@@ -57,10 +75,10 @@ const Analytics = ({ hideTitle = false }) => {
   };
 
   const safetyDistributionData = {
-    labels: ['High Safety', 'Medium Safety', 'Low Safety'],
+    labels: ['High', 'Med', 'Low'],
     datasets: [
       {
-        data: [65, 30, 5],
+        data: activeData.safetyDistribution,
         backgroundColor: [
           'rgba(79, 70, 229, 0.8)', // indigo-600
           'rgba(245, 158, 11, 0.8)', // warning-600
@@ -72,11 +90,11 @@ const Analytics = ({ hideTitle = false }) => {
   };
 
   const routesByTimeData = {
-    labels: ['06-09', '09-12', '12-15', '15-18', '18-21', '21-24'],
+    labels: activeData.labels,
     datasets: [
       {
         label: 'Delivery Routes',
-        data: [45, 120, 95, 140, 80, 25],
+        data: activeData.activeNodes || [45, 120, 95, 140, 80, 25],
         backgroundColor: 'rgba(79, 70, 229, 0.8)', // indigo-600
       },
     ],
