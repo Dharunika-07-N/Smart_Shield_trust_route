@@ -37,6 +37,21 @@ const TrainingCenter = () => {
         }
     };
 
+    const handleProcessFeedback = () => {
+        if (stats.feedback_pending === 0) return;
+        addLog(`Analyzing ${stats.feedback_pending} feedback items for feature extraction...`);
+        setRetraining(true);
+        setTimeout(() => {
+            setRetraining(false);
+            addLog("Feedback pool integrated into training dataset.");
+            setStats(prev => ({
+                ...prev,
+                total_samples: prev.total_samples + prev.feedback_pending,
+                feedback_pending: 0
+            }));
+        }, 2000);
+    };
+
     return (
         <div className="space-y-6">
             <div className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-2xl p-8 text-white shadow-xl shadow-indigo-500/10 border border-white/5">
@@ -79,10 +94,15 @@ const TrainingCenter = () => {
                         <div className="text-2xl font-bold">{stats.accuracy.toFixed(1)}%</div>
                         <div className="text-[10px] text-green-300 mt-1 font-bold">↑ 2.1% improvement</div>
                     </div>
-                    <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/10">
+                    <div
+                        onClick={handleProcessFeedback}
+                        className={`bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/10 cursor-pointer hover:bg-white/20 transition-all ${stats.feedback_pending > 0 ? 'ring-2 ring-amber-400' : ''}`}
+                    >
                         <div className="text-indigo-100 text-[10px] font-bold uppercase tracking-wider mb-1">User Feedback Pool</div>
                         <div className="text-2xl font-bold">{stats.feedback_pending}</div>
-                        <div className="text-[10px] text-amber-300 mt-1 font-bold">Requires processing</div>
+                        <div className="text-[10px] text-amber-300 mt-1 font-bold">
+                            {stats.feedback_pending > 0 ? 'Click to process' : 'Up to date'}
+                        </div>
                     </div>
                 </div>
             </div>
