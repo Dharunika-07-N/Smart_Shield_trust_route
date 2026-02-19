@@ -109,3 +109,26 @@ async def get_alerts(service_type: Optional[str] = None, db: Session = Depends(g
     except Exception as e:
         logger.error(f"Error fetching alerts: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+@router.get("/feedback/all")
+async def list_all_feedback(db: Session = Depends(get_db)):
+    """List all delivery feedback for admin dashboard."""
+    try:
+        feedback_list = db.query(DeliveryFeedback).order_by(DeliveryFeedback.submitted_at.desc()).all()
+        return {
+            "status": "success",
+            "data": [
+                {
+                    "id": f.id,
+                    "route_id": f.route_id,
+                    "rider_id": f.rider_id,
+                    "safety_rating": f.safety_rating,
+                    "route_quality_rating": f.route_quality_rating,
+                    "comfort_rating": f.comfort_rating,
+                    "feedback_text": f.feedback_text,
+                    "submitted_at": f.submitted_at
+                } for f in feedback_list
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Error listing feedback: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
