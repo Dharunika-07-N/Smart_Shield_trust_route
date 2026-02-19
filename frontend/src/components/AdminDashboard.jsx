@@ -33,6 +33,20 @@ const AdminDashboard = () => {
   const [userSearch, setUserSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
 
+  const [allAlerts, setAllAlerts] = useState([]);
+  const [allFeedback, setAllFeedback] = useState([]);
+
+  const fetchReports = async () => {
+    try {
+      const alerts = await api.get('/safety/alerts');
+      setAllAlerts(Array.isArray(alerts) ? alerts : []);
+      const feedbacks = await api.get('/feedback/all');
+      setAllFeedback(feedbacks.data || []);
+    } catch (e) {
+      console.error("Failed to load reports", e);
+    }
+  };
+
   const fetchAllUsers = async () => {
     setUsersLoading(true);
     setUsersError('');
@@ -49,6 +63,7 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     if (activeTab === 'Users') fetchAllUsers();
+    if (activeTab === 'Reports') fetchReports();
   }, [activeTab]);
 
   const handleToggleStatus = async (u) => {
@@ -520,11 +535,124 @@ const AdminDashboard = () => {
           )}
 
           {activeTab === 'Reports' && (
-            <div className="h-full flex flex-col items-center justify-center text-center">
-              <div className="p-8 bg-white rounded-[3rem] border border-slate-200 shadow-xl">
-                <FiMonitor size={48} className="text-slate-200 mx-auto mb-6" />
-                <h3 className="text-2xl font-black text-slate-900">Incident Reports</h3>
-                <p className="text-slate-500 mt-2 max-w-xs font-medium">Full incident report panel coming soon.</p>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <h2 className="text-2xl font-black text-slate-900">Safety Incident Reports</h2>
+                  <p className="text-slate-500 text-sm mt-1">Real-time SOS alerts and driver safety feedback</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      try {
+                        const alerts = await api.get('/safety/alerts');
+                        setAllAlerts(alerts);
+                        const feedbacks = await api.get('/feedback/all');
+                        setAllFeedback(feedbacks.data || []);
+                      } catch (e) {
+                        console.error("Failed to refresh reports", e);
+                      }
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
+                  >
+                    <FiRefreshCw size={14} /> Sync Feed
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Panic Alerts */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></div>
+                    Active Panic Alerts
+                  </h3>
+                  {allAlerts.length === 0 ? (
+                    <div className="p-12 bg-white rounded-[2.5rem] border border-slate-200 text-center border-dashed">
+                      <FiAlertTriangle className="mx-auto text-slate-100 mb-4" size={40} />
+                      <p className="text-slate-400 font-bold">No active SOS signals</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {allAlerts.map(alert => (
+                        <div key={alert.id} className={`p-5 bg-white rounded-3xl border ${alert.status === 'active' ? 'border-rose-200 shadow-lg shadow-rose-100' : 'border-slate-200'} transition-all`}>
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${alert.status === 'active' ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-400'}`}>
+                                <FiAlertTriangle />
+                              </div>
+                              <div>
+                                <p className="font-bold text-slate-900">SOS Triggered</p>
+                                <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">{new Date(alert.created_at).toLocaleString()}</p>
+                              </div>
+                            </div>
+                            <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${alert.status === 'active' ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                              {alert.status}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-50">
+                            <div className="text-[10px] font-bold text-slate-500 uppercase">Rider: {alert.rider_id}</div>
+                            <button
+                              onClick={async () => {
+                                if (alert.status === 'resolved') return;
+                                const notes = window.prompt("Enter resolution notes:");
+                                if (notes) {
+                                  await api.post('/safety/panic-button/resolve', {
+                                    alert_id: alert.id,
+                                    rider_id: alert.rider_id,
+                                    resolution_notes: notes
+                                  });
+                                  // Refresh
+                                  const updated = await api.get('/safety/alerts');
+                                  setAllAlerts(updated);
+                                }
+                              }}
+                              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${alert.status === 'resolved' ? 'bg-slate-50 text-slate-300 cursor-not-allowed' : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-500/20'}`}
+                            >
+                              Resolve Issue
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Safety Feedback */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Driver Feedback</h3>
+                  {allFeedback.length === 0 ? (
+                    <div className="p-12 bg-white rounded-[2.5rem] border border-slate-200 text-center border-dashed">
+                      <FiActivity className="mx-auto text-slate-100 mb-4" size={40} />
+                      <p className="text-slate-400 font-bold">No feedback submitted yet</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {allFeedback.map(fb => (
+                        <div key={fb.id} className="p-5 bg-white rounded-3xl border border-slate-200 hover:border-indigo-200 transition-all group">
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs uppercase">
+                                {fb.rider_id?.substring(0, 2)}
+                              </div>
+                              <p className="font-bold text-slate-800 text-sm">Zone Safety Rating</p>
+                            </div>
+                            <div className="flex gap-0.5">
+                              {[1, 2, 3, 4, 5].map(star => (
+                                <div key={star} className={`w-1.5 h-1.5 rounded-full ${star <= fb.safety_rating ? 'bg-indigo-600' : 'bg-slate-200'}`}></div>
+                              ))}
+                            </div>
+                          </div>
+                          <p className="text-xs text-slate-500 italic mb-3 line-clamp-2">"{fb.feedback_text || 'No comments provided'}"</p>
+                          <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                            <span>{fb.rider_id}</span>
+                            <span>{new Date(fb.submitted_at).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
