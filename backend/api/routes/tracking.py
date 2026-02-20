@@ -10,6 +10,8 @@ from datetime import datetime
 from typing import Dict, Set, Optional
 from pydantic import BaseModel
 
+from api.routes.notifications import manager as notification_manager
+
 router = APIRouter(prefix="/tracking", tags=["Tracking"])
 route_monitor = RouteMonitor()
 
@@ -97,6 +99,12 @@ async def update_location(
     
     await manager.broadcast(update.delivery_id, broadcast_data)
     await manager.broadcast("live_fleet", broadcast_data) # Global channel for dispatchers
+    
+    # Also broadcast to global system notifications
+    await notification_manager.broadcast({
+        "type": "rider_location_update",
+        "data": broadcast_data
+    })
     
     return {"success": True, "reoptimization_needed": reoptimization_needed}
 

@@ -11,6 +11,10 @@ from pydantic import BaseModel
 import uuid
 import os
 
+from api.routes.notifications import manager as notification_manager
+import json
+from datetime import datetime
+
 router = APIRouter(prefix="/deliveries", tags=["Deliveries"])
 
 class DeliveryCreate(BaseModel):
@@ -39,6 +43,18 @@ def create_delivery(
     db.add(new_delivery)
     db.commit()
     db.refresh(new_delivery)
+    
+    # Broadcast new delivery to dispatchers
+    notification_manager.broadcast_sync({
+        "type": "new_delivery",
+        "delivery": {
+            "id": new_delivery.id,
+            "order_id": new_delivery.order_id,
+            "status": new_delivery.status,
+            "created_at": new_delivery.created_at.isoformat() if new_delivery.created_at else datetime.now().isoformat()
+        }
+    })
+    
     return {"id": new_delivery.id, "status": new_delivery.status}
 
 @router.get("/", response_model=List[dict])
@@ -92,10 +108,19 @@ def update_delivery_status(
     
     delivery.status = update.status
     if update.status == "delivered":
-        from datetime import datetime
         delivery.delivered_at = datetime.utcnow()
     
     db.commit()
+    
+    # Broadcast status update
+    notification_manager.broadcast_sync({
+        "type": "delivery_status_update",
+        "delivery_id": delivery_id,
+        "status": update.status,
+        "rider_id": current_user.id if current_user.role == "rider" else delivery.assigned_rider_id,
+        "timestamp": datetime.utcnow().isoformat()
+    })
+    
     return {"id": delivery.id, "status": delivery.status}
 
 @router.post("/auto-dispatch")
@@ -107,6 +132,39 @@ async def trigger_auto_dispatch(
     dispatch_service = DispatchService(db)
     result = await dispatch_service.auto_assign_deliveries()
     return result
+
+class DeliveryAssign(BaseModel):
+    rider_id: str
+
+@router.patch("/{delivery_id}/assign")
+def assign_delivery(
+    delivery_id: str,
+    assign_in: DeliveryAssign,
+    db: Session = Depends(get_db),
+    dispatcher: User = Depends(get_current_dispatcher)
+):
+    """Manually assign a delivery to a rider."""
+    delivery = db.query(Delivery).filter(Delivery.id == delivery_id).first()
+    if not delivery:
+        raise HTTPException(status_code=404, detail="Delivery not found")
+    
+    rider = db.query(User).filter(User.id == assign_in.rider_id, User.role == "rider").first()
+    if not rider:
+        raise HTTPException(status_code=400, detail="Invalid rider ID")
+    
+    delivery.assigned_rider_id = rider.id
+    delivery.status = "assigned"
+    db.commit()
+    
+    # Broadcast update
+    notification_manager.broadcast_sync({
+        "type": "delivery_assigned",
+        "delivery_id": delivery_id,
+        "rider_id": rider.id,
+        "rider_name": rider.full_name or rider.username
+    })
+    
+    return {"id": delivery.id, "status": delivery.status, "assigned_rider_id": rider.id}
 
 
 @router.post("/{delivery_id}/proof")

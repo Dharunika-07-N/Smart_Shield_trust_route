@@ -26,16 +26,12 @@ from api.services.database import DatabaseService
 from api.services.route_monitor import RouteMonitor
 from database.database import get_db
 from loguru import logger
+from api.routes.notifications import manager as notification_manager
 
-# Use FREE OSRM service (no API key needed!)
-try:
-    from api.services.osrm_service import OSRMService
-    maps_service_instance = OSRMService()
-    logger.info("Using FREE OSRM service for routing")
-except ImportError:
-    from api.services.maps import MapsService
-    maps_service_instance = MapsService()
-    logger.warning("Using MapsService (requires Google API key)")
+# Use MapsService as the primary hub (handles Google, GraphHopper, OSRM fallbacks)
+from api.services.maps import MapsService
+maps_service_instance = MapsService()
+logger.info("Using MapsService hub for routing (Google/GraphHopper/OSRM)")
 
 router = APIRouter()
 route_optimizer = RouteOptimizer()
@@ -130,8 +126,8 @@ class ConnectionManager:
     
     async def broadcast_location_update(self, delivery_id: str, data: dict):
         """Broadcast location update to all connected clients."""
+        disconnected = set()
         if delivery_id in self.active_connections:
-            disconnected = set()
             for connection in self.active_connections[delivery_id]:
                 try:
                     await connection.send_json(data)
@@ -139,9 +135,29 @@ class ConnectionManager:
                     logger.error(f"Error sending to client: {e}")
                     disconnected.add(connection)
             
-            # Remove disconnected clients
-            for conn in disconnected:
-                self.active_connections[delivery_id].discard(conn)
+        # Remove disconnected clients
+        for conn in disconnected:
+            self.active_connections[delivery_id].discard(conn)
+
+    def broadcast_location_update_sync(self, delivery_id: str, data: dict):
+        """Thread-safe and sync-safe broadcast for location updates."""
+        try:
+            import asyncio
+            try:
+                loop = asyncio.get_running_loop()
+                if loop.is_running():
+                    loop.create_task(self.broadcast_location_update(delivery_id, data))
+                    return
+            except RuntimeError:
+                pass
+            
+            # Fallback for sync contexts
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            new_loop.run_until_complete(self.broadcast_location_update(delivery_id, data))
+            new_loop.close()
+        except Exception as e:
+            logger.error(f"Error in sync broadcast for delivery {delivery_id}: {e}")
 
 manager = ConnectionManager()
 
@@ -350,6 +366,12 @@ async def update_location(
         
         # Broadcast to all connected clients tracking this delivery
         await manager.broadcast_location_update(request.delivery_id, broadcast_data)
+        
+        # Also broadcast to global system notifications
+        await notification_manager.broadcast({
+            "type": "rider_location_update",
+            "data": broadcast_data
+        })
         
         response = {
             "success": True,
