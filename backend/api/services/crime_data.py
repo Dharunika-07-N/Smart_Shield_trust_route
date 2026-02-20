@@ -70,11 +70,13 @@ class CrimeDataService:
         "Tambaram": (12.9239, 80.1336),
     }
     
-    def __init__(self):
+    def __init__(self, db_session = None):
         self.crime_data: Dict[str, Dict] = {}
+        self.db_session = db_session
         self.data_dir = Path("data/crime")
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self._load_crime_data()
+        self._load_db_hotspots()
     
     def _load_crime_data(self):
         """Load crime data from CSV files or use defaults."""
@@ -88,7 +90,7 @@ class CrimeDataService:
                     with open(csv_file, 'r', encoding='utf-8') as f:
                         reader = csv.DictReader(f)
                         for row in reader:
-                            district = row.get('District', '').strip()
+                            district = row.get('District', row.get('Districts', '')).strip()
                             if district:
                                 self._parse_crime_row(district, row)
                 except Exception as e:
@@ -97,6 +99,36 @@ class CrimeDataService:
             # Use default crime data for Tamil Nadu districts
             logger.info("Using default crime data for Tamil Nadu districts")
             self._load_default_crime_data()
+
+    def _load_db_hotspots(self):
+        """Load high-precision crime hotspots from the database."""
+        try:
+            from database.database import SessionLocal
+            from database.models import CrimeData
+            
+            db = self.db_session or SessionLocal()
+            hotspots = db.query(CrimeData).filter(CrimeData.location != None).all()
+            
+            if hotspots:
+                logger.info(f"Loaded {len(hotspots)} high-precision crime hotspots from database")
+                for spot in hotspots:
+                    # We store these as a special list to check in scoring
+                    if not hasattr(self, 'hotspots'):
+                        self.hotspots = []
+                    
+                    loc = spot.location
+                    self.hotspots.append({
+                        "lat": loc.get('latitude', loc.get('lat')),
+                        "lng": loc.get('longitude', loc.get('lng')),
+                        "radius": spot.radius_km or 1.0,
+                        "risk_score": spot.crime_risk_score or 50.0,
+                        "details": spot
+                    })
+            
+            if not self.db_session:
+                db.close()
+        except Exception as e:
+            logger.warning(f"Could not load crime hotspots from DB: {e}")
     
     def _parse_crime_row(self, district: str, row: Dict):
         """Parse a row of crime data with flexible column matching."""
@@ -272,6 +304,22 @@ class CrimeDataService:
                 crime_density += data.get("theft", 0) * 1 * weight # Lower weight for theft
                 
                 max_crime_density = max(max_crime_density, crime_density)
+        
+        # Check high-precision DB hotspots
+        if hasattr(self, 'hotspots'):
+            for spot in self.hotspots:
+                spot_dist = geopy_distance(
+                    (coord.latitude, coord.longitude),
+                    (spot['lat'], spot['lng'])
+                ).km
+                
+                if spot_dist <= spot['radius']:
+                    # Hotspots directly set or boost the crime density
+                    # We map risk_score (0-100) to density (~0-50000)
+                    hotspot_density = (spot['risk_score'] / 100.0) * 50000
+                    # Factor in distance within radius
+                    proximity_weight = 1.0 - (spot_dist / spot['radius']) * 0.5
+                    max_crime_density = max(max_crime_density, hotspot_density * proximity_weight)
         
         # Normalize to 0-100 scale (inverse safety score)
         if max_crime_density == 0:

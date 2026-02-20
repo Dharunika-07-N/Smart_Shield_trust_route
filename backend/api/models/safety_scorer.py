@@ -28,6 +28,21 @@ class SafetyScorer:
         self.crime_service = crime_service or CrimeDataService()
         self.police_stations = self._load_police_stations()
         self.hospitals = self._load_hospitals()
+        
+        # Merge with DB safe zones
+        db_safe_zones = self._load_db_safe_zones()
+        if db_safe_zones:
+            # Add police stations from DB to the list
+            db_police = [z for z in db_safe_zones if z['type'] == 'police_station']
+            # Avoid duplicates by name
+            existing_names = set(s['name'] for s in self.police_stations)
+            for p in db_police:
+                if p['name'] not in existing_names:
+                    self.police_stations.append(p)
+            
+            # Add other safe zones (24hr shops, etc) to a general list for scoring
+            self.other_safe_zones = [z for z in db_safe_zones if z['type'] != 'police_station']
+            
         self._initialize_model()
 
     def _load_police_stations(self) -> List[Dict]:
@@ -41,6 +56,32 @@ class SafetyScorer:
                     return json.load(f)
         except Exception as e:
             logger.error(f"Error loading police stations: {e}")
+        return []
+
+    def _load_db_safe_zones(self) -> List[Dict]:
+        """Load safe zones from the database."""
+        try:
+            from database.database import SessionLocal
+            from database.models import SafeZone
+            
+            db = SessionLocal()
+            zones = db.query(SafeZone).all()
+            db_zones = []
+            for zone in zones:
+                loc = zone.location
+                db_zones.append({
+                    "name": zone.name,
+                    "latitude": loc.get('latitude', loc.get('lat')),
+                    "longitude": loc.get('longitude', loc.get('lng')),
+                    "type": zone.zone_type,
+                    "safety_score": zone.safety_score
+                })
+            db.close()
+            if db_zones:
+                logger.info(f"Loaded {len(db_zones)} safe zones from database")
+            return db_zones
+        except Exception as e:
+            logger.warning(f"Could not load safe zones from DB: {e}")
         return []
 
     def _load_hospitals(self) -> List[Dict]:
@@ -313,17 +354,33 @@ class SafetyScorer:
         return min(100.0, max(0.0, score))
 
     def _calculate_police_proximity(self, coord: Coordinate) -> float:
-        """Calculate proximity score to nearest police station (0-100)."""
-        if not self.police_stations:
+        """Calculate proximity score to nearest police station or safe zone (0-100)."""
+        all_safe_points = list(self.police_stations)
+        if hasattr(self, 'other_safe_zones'):
+            all_safe_points.extend(self.other_safe_zones)
+            
+        if not all_safe_points:
             return 50.0 # Default if no data
             
         min_dist_km = float('inf')
         
-        for station in self.police_stations:
+        for station in all_safe_points:
             try:
+                # Handle both JSON style and DB style coordinate keys
+                p_lat = station.get('latitude', station.get('lat'))
+                p_lng = station.get('longitude', station.get('lng'))
+                
+                if p_lat is None or p_lng is None:
+                    # Check location dict style
+                    loc = station.get('location', {})
+                    p_lat = loc.get('lat', loc.get('latitude'))
+                    p_lng = loc.get('lng', loc.get('longitude'))
+                
+                if p_lat is None or p_lng is None: continue
+
                 dist = distance(
                     (coord.latitude, coord.longitude),
-                    (station['latitude'], station['longitude'])
+                    (p_lat, p_lng)
                 ).km
                 if dist < min_dist_km:
                     min_dist_km = dist
@@ -331,8 +388,6 @@ class SafetyScorer:
                 continue
                 
         # Proximity score: 100 if < 500m, decays to 0 at 10km
-        # Logic: score = 100 * exp(-0.5 * dist_km)
-        # 1km -> 60, 2km -> 36, 5km -> 8
         if min_dist_km == float('inf'):
             return 0.0
             

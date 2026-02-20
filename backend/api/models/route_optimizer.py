@@ -22,15 +22,10 @@ from config.config import settings
 from api.schemas.delivery import Coordinate, DeliveryStop
 from loguru import logger
 
-# Use FREE OSRM service instead of Google Maps (no API key needed!)
-try:
-    from api.services.osrm_service import OSRMService
-    USE_OSRM = True
-    logger.info("Using FREE OSRM service (no API key required)")
-except ImportError:
-    from api.services.maps import MapsService
-    USE_OSRM = False
-    logger.warning("OSRM not available, falling back to MapsService")
+# Use MapsService as the primary hub
+from api.services.maps import MapsService
+USE_OSRM = False # Let MapsService handle provider selection
+logger.info("Using MapsService hub for optimization")
 
 from api.models.safety_scorer import SafetyScorer
 from api.services.weather import WeatherService
@@ -158,7 +153,7 @@ class RouteOptimizer:
             logger.warning(f"Could not fetch crowdsourced alerts: {e}")
 
         # Create distance matrix
-        distance_matrix = self._create_distance_matrix(all_points)
+        distance_matrix = await self._create_distance_matrix(all_points)
         
         # Optimize using multiple algorithms
         if len(stops) == 1:
@@ -170,6 +165,55 @@ class RouteOptimizer:
                 rider_info,
                 departure_time
             )
+
+        # Phase 5: Advanced GraphHopper Route Optimization
+        if hasattr(self.maps_service, 'graphhopper') and self.maps_service.graphhopper:
+            logger.info("Using GraphHopper VRP API for route optimization")
+            try:
+                # Prepare Vehicles
+                vehicles = [{
+                    "vehicle_id": "v1",
+                    "start_address": {
+                        "location_id": "start",
+                        "lat": starting_point.latitude,
+                        "lon": starting_point.longitude
+                    },
+                    "type_id": vehicle_type
+                }]
+                
+                # Prepare Services (Stops)
+                services = []
+                for idx, stop in enumerate(stops):
+                    services.append({
+                        "id": stop.stop_id,
+                        "name": stop.address or f"Stop {idx}",
+                        "address": {
+                            "location_id": stop.stop_id,
+                            "lat": stop.coordinates.latitude,
+                            "lon": stop.coordinates.longitude
+                        }
+                    })
+                
+                # Solve VRP
+                vrp_solution = self.maps_service.graphhopper.solve_vrp(vehicles, services)
+                if vrp_solution and vrp_solution.get('solution') and vrp_solution['solution']['routes']:
+                    gh_route = vrp_solution['solution']['routes'][0]
+                    # Map GH stop IDs back to our sequence indices
+                    gh_sequence = []
+                    stop_id_map = {s.stop_id: i for i, s in enumerate(stops)}
+                    for activity in gh_route['activities']:
+                        if activity['type'] == 'service':
+                            gh_sequence.append(stop_id_map[activity['id']])
+                    
+                    if gh_sequence:
+                        logger.info(f"GraphHopper VRP sequence found: {gh_sequence}")
+                        # Skip other algorithms and proceed with building segments
+                        segments, total_stats = await self._build_route_segments(
+                            starting_point, stops, gh_sequence, optimize_for, rider_info, departure_time
+                        )
+                        return self._format_optimization_response(gh_sequence, segments, total_stats, optimize_for, starting_point, stops, departure_time)
+            except Exception as e:
+                logger.error(f"GraphHopper VRP failed: {e}. Falling back to local algorithms.")
 
         # Create cost matrix based on objectives only if needed for multi-stop optimization
         cost_matrix = await self._create_cost_matrix(
@@ -232,12 +276,42 @@ class RouteOptimizer:
             "estimated_arrivals": estimated_arrivals,
             "created_at": datetime.now()
         }
+
+    def _format_optimization_response(self, sequence, segments, total_stats, optimize_for, starting_point, stops, departure_time):
+        """Helper to format the final optimization response."""
+        route_id = f"ROUTE_{uuid.uuid4().hex[:10]}"
+        estimated_arrivals = self._calculate_arrivals(
+            starting_point, stops, sequence, segments, departure_time
+        )
+        return {
+            "route_id": route_id,
+            "sequence": [stops[i].stop_id for i in sequence],
+            "segments": segments,
+            "total_distance_meters": total_stats["distance"],
+            "total_duration_seconds": total_stats["duration"],
+            "average_safety_score": total_stats["avg_safety"],
+            "total_fuel_liters": total_stats["fuel"],
+            "optimizations_applied": optimize_for,
+            "estimated_arrivals": estimated_arrivals,
+            "created_at": datetime.now()
+        }
     
-    def _create_distance_matrix(self, points: List[Coordinate]) -> List[List[float]]:
+    async def _create_distance_matrix(self, points: List[Coordinate]) -> List[List[float]]:
         """Create distance matrix between all points."""
         n = len(points)
-        matrix = [[0.0] * n for _ in range(n)]
         
+        # 1. Try GraphHopper Matrix API (very efficient for large matrices)
+        if hasattr(self.maps_service, 'graphhopper') and self.maps_service.graphhopper:
+            try:
+                coords = [(p.latitude, p.longitude) for p in points]
+                matrix_data = self.maps_service.graphhopper.get_matrix(coords)
+                if matrix_data and 'distances' in matrix_data:
+                    return matrix_data['distances']
+            except Exception as e:
+                logger.warning(f"GraphHopper Matrix API failed: {e}. Falling back to straight distance.")
+
+        # 2. Fallback to calculating individually
+        matrix = [[0.0] * n for _ in range(n)]
         for i in range(n):
             for j in range(n):
                 if i != j:
@@ -605,45 +679,62 @@ class RouteOptimizer:
                     traffic_model="best_guess"
                 )
             
-            # Extract route geometry if available
+            # Extract route geometry and instructions if available
             route_coords = None
-            instructions = None
-            if directions and 'route_coordinates' in directions:
-                route_coords = directions['route_coordinates']
+            instructions = []
             
-            if directions and 'instructions' in directions:
-                instructions = directions['instructions']
+            if directions and isinstance(directions, list) and len(directions) > 0:
+                primary_route = directions[0]
+                route_coords = primary_route.get('route_coordinates')
+                
+                # Extract instructions from steps
+                for leg in primary_route.get('legs', []):
+                    for step in leg.get('steps', []):
+                        if 'html_instructions' in step:
+                            instructions.append(step['html_instructions'])
+                        elif 'instruction' in step: # Some providers might use this
+                            instructions.append(step['instruction'])
+            elif directions and isinstance(directions, dict): # Fallback for dict
+                route_coords = directions.get('route_coordinates')
+                for leg in directions.get('legs', []):
+                    for step in leg.get('steps', []):
+                        instructions.append(step.get('html_instructions', step.get('instruction', '')))
 
-            # Get traffic-aware duration
+            # Extract distance and duration from directions
+            distance = 0
+            duration = 0
+            
+            if directions and isinstance(directions, list) and len(directions) > 0:
+                primary_route = directions[0]
+                if primary_route.get('legs'):
+                    leg = primary_route['legs'][0]
+                    distance = leg['distance']['value']
+                    duration = leg.get('duration_in_traffic', leg['duration'])['value']
+            elif directions and isinstance(directions, dict) and directions.get('legs'):
+                leg = directions['legs'][0]
+                distance = leg['distance']['value']
+                duration = leg.get('duration_in_traffic', leg['duration'])['value']
+            
+            # If still 0, use straight-line fallback
+            if distance == 0:
+                distance = self.maps_service.calculate_straight_distance(current_point, next_point)
+                duration = distance / 8.33 # default 30km/h
+            
+            # Get traffic-aware override if service is available
             traffic_level = "low"
             try:
-                if hasattr(self.traffic_service, 'get_traffic_level') and asyncio.iscoroutinefunction(self.traffic_service.get_traffic_level):
-                    traffic_level, _, duration = await self.traffic_service.get_traffic_level(
-                        current_point, next_point
-                    )
-                else:
-                    traffic_level, _, duration = self.traffic_service.get_traffic_level(
-                        current_point, next_point
-                    )
+                if hasattr(self.traffic_service, 'get_traffic_level'):
+                    if asyncio.iscoroutinefunction(self.traffic_service.get_traffic_level):
+                        t_level, _, t_duration = await self.traffic_service.get_traffic_level(current_point, next_point)
+                    else:
+                        t_level, _, t_duration = self.traffic_service.get_traffic_level(current_point, next_point)
+                    
+                    traffic_level = t_level
+                    # Only override if we don't have directions duration or if traffic says it's higher
+                    if duration == 0 or t_duration > duration:
+                        duration = t_duration
             except Exception:
-                # Fallback to average speed if traffic service fails
-                duration = distance / 8.33
-            
-            # Get distance and duration from directions (traffic-aware)
-            if directions and directions.get('legs'):
-                leg = directions['legs'][0]
-                distance = leg['distance']['value']  # meters
-                # Use traffic duration if available, otherwise regular duration
-                if 'duration_in_traffic' in leg:
-                    duration = leg['duration_in_traffic']['value']  # seconds
-                else:
-                    duration = leg['duration']['value']  # seconds
-            else:
-                # Fallback to straight-line distance
-                distance = self.maps_service.calculate_straight_distance(
-                    current_point, next_point
-                )
-                duration = distance / 8.33  # Estimate
+                pass
             
             # Get weather data for route points
             weather_points = [current_point, next_point]

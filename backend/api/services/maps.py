@@ -5,6 +5,11 @@ import googlemaps
 import requests
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple
+from api.services.graphhopper import GraphHopperService
+try:
+    from api.services.osrm_service import OSRMService
+except ImportError:
+    OSRMService = None
 import polyline
 import math
 import sys
@@ -34,6 +39,22 @@ class MapsService:
         else:
             self.gmaps = None
             print("Warning: Google Maps API key not provided")
+
+        # Initialize GraphHopper
+        self.gh_api_key = settings.GRAPHHOPPER_API_KEY
+        if self.gh_api_key:
+            self.graphhopper = GraphHopperService(api_key=self.gh_api_key)
+            logger.info("GraphHopper Service initialized")
+        else:
+            self.graphhopper = None
+            print("Warning: GraphHopper API key not provided")
+
+        # Initialize OSRM
+        if OSRMService:
+            self.osrm = OSRMService()
+            logger.info("OSRM Service initialized as fallback")
+        else:
+            self.osrm = None
             
         # Crime data by district (Tamil Nadu 2022)
         self.crime_data = {
@@ -65,47 +86,80 @@ class MapsService:
         """
         Get driving directions with multiple alternatives and traffic data
         """
-        if not self.gmaps:
-            return self._get_mock_directions(origin, destination, waypoints)
-            
-        try:
-            orig = self._get_lat_lng(origin)
-            dest = self._get_lat_lng(destination)
-            
-            # Prepare waypoints if multi-stop delivery
-            waypoint_list = None
-            if waypoints:
-                waypoint_list = [f"{self._get_lat_lng(wp)[0]},{self._get_lat_lng(wp)[1]}" for wp in waypoints]
-            
-            directions = self.gmaps.directions(
-                origin=orig,
-                destination=dest,
-                waypoints=waypoint_list,
-                mode="driving",
-                alternatives=alternatives,
-                departure_time=datetime.now(),
-                traffic_model="best_guess",
-                optimize_waypoints=True if waypoints else False
-            )
-            
-            if not directions:
-                return self._get_mock_directions(origin, destination, waypoints)
+        orig = self._get_lat_lng(origin)
+        dest = self._get_lat_lng(destination)
+        waypoint_list = None
+        if waypoints:
+            waypoint_list = [self._get_lat_lng(wp) for wp in waypoints]
 
-            # Post-process for backward compatibility (adding route_coordinates)
-            for route in directions:
-                route_coords = []
-                for leg in route.get('legs', []):
-                    for step in leg.get('steps', []):
-                        start = step.get('start_location', {})
-                        route_coords.append({'lat': start.get('lat'), 'lng': start.get('lng')})
-                        end = step.get('end_location', {})
-                        route_coords.append({'lat': end.get('lat'), 'lng': end.get('lng')})
-                route['route_coordinates'] = route_coords
-            
-            return directions
-        except Exception as e:
-            logger.warning(f"Google Maps API error: {e}. Falling back to mock data.")
-            return self._get_mock_directions(origin, destination, waypoints)
+        # 1. Try Google Maps First (if key is present)
+        if self.gmaps:
+            try:
+                g_waypoints = [f"{wp[0]},{wp[1]}" for wp in waypoint_list] if waypoint_list else None
+                directions = self.gmaps.directions(
+                    origin=orig,
+                    destination=dest,
+                    waypoints=g_waypoints,
+                    mode="driving",
+                    alternatives=alternatives,
+                    departure_time=datetime.now(),
+                    traffic_model="best_guess",
+                    optimize_waypoints=True if waypoints else False
+                )
+                
+                if directions:
+                    # Post-process for backward compatibility (adding route_coordinates)
+                    for route in directions:
+                        route_coords = []
+                        for leg in route.get('legs', []):
+                            for step in leg.get('steps', []):
+                                start = step.get('start_location', {})
+                                route_coords.append({'lat': start.get('lat'), 'lng': start.get('lng')})
+                                end = step.get('end_location', {})
+                                route_coords.append({'lat': end.get('lat'), 'lng': end.get('lng')})
+                        route['route_coordinates'] = route_coords
+                    return directions
+            except Exception as e:
+                logger.warning(f"Google Maps API error: {e}. Trying GraphHopper...")
+
+        # 2. Try GraphHopper as fallback or primary alternative
+        if self.graphhopper:
+            try:
+                gh_route = self.graphhopper.get_directions(orig, dest, waypoint_list, **kwargs)
+                if gh_route:
+                    # Wrap in list to match directions format
+                    # Since GH by default returns one path, we can request alternatives if needed
+                    # but for now we return the primary GH route
+                    # Note: We can expand GraphHopperService to support multiple paths if their plan allows
+                    return [gh_route]
+            except Exception as e:
+                logger.warning(f"GraphHopper API error: {e}. Trying OSRM...")
+
+        # 3. Try OSRM (Free, no key needed)
+        if self.osrm:
+            try:
+                # OSRM is async in its original implementation? Let me check.
+                # In osrm_service.py it is 'async def get_directions'.
+                # MapsService is synchronous. I'll need to handle this.
+                import asyncio
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                
+                if asyncio.iscoroutinefunction(self.osrm.get_directions):
+                    osrm_routes = loop.run_until_complete(self.osrm.get_directions(orig, dest, waypoint_list, alternatives=alternatives))
+                else:
+                    osrm_routes = self.osrm.get_directions(orig, dest, waypoint_list, alternatives=alternatives)
+                
+                if osrm_routes:
+                    return osrm_routes
+            except Exception as e:
+                logger.warning(f"OSRM API error: {e}. Trying mock data...")
+
+        # 4. Final Fallback: Mock Data
+        return self._get_mock_directions(origin, destination, waypoints)
 
     def _get_mock_directions(self, origin, destination, waypoints=None) -> List[Dict]:
         """Generate mock directions when API is unavailable - Returns FAST and SAFE options."""
@@ -606,26 +660,48 @@ class MapsService:
     @functools.lru_cache(maxsize=512)
     def geocode_address(self, address: str) -> Optional[Dict[str, float]]:
         """Convert address to coordinates with caching."""
-        if not self.gmaps: return None
-        try:
-            result = self.gmaps.geocode(address)
-            if result:
-                location = result[0]['geometry']['location']
-                return {'lat': location['lat'], 'lng': location['lng']}
-        except Exception as e:
-            logger.error(f"Geocoding error for '{address}': {e}")
+        # 1. Try Google Maps
+        if self.gmaps:
+            try:
+                result = self.gmaps.geocode(address)
+                if result:
+                    location = result[0]['geometry']['location']
+                    return {'lat': location['lat'], 'lng': location['lng']}
+            except Exception as e:
+                logger.warning(f"Google Geocoding error for '{address}': {e}")
+        
+        # 2. Try GraphHopper
+        if self.graphhopper:
+            try:
+                res = self.graphhopper.geocode(address)
+                if res:
+                    return res
+            except Exception as e:
+                logger.warning(f"GraphHopper Geocoding error for '{address}': {e}")
+                
         return None
     
     @functools.lru_cache(maxsize=512)
     def _reverse_geocode_cached(self, lat: float, lng: float) -> str:
         """Internal cached reverse geocoding."""
-        if not self.gmaps: return "Unknown Address"
-        try:
-            result = self.gmaps.reverse_geocode((lat, lng))
-            if result:
-                return result[0]['formatted_address']
-        except Exception as e:
-            logger.error(f"Reverse geocoding error at ({lat}, {lng}): {e}")
+        # 1. Try Google Maps
+        if self.gmaps:
+            try:
+                result = self.gmaps.reverse_geocode((lat, lng))
+                if result:
+                    return result[0]['formatted_address']
+            except Exception as e:
+                logger.warning(f"Google Reverse geocoding error at ({lat}, {lng}): {e}")
+        
+        # 2. Try GraphHopper
+        if self.graphhopper:
+            try:
+                res = self.graphhopper.reverse_geocode(lat, lng)
+                if res:
+                    return res
+            except Exception as e:
+                logger.warning(f"GraphHopper Reverse geocoding error: {e}")
+                
         return "Unknown Address"
 
     def reverse_geocode(self, lat_or_coord: any, lng: Optional[float] = None) -> Optional[str]:
