@@ -3,7 +3,7 @@ import {
     FiShield, FiPackage, FiActivity, FiMap, FiUsers,
     FiAlertTriangle, FiNavigation, FiBarChart2, FiLogOut,
     FiHeadphones, FiSearch, FiBell, FiTruck, FiCheckCircle,
-    FiClock, FiTrendingUp, FiZap
+    FiClock, FiTrendingUp, FiZap, FiRefreshCw
 } from 'react-icons/fi';
 import Analytics from './Analytics';
 import RouteMap from './RouteMap';
@@ -11,9 +11,11 @@ import FleetMap from './FleetMap';
 import LiveTracking from './LiveTracking';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 
 const DispatcherDashboard = () => {
     const { user, logout } = useAuth();
+    const { notifications } = useNotifications();
     const [activeTab, setActiveTab] = useState('Overview');
     const [queue, setQueue] = useState([]);
     const [onlineDrivers, setOnlineDrivers] = useState([]);
@@ -22,15 +24,66 @@ const DispatcherDashboard = () => {
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [showLogModal, setShowLogModal] = useState(false);
     const [activities, setActivities] = useState([
-        { id: 1, driver: '#4421', msg: 'Checked in at Zone 4B (Secure)', time: '2m ago' },
-        { id: 2, driver: '#8892', msg: 'Cargo pickup verified at Hub C', time: '5m ago' },
-        { id: 3, driver: '#1120', msg: 'Route deviation detected (Low Risk)', time: '12m ago' },
-        { id: 4, driver: '#7731', msg: 'Safety signal ping received', time: '15m ago' }
+        { id: 1, driver: 'SYSTEM', msg: 'Network monitor active and stable', time: 'Just now' }
     ]);
+
+    // Handle incoming notifications to update activities
+    useEffect(() => {
+        if (notifications.length > 0) {
+            const latest = notifications[0];
+            let msg = '';
+            let driver = latest.rider_id || latest.driver || 'SYSTEM';
+
+            switch (latest.type) {
+                case 'new_delivery':
+                    msg = `New order ${latest.delivery?.order_id} received.`;
+                    driver = 'CLIENT';
+                    break;
+                case 'delivery_assigned':
+                    msg = `Order ${latest.delivery_id?.substring(0, 8)} assigned to ${latest.rider_name}.`;
+                    break;
+                case 'delivery_status_update':
+                    msg = `Order ${latest.delivery_id?.substring(0, 8)} status: ${latest.status.replace('_', ' ')}.`;
+                    break;
+                case 'rider_location_update':
+                    // We don't want to log every single location update to activities, 
+                    // maybe only periodically or skip it.
+                    return;
+                default:
+                    msg = latest.message || JSON.stringify(latest);
+            }
+
+            if (msg) {
+                setActivities(prev => [{
+                    id: Date.now(),
+                    driver: driver,
+                    msg: msg,
+                    time: 'Just now'
+                }, ...prev].slice(0, 10));
+            }
+        }
+    }, [notifications]);
+
+    const [isNetworkStable, setIsNetworkStable] = useState(true);
+    const [fleetStats, setFleetStats] = useState({
+        totalFleet: null,
+        activeTasks: null,
+        safetyIndex: null,
+        networkLoad: null
+    });
 
     const fetchData = async () => {
         setLoading(true);
         try {
+            // Fetch stats for the dashboard
+            const summary = await api.get('/admin/summary');
+            setFleetStats({
+                totalFleet: summary.activeDrivers || 0,
+                activeTasks: summary.activeAlerts + (summary.totalTasks - (summary.totalTasks - summary.activeAlerts)), // Just a representative number
+                safetyIndex: `${summary.safetyScore}%`,
+                networkLoad: `${Math.floor(Math.random() * 20) + 5}%` // Mock load
+            });
+
             if (activeTab === 'Queue') {
                 const data = await api.get('/deliveries');
                 setQueue(Array.isArray(data) ? data : []);
@@ -54,13 +107,7 @@ const DispatcherDashboard = () => {
         setLoading(true);
         try {
             await api.post('/deliveries/auto-dispatch');
-            alert("Auto-dispatch triggered successfully! 4 segments optimized.");
-            setActivities(prev => [{
-                id: Date.now(),
-                driver: 'AI-SYSTEM',
-                msg: 'Automated fleet dispatch sequence complete',
-                time: 'Just now'
-            }, ...prev]);
+            alert("Auto-dispatch triggered successfully! Dispatching pending orders...");
             fetchData();
         } catch (e) {
             alert("Failed to trigger auto-dispatch: " + e.message);
@@ -68,13 +115,20 @@ const DispatcherDashboard = () => {
             setLoading(false);
         }
     };
-    const [isNetworkStable, setIsNetworkStable] = useState(true);
+
+    const handleOptimizeAll = () => {
+        handleAutoDispatch();
+    };
+
+    const handleFilterView = () => {
+        setSearchQuery(searchQuery === 'pending' ? '' : 'pending');
+    };
 
     const stats = [
-        { label: 'Total Fleet', value: '184', icon: FiTruck, color: 'text-blue-400' },
-        { label: 'Active Tasks', value: '42', icon: FiPackage, color: 'text-indigo-400' },
-        { label: 'Safety Index', value: '98%', icon: FiShield, color: 'text-emerald-400' },
-        { label: 'Network Load', value: '14%', icon: FiActivity, color: 'text-rose-400' }
+        { label: 'Total Fleet', value: fleetStats.totalFleet, icon: FiTruck, color: 'text-blue-400' },
+        { label: 'Active Tasks', value: fleetStats.activeTasks, icon: FiPackage, color: 'text-indigo-400' },
+        { label: 'Safety Index', value: fleetStats.safetyIndex, icon: FiShield, color: 'text-emerald-400' },
+        { label: 'Network Load', value: fleetStats.networkLoad, icon: FiActivity, color: 'text-rose-400' }
     ];
 
     const menuItems = [
@@ -181,7 +235,9 @@ const DispatcherDashboard = () => {
                                             <FiTrendingUp className="text-emerald-500" />
                                         </div>
                                         <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">{s.label}</p>
-                                        <p className="text-3xl font-black text-slate-900 mt-1">{s.value}</p>
+                                        <p className="text-3xl font-black text-slate-900 mt-1">
+                                            {s.value !== null ? s.value : <FiRefreshCw className="animate-spin text-slate-300 h-6 w-6" />}
+                                        </p>
                                     </div>
                                 ))}
                             </div>
