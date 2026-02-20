@@ -4,7 +4,7 @@ import {
   FiAlertTriangle, FiNavigation, FiSettings, FiLogOut,
   FiBell, FiSearch, FiMonitor, FiMap, FiCheckCircle,
   FiTrash2, FiToggleLeft, FiToggleRight, FiRefreshCw,
-  FiUserCheck, FiShare2
+  FiUserCheck, FiShare2, FiUserX
 } from 'react-icons/fi';
 import Analytics from './Analytics';
 import RouteMap from './RouteMap';
@@ -14,17 +14,44 @@ import ModelPerformance from './ModelPerformance';
 import AIReportSummary from './AIReportSummary';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
+  const { notifications } = useNotifications();
   const [activeTab, setActiveTab] = useState('Overview');
   const [systemHealth, setSystemHealth] = useState('stable');
   const [stats, setStats] = useState({
-    activeDrivers: 42,
-    fleetUtilization: '89%',
-    safetyScore: 94,
-    activeAlerts: 3
+    activeDrivers: null,
+    fleetUtilization: null,
+    safetyScore: null,
+    activeAlerts: null
   });
+  const [statsLoading, setStatsLoading] = useState(false);
+
+  // Handle incoming notifications to update stats and events in real-time
+  useEffect(() => {
+    if (notifications.length > 0) {
+      const latest = notifications[0];
+
+      // Update stats based on notification type
+      if (latest.type === 'delivery_status_update' || latest.type === 'new_delivery') {
+        fetchStats(); // Full refresh of stats when something major happens
+      }
+
+      // Add to recent events if it's an interesting systemic event
+      if (['delivery_status_update', 'delivery_assigned', 'panic_alert'].includes(latest.type)) {
+        const newEvent = {
+          id: Date.now(),
+          type: latest.type === 'panic_alert' ? 'alert' : 'info',
+          title: latest.type.replace(/_/g, ' ').toUpperCase(),
+          description: latest.message || `Delivery ${latest.delivery_id?.substring(0, 8)} update: ${latest.status || ''}`,
+          time: new Date().toISOString()
+        };
+        setRecentEvents(prev => [newEvent, ...prev].slice(0, 10));
+      }
+    }
+  }, [notifications]);
 
   // User Management state
   const [allUsers, setAllUsers] = useState([]);
@@ -78,6 +105,7 @@ const AdminDashboard = () => {
   };
 
   const fetchStats = async () => {
+    setStatsLoading(true);
     try {
       const data = await api.get('/admin/summary');
       setStats({
@@ -90,6 +118,8 @@ const AdminDashboard = () => {
       fetchEvents();
     } catch (e) {
       console.error("Failed to fetch admin stats", e);
+    } finally {
+      setStatsLoading(false);
     }
   };
 
@@ -306,7 +336,9 @@ const AdminDashboard = () => {
                     </button>
                   </div>
                   <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Active Fleet</p>
-                  <p className="text-3xl font-black text-slate-900 mt-1">{stats.activeDrivers}</p>
+                  <p className="text-3xl font-black text-slate-900 mt-1">
+                    {stats.activeDrivers !== null ? stats.activeDrivers : <FiRefreshCw className="animate-spin text-indigo-500 opacity-20" />}
+                  </p>
                 </div>
                 <div className="bg-white p-6 rounded-3xl border border-slate-200 hover:border-blue-500/30 transition-all group shadow-sm">
                   <div className="flex items-center justify-between mb-4">
@@ -316,7 +348,9 @@ const AdminDashboard = () => {
                     <span className="text-xs font-bold text-blue-600">Live</span>
                   </div>
                   <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Utilization</p>
-                  <p className="text-3xl font-black text-slate-900 mt-1">{stats.fleetUtilization}</p>
+                  <p className="text-3xl font-black text-slate-900 mt-1">
+                    {stats.fleetUtilization !== null ? stats.fleetUtilization : <FiRefreshCw className="animate-spin text-blue-500 opacity-20" />}
+                  </p>
                 </div>
                 <div className="bg-white p-6 rounded-3xl border border-slate-200 hover:border-amber-500/30 transition-all group shadow-sm">
                   <div className="flex items-center justify-between mb-4">
@@ -326,7 +360,9 @@ const AdminDashboard = () => {
                     <span className="text-xs font-bold text-indigo-600">Safe</span>
                   </div>
                   <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Avg Safety</p>
-                  <p className="text-3xl font-black text-slate-900 mt-1">{stats.safetyScore}%</p>
+                  <p className="text-3xl font-black text-slate-900 mt-1">
+                    {stats.safetyScore !== null ? `${stats.safetyScore}%` : <FiRefreshCw className="animate-spin text-amber-500 opacity-20" />}
+                  </p>
                 </div>
                 <div className="bg-white p-6 rounded-3xl border border-slate-200 hover:border-rose-500/30 transition-all group shadow-sm">
                   <div className="flex items-center justify-between mb-4">
@@ -336,7 +372,9 @@ const AdminDashboard = () => {
                     <span className="text-xs font-bold text-rose-600">Urgent</span>
                   </div>
                   <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Active Alerts</p>
-                  <p className="text-3xl font-black text-slate-900 mt-1">{stats.activeAlerts}</p>
+                  <p className="text-3xl font-black text-slate-900 mt-1">
+                    {stats.activeAlerts !== null ? stats.activeAlerts : <FiRefreshCw className="animate-spin text-rose-500 opacity-20" />}
+                  </p>
                 </div>
               </div>
 
