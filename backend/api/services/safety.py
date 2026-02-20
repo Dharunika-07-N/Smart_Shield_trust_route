@@ -61,114 +61,97 @@ class SafetyService:
             Alert data with notification status
         """
         try:
-            # Try to get user info (new system)
+            # 1. Immediate DB record
             user = db.query(User).filter(User.id == rider_id).first()
+            rider = user if user else db.query(Rider).filter(Rider.id == rider_id).first()
             
-            # Fallback to old Rider model if not found in User
-            rider = None
-            if user:
-                # Map user fields to what the service expects
-                rider = user
-            else:
-                rider = db.query(Rider).filter(Rider.id == rider_id).first()
-            
-            # Create panic alert anyway, even if rider not in DB (still want to log and try system email)
+            rider_name = "Unknown Rider"
+            if rider:
+                rider_name = getattr(rider, 'full_name', getattr(rider, 'name', "Rider"))
+
             alert = PanicAlert(
                 rider_id=rider_id,
                 route_id=route_id,
                 delivery_id=delivery_id,
-                location={
-                    "latitude": location.latitude,
-                    "longitude": location.longitude
-                },
+                location={"latitude": location.latitude, "longitude": location.longitude},
                 status="active"
             )
             db.add(alert)
             db.commit()
             db.refresh(alert)
             
-            # Notify emergency contacts
-            emergency_contacts = []
-            if rider:
-                emergency_contacts = getattr(rider, 'emergency_contacts', []) or []
+            # 2. IMMEDIATE WebSocket Broadcast (Critical for Dispatchers)
+            try:
+                from api.routes.notifications import manager as notification_manager
+                notification_manager.broadcast_sync({
+                    "type": "panic_alert",
+                    "alert_id": alert.id,
+                    "rider_id": rider_id,
+                    "rider_name": rider_name,
+                    "location": {"latitude": location.latitude, "longitude": location.longitude},
+                    "message": f"🚨 SOS ALERT: {rider_name} triggered panic button!",
+                    "timestamp": alert.created_at.isoformat()
+                })
+            except Exception as notify_err:
+                logger.error(f"WS Broadcast Error: {notify_err}")
+
+            # 3. Async background notification tasks
+            import asyncio
             
+            # Notify emergency contacts
+            emergency_contacts = getattr(rider, 'emergency_contacts', []) or [] if rider else []
             alerted_contacts = []
-            emails_sent = 0
             
             for contact in emergency_contacts:
                 try:
                     success = await self._notify_emergency_contact(contact, rider, alert)
                     if success:
                         alerted_contacts.append({
-                            "name": contact.get("name"),
-                            "phone": contact.get("phone"),
-                            "email": contact.get("email"),
+                            "name": contact.get("name"), 
                             "notified": True
                         })
-                        if contact.get("email"):
-                            emails_sent += 1
                 except Exception as contact_err:
                     logger.error(f"Error notifying contact {contact}: {contact_err}")
             
-            alert.alerted_contacts = alerted_contacts
+            # Critical Backup Email (Run in thread to avoid blocking loop)
+            system_email_task = asyncio.to_thread(self._send_sos_email, rider, alert)
             
-            # Send email to the system emergency email as a critical backup
-            system_email_sent = False
-            try:
-                system_email_sent = self._send_sos_email(rider if rider else None, alert)
-            except Exception as email_err:
-                logger.error(f"Critical error sending system SOS email: {email_err}")
+            # System SMS (Already async)
+            loc_str = f"{location.latitude}, {location.longitude}"
+            system_sms_task = self.sms_service.send_emergency_alert(rider_name, loc_str)
             
-            # Send SMS to system emergency phone as a critical backup (Phase 2)
-            system_sms_sent = False
-            try:
-                rider_name = "Unknown Rider"
-                if rider:
-                    rider_name = getattr(rider, 'full_name', getattr(rider, 'name', "Rider"))
-                
-                loc_str = f"{location.latitude}, {location.longitude}"
-                import asyncio
-                # Since this is an async operation in an async function (usually), we handle it
-                # trigger_panic_button is called from an async route
-                system_sms_sent = await self.sms_service.send_emergency_alert(
-                    rider_name=rider_name,
-                    location_str=loc_str
-                )
-            except Exception as sms_err:
-                logger.error(f"Critical error sending system SOS SMS: {sms_err}")
+            # Company notification
+            company_notified_task = self._notify_company(db, rider, alert) if rider else None
             
-            # Notify company
+            # We don't necessarily need to wait for all of these before returning success to the rider app
+            # but for consistency we await them here or wrap in a background task
+            system_email_sent, system_sms_sent = await asyncio.gather(
+                system_email_task, 
+                system_sms_task,
+                return_exceptions=True
+            )
+            
+            # Convert exceptions to False
+            if isinstance(system_email_sent, Exception): system_email_sent = False
+            if isinstance(system_sms_sent, Exception): system_sms_sent = False
+
             company_notified = False
-            try:
-                if rider:
-                    company_notified = await self._notify_company(db, rider, alert)
-            except Exception as company_err:
-                logger.error(f"Error notifying company: {company_err}")
-            
+            if company_notified_task:
+                company_notified = await company_notified_task
+
             alert.company_notified = company_notified
-            
-            # Optionally notify emergency services (can be configured)
-            emergency_services_notified = False  
-            alert.emergency_services_notified = emergency_services_notified
-            
             db.commit()
             
-            logger.critical(
-                f"PANIC ALERT: User {rider_id} at {location.latitude}, {location.longitude}. "
-                f"Backup Email Sent: {system_email_sent}"
-            )
+            logger.critical(f"PANIC ALERT: User {rider_id} at {location.latitude}, {location.longitude}")
             
             return {
                 "alert_id": alert.id,
                 "status": "active",
-                "email_sent": emails_sent > 0 or system_email_sent,
+                "email_sent": system_email_sent,
                 "sms_sent": system_sms_sent,
                 "company_notified": company_notified,
                 "emergency_contacts_notified": len(alerted_contacts),
-                "location": {
-                    "latitude": location.latitude,
-                    "longitude": location.longitude
-                },
+                "location": {"latitude": location.latitude, "longitude": location.longitude},
                 "timestamp": alert.created_at.isoformat()
             }
             
@@ -201,9 +184,21 @@ class SafetyService:
             
             db.commit()
             
-            logger.info(f"Panic alert {alert_id} resolved by rider {rider_id}")
+            # Broadcast resolution via WebSocket
+            try:
+                from api.routes.notifications import manager as notification_manager
+                notification_manager.broadcast_sync({
+                    "type": "panic_resolved",
+                    "alert_id": alert_id,
+                    "rider_id": rider_id,
+                    "status": "resolved",
+                    "message": f"✅ SOS Resolved: Alert for rider {rider_id} has been cleared.",
+                    "timestamp": alert.resolved_at.isoformat()
+                })
+            except Exception as notify_err:
+                logger.error(f"WS Resolve Broadcast Error: {notify_err}")
             
-            # TODO: Notify contacts that rider is safe
+            logger.info(f"Panic alert {alert_id} resolved by rider {rider_id}")
             
             return {
                 "success": True,

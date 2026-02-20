@@ -33,6 +33,26 @@ class NotificationManager:
         for connection in disconnected:
             self.active_connections.remove(connection)
 
+    def broadcast_sync(self, message: dict):
+        """Thread-safe and sync-safe broadcast."""
+        try:
+            import asyncio
+            try:
+                loop = asyncio.get_running_loop()
+                if loop.is_running():
+                    loop.create_task(self.broadcast(message))
+                    return
+            except RuntimeError:
+                pass
+            
+            # Fallback for sync contexts
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            new_loop.run_until_complete(self.broadcast(message))
+            new_loop.close()
+        except Exception as e:
+            logger.error(f"Error in sync broadcast: {e}")
+
 manager = NotificationManager()
 
 @router.websocket("/ws/notifications")
