@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     
     # API Keys
     GOOGLE_MAPS_API_KEY: str = os.getenv("GOOGLE_MAPS_API_KEY", "")
+    GRAPHHOPPER_API_KEY: str = os.getenv("GRAPHHOPPER_API_KEY", "")
     MAPBOX_TOKEN: str = os.getenv("MAPBOX_TOKEN", "")
     SAFEGRAPH_API_KEY: str = os.getenv("SAFEGRAPH_API_KEY", "")
     
