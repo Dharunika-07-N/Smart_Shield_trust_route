@@ -1473,6 +1473,25 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
                 )}
 
 
+                {/* External Route from Props (e.g. from Driver Dashboard) */}
+                {route && showSafetyOverlay && getRoutePolylines(route, route.segments).map((poly, idx) => (
+                  <Polyline
+                    key={`external-route-${idx}`}
+                    positions={poly.positions}
+                    pathOptions={{
+                      color: poly.color,
+                      weight: 6,
+                      opacity: 1.0,
+                    }}
+                  />
+                ))}
+
+                {/* Markers from Props */}
+                {markers && markers.map((m, i) => (
+                  <Marker key={`prop-marker-${i}`} position={m.position}>
+                    {m.popup && <Popup>{m.popup}</Popup>}
+                  </Marker>
+                ))}
               </MapContainer>
             </div>
           </div>

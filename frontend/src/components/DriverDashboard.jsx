@@ -22,8 +22,11 @@ const DriverDashboard = () => {
     const { location: currentLocation } = useLocation();
     const [isOnline, setIsOnline] = useState(true);
     const [isTripExpanded, setIsTripExpanded] = useState(true);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile sidebar toggle
     const [searchTerm, setSearchTerm] = useState('');
+    const [isNavigating, setIsNavigating] = useState(false);
+    const [navigationSteps, setNavigationSteps] = useState([]);
+    const [selectedRoute, setSelectedRoute] = useState(null);
+    const [fetchingRoute, setFetchingRoute] = useState(false);
 
     // Real Data States
     const [activeDelivery, setActiveDelivery] = useState(null);
@@ -146,17 +149,57 @@ const DriverDashboard = () => {
         }
     };
 
-    const handleStartNavigation = () => {
-        if (!activeDelivery) return;
+    const handleStartNavigation = async () => {
+        if (!activeDelivery || !currentLocation) return;
+
         const dest = activeDelivery.dropoff_location;
-        if (dest && dest.lat && dest.lng) {
-            // Update status to in_transit if starting navigation
-            if (activeDelivery.status === 'assigned' || activeDelivery.status === 'picked_up') {
-                updateStatus('in_transit');
-            }
-            window.open(`https://www.google.com/maps/dir/?api=1&destination=${dest.lat},${dest.lng}`, '_blank');
-        } else {
+        if (!dest || !dest.lat || !dest.lng) {
             alert("Destination coordinates not found");
+            return;
+        }
+
+        setFetchingRoute(true);
+        try {
+            // Update status to in_transit
+            if (activeDelivery.status === 'assigned' || activeDelivery.status === 'picked_up') {
+                await updateStatus('in_transit');
+            }
+
+            // Fetch optimized route from backend
+            const response = await api.optimizeRoute({
+                starting_point: { latitude: currentLocation.latitude, longitude: currentLocation.longitude },
+                stops: [{
+                    stop_id: activeDelivery.id,
+                    address: dest.address,
+                    coordinates: { latitude: dest.lat, longitude: dest.lng }
+                }],
+                optimize_for: ['safety', 'time']
+            });
+
+            if (response.success && response.data) {
+                const route = response.data;
+                setSelectedRoute(route);
+
+                // Extract all instructions from segments
+                const steps = [];
+                route.segments?.forEach(seg => {
+                    if (seg.instructions) {
+                        steps.push(...seg.instructions);
+                    }
+                });
+                setNavigationSteps(steps.length > 0 ? steps : ["Head towards destination"]);
+                setIsNavigating(true);
+                setIsTripExpanded(false); // Collapse trip card to show map more
+            } else {
+                // Fallback to Google Maps if backend fails
+                window.open(`https://www.google.com/maps/dir/?api=1&destination=${dest.lat},${dest.lng}`, '_blank');
+            }
+        } catch (error) {
+            console.error("Navigation setup failed:", error);
+            // Fallback
+            window.open(`https://www.google.com/maps/dir/?api=1&destination=${dest.lat},${dest.lng}`, '_blank');
+        } finally {
+            setFetchingRoute(false);
         }
     };
 
@@ -175,6 +218,7 @@ const DriverDashboard = () => {
                 <RouteMap
                     variant="light-minimal"
                     showSafeZones={true}
+                    route={selectedRoute}
                     markers={activeDelivery ? [
                         {
                             position: [activeDelivery.dropoff_location?.lat || 12.9716, activeDelivery.dropoff_location?.lng || 80.2452],
@@ -182,8 +226,56 @@ const DriverDashboard = () => {
                             popup: 'Destination'
                         }
                     ] : []}
-                    center={activeDelivery ? [activeDelivery.dropoff_location?.lat, activeDelivery.dropoff_location?.lng] : null}
+                    center={isNavigating && currentLocation ? [currentLocation.latitude, currentLocation.longitude] : (activeDelivery ? [activeDelivery.dropoff_location?.lat, activeDelivery.dropoff_location?.lng] : null)}
                 />
+
+                {/* Navigation Drawer */}
+                {isNavigating && (
+                    <div className="absolute top-4 right-4 bottom-4 w-80 z-30 animate-in slide-in-from-right duration-500">
+                        <div className="h-full bg-white/95 backdrop-blur-xl border border-slate-200 rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden">
+                            <div className="p-6 bg-indigo-600 text-white shrink-0">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h3 className="font-black uppercase tracking-widest text-xs opacity-80">Navigation Active</h3>
+                                    <button onClick={() => setIsNavigating(false)} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+                                        <FiLogOut size={16} className="rotate-180" />
+                                    </button>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                                        <FiNavigation size={24} className="animate-pulse" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xl font-black">{Math.round((selectedRoute?.total_duration_seconds || 0) / 60)} min</p>
+                                        <p className="text-[10px] font-bold opacity-70">ETA • {(selectedRoute?.total_distance_meters / 1000).toFixed(1)} km left</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                                {navigationSteps.map((step, idx) => (
+                                    <div key={idx} className={`p-4 rounded-2xl flex gap-3 transition-all ${idx === 0 ? 'bg-indigo-50 border border-indigo-100 ring-2 ring-indigo-500/10' : 'bg-slate-50 border border-slate-100'}`}>
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${idx === 0 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-400'}`}>
+                                            {idx === 0 ? <FiNavigation size={14} /> : <div className="w-1.5 h-1.5 rounded-full bg-current" />}
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className={`text-xs font-bold leading-relaxed ${idx === 0 ? 'text-indigo-900' : 'text-slate-600'}`} dangerouslySetInnerHTML={{ __html: step }} />
+                                            {idx === 0 && <p className="text-[10px] text-indigo-500 font-black mt-1 uppercase">Next Turn</p>}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="p-6 bg-slate-50 border-t border-slate-100 shrink-0">
+                                <button
+                                    onClick={() => updateStatus('delivered')}
+                                    className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-sm transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
+                                >
+                                    <FiCheckCircle /> COMPLETE DELIVERY
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Map Overlay Controls */}
                 <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
@@ -258,10 +350,12 @@ const DriverDashboard = () => {
                                 {activeDelivery.status !== 'delivered' && (
                                     <>
                                         <button
+                                            disabled={fetchingRoute}
                                             onClick={handleStartNavigation}
-                                            className="flex-[2] py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20"
+                                            className="flex-[2] py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20"
                                         >
-                                            <FiNavigation /> START NAVIGATION
+                                            {fetchingRoute ? <FiRefreshCw className="animate-spin" /> : <FiNavigation />}
+                                            {fetchingRoute ? 'PLANNING...' : 'START NAVIGATION'}
                                         </button>
                                         {activeDelivery.status === 'in_transit' ? (
                                             <button
