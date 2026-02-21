@@ -158,6 +158,10 @@ export const api = {
   createRideAlong: (data) => apiClient.post('/safety/ride-along', data),
   getRideAlongStatus: (shareToken) => apiClient.get(`/safety/ride-along/${shareToken}`),
 
+  // Admin & Monitoring
+  getRidersStatus: () => apiClient.get('/admin/riders-status'),
+  getRiderPerformance: () => apiClient.get('/admin/rider-performance'),
+
   // Training
   retrainModel: () => apiClient.post('/training/retrain'),
 
