@@ -112,6 +112,128 @@ def get_recent_fleet_events(
     events.sort(key=lambda x: x['time'] or '', reverse=True)
     return events[:10]
 
+@router.get("/riders-status")
+def get_riders_live_status(
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """
+    Get all riders/drivers with their live location, active delivery info, 
+    and the latest tracking update. Used by Admin Dashboard to monitor workability.
+    """
+    # Get all rider/driver users
+    riders = db.query(User).filter(
+        User.role.in_(["rider", "driver"]),
+        User.is_active == True
+    ).all()
+
+    result = []
+    for rider in riders:
+        # Get the latest DeliveryStatus entry for this rider
+        latest_track = (
+            db.query(DeliveryStatus)
+            .filter(DeliveryStatus.rider_id == rider.id)
+            .order_by(DeliveryStatus.timestamp.desc())
+            .first()
+        )
+
+        # Get rider's current active delivery
+        active_delivery = (
+            db.query(Delivery)
+            .filter(
+                Delivery.assigned_rider_id == rider.id,
+                ~Delivery.status.in_(["delivered", "cancelled", "failed"])
+            )
+            .order_by(Delivery.created_at.desc())
+            .first()
+        )
+
+        # Build response entry
+        entry = {
+            "rider_id": rider.id,
+            "name": rider.full_name or rider.username,
+            "phone": rider.phone,
+            "email": rider.email,
+            "role": rider.role,
+            "status": rider.status,
+            # Location data
+            "last_location": latest_track.current_location if latest_track else None,
+            "last_seen": latest_track.timestamp.isoformat() if latest_track else None,
+            "speed_kmh": latest_track.speed_kmh if latest_track else None,
+            "heading": latest_track.heading if latest_track else None,
+            "battery_level": latest_track.battery_level if latest_track else None,
+            # Delivery data
+            "active_delivery": {
+                "id": active_delivery.id,
+                "order_id": active_delivery.order_id,
+                "status": active_delivery.status,
+                "dropoff_location": active_delivery.dropoff_location,
+                "pickup_location": active_delivery.pickup_location,
+                "safety_score": active_delivery.safety_score,
+                "estimated_distance": active_delivery.estimated_distance,
+                "estimated_duration": active_delivery.estimated_duration,
+                "created_at": active_delivery.created_at.isoformat() if active_delivery.created_at else None,
+            } if active_delivery else None,
+            # Computed fields
+            "is_online": latest_track is not None and (
+                datetime.utcnow() - latest_track.timestamp
+            ).total_seconds() < 300,  # online if updated within 5 min
+            "deliveries_today": db.query(Delivery).filter(
+                Delivery.assigned_rider_id == rider.id,
+                Delivery.status == "delivered",
+                Delivery.delivered_at >= datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            ).count()
+        }
+        result.append(entry)
+
+    # Sort: online first, then by name
+    result.sort(key=lambda x: (not x["is_online"], x["name"] or ""))
+    return result
+
+
+@router.get("/rider-performance")
+def get_rider_performance_stats(
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """
+    Get aggregated performance metrics for all riders.
+    Includes total deliveries, avg safety score, avg delivery time.
+    """
+    riders = db.query(User).filter(User.role.in_(["rider", "driver"])).all()
+    
+    stats = []
+    for rider in riders:
+        deliveries = db.query(Delivery).filter(
+            Delivery.assigned_rider_id == rider.id,
+            Delivery.status == "delivered"
+        ).all()
+        
+        total = len(deliveries)
+        if total > 0:
+            avg_safety = sum((d.safety_score or 0) for d in deliveries) / total
+            # Calculate avg duration in minutes
+            durations = []
+            for d in deliveries:
+                if d.delivered_at and d.created_at:
+                    durations.append((d.delivered_at - d.created_at).total_seconds() / 60)
+            avg_duration = sum(durations) / len(durations) if durations else 0
+        else:
+            avg_safety = 0
+            avg_duration = 0
+            
+        stats.append({
+            "rider_id": rider.id,
+            "name": rider.full_name or rider.username,
+            "total_deliveries": total,
+            "avg_safety_score": round(avg_safety, 1),
+            "avg_delivery_time": round(avg_duration, 1),
+            "rating": 4.5 + (avg_safety / 200) # Mock rating based on safety
+        })
+        
+    return stats
+
+
 @router.get("/export/reports")
 def export_incident_reports(
     db: Session = Depends(get_db),
