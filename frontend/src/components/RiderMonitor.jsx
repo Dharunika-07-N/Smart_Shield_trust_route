@@ -517,11 +517,15 @@ const RiderCard = ({ rider, isSelected, onClick }) => {
                             <div>
                                 <p className="text-[10px] text-slate-400 font-bold uppercase">Last Known Location</p>
                                 <p className="text-xs font-bold text-slate-700 mt-0.5">{lat?.toFixed(5)}, {lng?.toFixed(5)}</p>
-                                {rider.heading != null && (
-                                    <p className="text-[10px] text-slate-400 mt-0.5">
-                                        Heading: {Math.round(rider.heading)}°
-                                        {rider.speed_kmh != null && ` · ${Math.round(rider.speed_kmh)} km/h`}
-                                    </p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">
+                                    {rider.heading != null && `Heading: ${Math.round(rider.heading)}°`}
+                                    {rider.speed_kmh != null && ` · ${Math.round(rider.speed_kmh)} km/h`}
+                                </p>
+                                {rider.h3_index && (
+                                    <div className="mt-2 flex items-center gap-1.5">
+                                        <span className="text-[9px] bg-amber-100 text-amber-700 font-black px-1.5 py-0.5 rounded-md uppercase tracking-tighter">H3-ID</span>
+                                        <code className="text-[10px] font-mono text-slate-500 bg-slate-100 px-1 rounded">{rider.h3_index}</code>
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -592,8 +596,9 @@ const RiderCard = ({ rider, isSelected, onClick }) => {
                         </div>
                     )}
                 </div>
-            )}
-        </div>
+            )
+            }
+        </div >
     );
 };
 
