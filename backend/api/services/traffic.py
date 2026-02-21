@@ -234,9 +234,9 @@ class TrafficService:
         a = math.sin(dphi/2)**2 + math.cos(p1) * math.cos(p2) * math.sin(dlam/2)**2
         return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
 
-    def get_bbox_traffic(self, min_lat, min_lng, max_lat, max_lng) -> List[Dict]:
+    async def get_bbox_traffic(self, min_lat, min_lng, max_lat, max_lng) -> List[Dict]:
         """Get flattened traffic segments for a bounding box."""
-        segments = aggregator.get_traffic_data((min_lat, min_lng, max_lat, max_lng))
+        segments = await aggregator.get_traffic_data((min_lat, min_lng, max_lat, max_lng))
         return [
             {
                 'segment_id': s.segment_id,
@@ -276,7 +276,7 @@ class TrafficService:
             avg_val = sum(s.traffic_level.value for s in segments) / len(segments)
             lvl_val = round(avg_val)
             
-            level_map = {1: 'low', 2: 'low', 3: 'medium', 4: 'high', 5: 'high'}
+            level_map = {0: 'low', 1: 'low', 2: 'low', 3: 'medium', 4: 'high', 5: 'high'}
             traffic = level_map.get(lvl_val, 'low')
             
             speed = self._get_speed_for_traffic(traffic)
@@ -300,13 +300,13 @@ class TrafficService:
         elif traffic_level == 'medium': return self.base_speed_ms * 0.75
         else: return self.base_speed_ms
     
-    def get_route_traffic(self, coordinates: List[Coordinate]) -> List[Dict]:
+    async def get_route_traffic(self, coordinates: List[Coordinate]) -> List[Dict]:
         """Get traffic data for entire route."""
         if len(coordinates) < 2: return []
         segments = []
         for i in range(len(coordinates) - 1):
             s, e = coordinates[i], coordinates[i + 1]
-            traffic, dist, dur = self.get_traffic_level(s, e)
+            traffic, dist, dur = await self.get_traffic_level(s, e)
             segments.append({
                 "start": s, "end": e, "traffic_level": traffic,
                 "distance_meters": dist, "duration_seconds": dur,

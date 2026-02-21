@@ -55,7 +55,7 @@ async def get_traffic_for_segment(
 ):
     """Get traffic level for a route segment."""
     try:
-        traffic_level, dist, duration = traffic_service.get_traffic_level(start, end)
+        traffic_level, dist, duration = await traffic_service.get_traffic_level(start, end)
         speed = dist / duration if duration > 0 else 0
         congestion = traffic_service.calculate_congestion_percentage(traffic_level)
         
@@ -81,7 +81,7 @@ async def get_traffic_for_route(
         if len(coordinates) < 2:
             raise HTTPException(status_code=400, detail="Need at least 2 coordinates")
         
-        route_segments = traffic_service.get_route_traffic(coordinates)
+        route_segments = await traffic_service.get_route_traffic(coordinates)
         
         response_segments = [
             RouteSegmentTraffic(
@@ -123,7 +123,7 @@ async def get_traffic_segments(
 ):
     """Get real-time traffic segments for bounding box."""
     try:
-        return traffic_service.get_bbox_traffic(min_lat, min_lng, max_lat, max_lng)
+        return await traffic_service.get_bbox_traffic(min_lat, min_lng, max_lat, max_lng)
     except Exception as e:
         logger.error(f"Error fetching traffic segments: {e}")
         raise HTTPException(status_code=500, detail=str(e))
