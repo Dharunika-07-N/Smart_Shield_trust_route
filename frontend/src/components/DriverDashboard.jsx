@@ -7,10 +7,10 @@ import {
     FiBarChart2, FiSearch
 } from 'react-icons/fi';
 import RouteMap from './RouteMap';
+import LiveNavigationHUD from './LiveNavigationHUD';
 import { api } from '../services/api';
 import useLocation from '../hooks/useLocation';
 import { useAuth } from '../context/AuthContext';
-
 import { useNotifications } from '../context/NotificationContext';
 
 const DriverDashboard = () => {
@@ -27,6 +27,7 @@ const DriverDashboard = () => {
     const [navigationSteps, setNavigationSteps] = useState([]);
     const [selectedRoute, setSelectedRoute] = useState(null);
     const [fetchingRoute, setFetchingRoute] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     // Real Data States
     const [activeDelivery, setActiveDelivery] = useState(null);
@@ -229,62 +230,35 @@ const DriverDashboard = () => {
                     center={isNavigating && currentLocation ? [currentLocation.latitude, currentLocation.longitude] : (activeDelivery ? [activeDelivery.dropoff_location?.lat, activeDelivery.dropoff_location?.lng] : null)}
                 />
 
-                {/* Navigation Drawer */}
+                {/* Live Navigation HUD Sidebar */}
                 {isNavigating && (
-                    <div className="absolute top-4 right-4 bottom-4 w-80 z-30 animate-in slide-in-from-right duration-500">
-                        <div className="h-full bg-white/95 backdrop-blur-xl border border-slate-200 rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden">
-                            <div className="p-6 bg-indigo-600 text-white shrink-0">
-                                <div className="flex items-center justify-between mb-2">
-                                    <h3 className="font-black uppercase tracking-widest text-xs opacity-80">Navigation Active</h3>
-                                    <button onClick={() => setIsNavigating(false)} className="p-1 hover:bg-white/20 rounded-full transition-colors">
-                                        <FiLogOut size={16} className="rotate-180" />
-                                    </button>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                                        <FiNavigation size={24} className="animate-pulse" />
-                                    </div>
-                                    <div>
-                                        <p className="text-xl font-black">{Math.round((selectedRoute?.total_duration_seconds || 0) / 60)} min</p>
-                                        <p className="text-[10px] font-bold opacity-70">ETA • {(selectedRoute?.total_distance_meters / 1000).toFixed(1)} km left</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                                {navigationSteps.map((step, idx) => (
-                                    <div key={idx} className={`p-4 rounded-2xl flex gap-3 transition-all ${idx === 0 ? 'bg-indigo-50 border border-indigo-100 ring-2 ring-indigo-500/10' : 'bg-slate-50 border border-slate-100'}`}>
-                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${idx === 0 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-400'}`}>
-                                            {idx === 0 ? <FiNavigation size={14} /> : <div className="w-1.5 h-1.5 rounded-full bg-current" />}
-                                        </div>
-                                        <div className="flex-1">
-                                            <p className={`text-xs font-bold leading-relaxed ${idx === 0 ? 'text-indigo-900' : 'text-slate-600'}`} dangerouslySetInnerHTML={{ __html: step }} />
-                                            {idx === 0 && <p className="text-[10px] text-indigo-500 font-black mt-1 uppercase">Next Turn</p>}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div className="p-6 bg-slate-50 border-t border-slate-100 shrink-0">
-                                <button
-                                    onClick={() => updateStatus('delivered')}
-                                    className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-sm transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
-                                >
-                                    <FiCheckCircle /> COMPLETE DELIVERY
-                                </button>
-                            </div>
-                        </div>
+                    <div className="absolute top-0 right-0 bottom-0 w-80 z-30 shadow-2xl border-l border-slate-200 bg-white flex flex-col overflow-hidden" style={{ zIndex: 40 }}>
+                        <LiveNavigationHUD
+                            route={selectedRoute}
+                            currentLocation={currentLocation}
+                            onClose={() => setIsNavigating(false)}
+                            onDeliveryComplete={() => updateStatus('delivered')}
+                            destination={activeDelivery?.dropoff_location}
+                        />
                     </div>
                 )}
 
-                {/* Map Overlay Controls */}
-                <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
+                {/* Map Overlay Controls + Compact Nav Banner */}
+                <div className="absolute top-4 left-4 right-4 z-10 flex flex-col gap-2" style={{ right: isNavigating ? '336px' : '16px' }}>
                     <div className="bg-white/90 backdrop-blur-md p-2 rounded-2xl border border-slate-200 shadow-lg flex items-center gap-3">
                         <div className={`w-3 h-3 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></div>
                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">
                             {isOnline ? 'Live Tracking Active' : 'Offline'}
                         </span>
                     </div>
+                    {/* Compact HUD Banner when navigating */}
+                    {isNavigating && selectedRoute && (
+                        <LiveNavigationHUD
+                            route={selectedRoute}
+                            currentLocation={currentLocation}
+                            compact={true}
+                        />
+                    )}
                 </div>
 
                 {/* Delivery Card - Floating */}
