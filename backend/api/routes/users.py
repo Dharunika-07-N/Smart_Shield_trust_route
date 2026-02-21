@@ -141,7 +141,7 @@ def list_all_users(
 
 @router.patch("/{user_id}/status")
 def toggle_user_status(
-    user_id: int,
+    user_id: str,
     payload: dict,
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin)
@@ -159,7 +159,7 @@ def toggle_user_status(
 
 @router.delete("/{user_id}")
 def delete_user(
-    user_id: int,
+    user_id: str,
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin)
 ):

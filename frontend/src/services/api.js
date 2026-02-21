@@ -28,6 +28,11 @@ apiClient.interceptors.request.use(
     const token = localStorage.getItem('auth_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      if (process.env.NODE_ENV === 'development') {
+        console.log('API Request:', config.method.toUpperCase(), config.url, 'Token:', token.substring(0, 10) + '...');
+      }
+    } else {
+      console.warn('API Request:', config.method.toUpperCase(), config.url, 'MISSING TOKEN');
     }
     return config;
   },
@@ -65,7 +70,7 @@ apiClient.interceptors.response.use(
             errorMessage = 'Invalid request. Please check your input.';
             break;
           case 401:
-            errorMessage = 'Unauthorized. Please check your authentication.';
+            errorMessage = 'Could not validate credentials';
             break;
           case 403:
             errorMessage = 'Access forbidden.';
