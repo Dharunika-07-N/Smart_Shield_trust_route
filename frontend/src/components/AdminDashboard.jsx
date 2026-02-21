@@ -12,6 +12,7 @@ import FleetMap from './FleetMap';
 import TrainingCenter from './TrainingCenter';
 import ModelPerformance from './ModelPerformance';
 import AIReportSummary from './AIReportSummary';
+import RiderMonitor from './RiderMonitor';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
@@ -205,6 +206,7 @@ const AdminDashboard = () => {
     { id: 'Overview', icon: FiMonitor, label: 'System Overview' },
     { id: 'Optimizer', icon: FiNavigation, label: 'Route Optimizer' },
     { id: 'Fleet', icon: FiMap, label: 'Fleet Map' },
+    { id: 'Riders', icon: FiActivity, label: 'Rider Monitor' },
     { id: 'Users', icon: FiUsers, label: 'User Management' },
     { id: 'Analytics', icon: FiBarChart2, label: 'Advanced Analytics' },
     { id: 'Training', icon: FiCpu, label: 'ML Training Center' },
@@ -515,6 +517,12 @@ const AdminDashboard = () => {
           {activeTab === 'Fleet' && (
             <div className="h-full rounded-[2.5rem] overflow-hidden border border-slate-200 bg-white ring-8 ring-slate-100/50">
               <FleetMap />
+            </div>
+          )}
+
+          {activeTab === 'Riders' && (
+            <div className="h-full flex flex-col">
+              <RiderMonitor />
             </div>
           )}
 
