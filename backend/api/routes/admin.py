@@ -2,12 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database.database import get_db
-from database.models import User, Delivery, PanicAlert, DeliveryFeedback
+from database.models import User, Delivery, PanicAlert, DeliveryFeedback, DeliveryStatus
 from api.deps import get_current_admin
 from datetime import datetime, timedelta
 import csv
 import io
 from fastapi.responses import StreamingResponse
+
+from api.services.geospatial import geo_service
+from config.config import settings
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -182,7 +185,11 @@ def get_riders_live_status(
                 Delivery.assigned_rider_id == rider.id,
                 Delivery.status == "delivered",
                 Delivery.delivered_at >= datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-            ).count()
+            ).count(),
+            "h3_index": geo_service.get_hex_id(
+                latest_track.current_location.get("latitude"),
+                latest_track.current_location.get("longitude")
+            ) if latest_track and latest_track.current_location else None
         }
         result.append(entry)
 
@@ -232,6 +239,40 @@ def get_rider_performance_stats(
         })
         
     return stats
+
+
+@router.get("/nearby-riders")
+def find_nearby_riders_h3(
+    lat: float,
+    lng: float,
+    radius_cells: int = 1,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """
+    Ultra-fast honeycomb lookup for riders near a point.
+    Matches Uber's K-Ring search logic.
+    """
+    rider_ids = geo_service.find_nearby_riders(lat, lng, k_rings=radius_cells)
+    
+    if not rider_ids:
+        return []
+    
+    # Fetch user details for the matched IDs
+    nearby_riders = db.query(User).filter(User.id.in_(rider_ids)).all()
+    
+    # Enrich with their current H3 cell
+    results = []
+    for r in nearby_riders:
+        results.append({
+            "id": r.id,
+            "name": r.full_name or r.username,
+            "role": r.role,
+            "h3_cell": geo_service.get_hex_id(lat, lng), # Current center cell for context
+            "distance_tier": "immediate" if radius_cells == 0 else "k-ring-1"
+        })
+        
+    return results
 
 
 @router.get("/export/reports")

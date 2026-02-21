@@ -219,18 +219,19 @@ async def get_recent_alerts(
     """Get recent safety alerts."""
     try:
         alerts = db.query(SafetyFeedback).order_by(
-            SafetyFeedback.created_at.desc()
+            SafetyFeedback.date_submitted.desc()
         ).limit(limit).all()
         
         alert_data = []
         for alert in alerts:
+            # Map feedback fields to expected dashboard alert structure
             alert_data.append({
                 "id": alert.id,
-                "type": getattr(alert, 'alert_type', 'general'),
-                "message": getattr(alert, 'message', 'Safety alert'),
-                "location": getattr(alert, 'location', {}),
-                "severity": getattr(alert, 'severity', 'medium'),
-                "created_at": alert.created_at.isoformat() if alert.created_at else None
+                "type": alert.incident_type or alert.feedback_type or 'general',
+                "message": alert.comments or 'Safety feedback received',
+                "location": alert.location if isinstance(alert.location, dict) else {},
+                "severity": "high" if alert.rating <= 2 else "medium" if alert.rating <= 3 else "low",
+                "created_at": alert.date_submitted.isoformat() if alert.date_submitted else None
             })
         
         return {

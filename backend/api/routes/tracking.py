@@ -11,6 +11,7 @@ from typing import Dict, Set, Optional
 from pydantic import BaseModel
 
 from api.routes.notifications import manager as notification_manager
+from api.services.geospatial import geo_service
 
 router = APIRouter(prefix="/tracking", tags=["Tracking"])
 route_monitor = RouteMonitor()
@@ -71,6 +72,13 @@ async def update_location(
     }
     
     db_service.save_location_update(location_data)
+    
+    # Update H3 Index in the high-performance Geospatial Service
+    geo_service.update_rider_location(
+        rider_id=current_user.id,
+        latitude=update.latitude,
+        longitude=update.longitude
+    )
     
     # Check for route deviation
     reoptimization_needed = False
