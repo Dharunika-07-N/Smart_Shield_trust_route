@@ -4,6 +4,7 @@ import {
     FiShield, FiMap, FiNavigation, FiUser, FiLogOut, FiBell, FiCheckCircle, FiChevronDown, FiChevronUp
 } from 'react-icons/fi';
 import RouteMap from './RouteMap';
+import LiveNavigationHUD from './LiveNavigationHUD';
 import { api } from '../services/api';
 import useLocation from '../hooks/useLocation';
 import { useAuth } from '../context/AuthContext';
@@ -22,6 +23,14 @@ const RiderDashboard = () => {
         { id: 2, type: 'traffic', msg: 'High congestion detected on Highway 4.', time: '25m ago' },
         { id: 3, type: 'safety', msg: 'All secure checkpoints verified for your route.', time: '1h ago' }
     ]);
+    const [isNavigating, setIsNavigating] = useState(false);
+    const [selectedRoute, setSelectedRoute] = useState(null);
+    const [activeTrip, setActiveTrip] = useState({
+        order_id: 'TRIP-7721',
+        pickup_location: { address: 'Anna Nagar, Chennai' },
+        dropoff_location: { lat: 13.0827, lng: 80.2707, address: 'Central Station, Chennai' },
+        status: 'in_transit'
+    });
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -61,6 +70,31 @@ const RiderDashboard = () => {
             alert("Check-in successful!");
         } catch (e) {
             alert("Check-in failed.");
+        }
+    };
+
+    const handleStartNavigation = async () => {
+        if (!currentLocation || !activeTrip) return;
+        try {
+            const resp = await api.optimizeRoute({
+                starting_point: { latitude: currentLocation.latitude, longitude: currentLocation.longitude },
+                stops: [{
+                    stop_id: activeTrip.order_id,
+                    address: activeTrip.dropoff_location.address,
+                    coordinates: { latitude: activeTrip.dropoff_location.lat, longitude: activeTrip.dropoff_location.lng }
+                }],
+                optimize_for: ['safety', 'time']
+            });
+
+            if (resp.success && resp.data) {
+                setSelectedRoute(resp.data);
+                setIsNavigating(true);
+                setIsTripInfoExpanded(false);
+            } else {
+                window.open(`https://www.google.com/maps/dir/?api=1&destination=${activeTrip.dropoff_location.lat},${activeTrip.dropoff_location.lng}`, '_blank');
+            }
+        } catch (e) {
+            console.error("Nav error", e);
         }
     };
 
@@ -115,43 +149,86 @@ const RiderDashboard = () => {
                 <main className="flex-1 relative overflow-y-auto">
                     {activeView === 'map' && (
                         <>
-                            <RouteMap />
-                            {/* Overlay Status Card */}
-                            <div
-                                onClick={() => setIsTripInfoExpanded(!isTripInfoExpanded)}
-                                className={`absolute top-4 transition-all duration-500 ease-in-out bg-white/95 backdrop-blur-sm shadow-xl border border-gray-100 cursor-pointer overflow-hidden z-20 ${isTripInfoExpanded
-                                    ? 'left-4 right-4 p-4 rounded-xl'
-                                    : 'right-4 w-auto rounded-full px-4 py-2 flex items-center gap-2 left-auto'
-                                    }`}
-                            >
-                                {isTripInfoExpanded ? (
-                                    <>
-                                        <div className="flex justify-between items-center text-sm mb-2">
-                                            <span className="text-gray-500 font-medium">Current Trip</span>
-                                            <span className="font-bold text-green-600 flex items-center gap-1">
-                                                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                                                On Track
-                                            </span>
-                                        </div>
-                                        <div className="text-2xl font-black text-gray-900 tracking-tight">
-                                            14 <span className="text-base font-normal text-gray-500">mins</span>
-                                        </div>
-                                        <div className="mt-1 text-xs text-indigo-600 font-medium flex items-center gap-1">
-                                            <FiShield size={12} />
-                                            via Safe Zone Corridor
-                                        </div>
-                                        <div className="absolute top-2 right-2 text-gray-300">
-                                            <FiChevronUp />
-                                        </div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                                        <span className="font-bold text-gray-900 text-sm">14 mins</span>
-                                        <FiChevronDown className="text-gray-400" />
-                                    </>
-                                )}
-                            </div>
+                            <RouteMap route={selectedRoute} />
+
+                            {/* Proactive Navigation Call to Action */}
+                            {!isNavigating && activeTrip && (
+                                <div className="absolute bottom-20 left-4 right-4 z-20">
+                                    <button
+                                        onClick={handleStartNavigation}
+                                        className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-xl shadow-indigo-500/30 flex items-center justify-center gap-3 active:scale-95 transition-all"
+                                    >
+                                        <FiNavigation size={20} className="animate-pulse" />
+                                        START LIVE NAVIGATION
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Full HUD Modal-like sidebar for mobile */}
+                            {isNavigating && (
+                                <div className="absolute inset-0 z-30 bg-white">
+                                    <LiveNavigationHUD
+                                        route={selectedRoute}
+                                        currentLocation={currentLocation}
+                                        onClose={() => setIsNavigating(false)}
+                                        onDeliveryComplete={() => {
+                                            alert("Trip Finished! Stay Safe.");
+                                            setIsNavigating(false);
+                                        }}
+                                        destination={activeTrip.dropoff_location}
+                                    />
+                                </div>
+                            )}
+
+                            {/* Compact HUD Banner at top when navigating but map is main focus */}
+                            {isNavigating && (
+                                <div className="absolute top-4 left-4 right-4 z-40">
+                                    <LiveNavigationHUD
+                                        route={selectedRoute}
+                                        currentLocation={currentLocation}
+                                        compact={true}
+                                    />
+                                </div>
+                            )}
+
+                            {/* Overlay Status Card (Trip Summary) */}
+                            {!isNavigating && (
+                                <div
+                                    onClick={() => setIsTripInfoExpanded(!isTripInfoExpanded)}
+                                    className={`absolute top-4 transition-all duration-500 ease-in-out bg-white/95 backdrop-blur-sm shadow-xl border border-gray-100 cursor-pointer overflow-hidden z-20 ${isTripInfoExpanded
+                                        ? 'left-4 right-4 p-4 rounded-xl'
+                                        : 'right-4 w-auto rounded-full px-4 py-2 flex items-center gap-2 left-auto'
+                                        }`}
+                                >
+                                    {isTripInfoExpanded ? (
+                                        <>
+                                            <div className="flex justify-between items-center text-sm mb-2">
+                                                <span className="text-gray-500 font-medium">{activeTrip.order_id}</span>
+                                                <span className="font-bold text-green-600 flex items-center gap-1">
+                                                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                                                    On Track
+                                                </span>
+                                            </div>
+                                            <div className="text-2xl font-black text-gray-900 tracking-tight">
+                                                14 <span className="text-base font-normal text-gray-500">mins</span>
+                                            </div>
+                                            <div className="mt-1 text-xs text-indigo-600 font-medium flex items-center gap-1">
+                                                <FiShield size={12} />
+                                                via Safe Zone Corridor
+                                            </div>
+                                            <div className="absolute top-2 right-2 text-gray-300">
+                                                <FiChevronUp />
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                                            <span className="font-bold text-gray-900 text-sm">14 mins</span>
+                                            <FiChevronDown className="text-gray-400" />
+                                        </>
+                                    )}
+                                </div>
+                            )}
                         </>
                     )}
 
@@ -161,8 +238,8 @@ const RiderDashboard = () => {
                             {safetyAlerts.map(alert => (
                                 <div key={alert.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex gap-4">
                                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${alert.type === 'weather' ? 'bg-blue-50 text-blue-600' :
-                                            alert.type === 'traffic' ? 'bg-amber-50 text-amber-600' :
-                                                'bg-green-50 text-green-600'
+                                        alert.type === 'traffic' ? 'bg-amber-50 text-amber-600' :
+                                            'bg-green-50 text-green-600'
                                         }`}>
                                         <FiBell size={20} />
                                     </div>
