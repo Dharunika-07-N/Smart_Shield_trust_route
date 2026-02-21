@@ -929,7 +929,6 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
 
                     const duration = Math.round(route.total_duration_seconds / 60);
                     const distanceKm = (route.total_distance_meters / 1000).toFixed(1);
-                    const distanceMi = (route.total_distance_meters / 1609.34).toFixed(1);
                     const safetyScore = Math.round(route.average_safety_score);
 
                     return (
@@ -980,7 +979,7 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
                               <div className="flex items-center gap-4 text-gray-600">
                                 <div className="flex items-center gap-1.5 text-sm">
                                   <FiNavigation className="text-gray-400 rotate-45" />
-                                  <span>{distanceMi} mi</span>
+                                  <span>{distanceKm} km</span>
                                 </div>
                                 <div className="flex items-center gap-1.5 text-sm">
                                   <FiClock className="text-gray-400" />

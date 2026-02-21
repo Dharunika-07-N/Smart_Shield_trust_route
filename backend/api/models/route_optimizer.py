@@ -170,15 +170,14 @@ class RouteOptimizer:
         if hasattr(self.maps_service, 'graphhopper') and self.maps_service.graphhopper:
             logger.info("Using GraphHopper VRP API for route optimization")
             try:
-                # Prepare Vehicles
+                # Prepare Vehicles - GH VRP requires start_address with lat/lon
                 vehicles = [{
                     "vehicle_id": "v1",
                     "start_address": {
                         "location_id": "start",
                         "lat": starting_point.latitude,
                         "lon": starting_point.longitude
-                    },
-                    "type_id": vehicle_type
+                    }
                 }]
                 
                 # Prepare Services (Stops)
@@ -683,22 +682,31 @@ class RouteOptimizer:
             route_coords = None
             instructions = []
             
+            primary_route = None
             if directions and isinstance(directions, list) and len(directions) > 0:
                 primary_route = directions[0]
+            elif directions and isinstance(directions, dict):
+                primary_route = directions
+            
+            if primary_route:
                 route_coords = primary_route.get('route_coordinates')
+                
+                # If no route_coords, try decoding the overview_polyline
+                if not route_coords and primary_route.get('overview_polyline', {}).get('points'):
+                    try:
+                        import polyline as polyline_lib
+                        decoded = polyline_lib.decode(primary_route['overview_polyline']['points'])
+                        route_coords = [{'lat': p[0], 'lng': p[1]} for p in decoded]
+                    except Exception as poly_err:
+                        logger.warning(f"Polyline decode failed: {poly_err}")
                 
                 # Extract instructions from steps
                 for leg in primary_route.get('legs', []):
                     for step in leg.get('steps', []):
                         if 'html_instructions' in step:
                             instructions.append(step['html_instructions'])
-                        elif 'instruction' in step: # Some providers might use this
+                        elif 'instruction' in step:
                             instructions.append(step['instruction'])
-            elif directions and isinstance(directions, dict): # Fallback for dict
-                route_coords = directions.get('route_coordinates')
-                for leg in directions.get('legs', []):
-                    for step in leg.get('steps', []):
-                        instructions.append(step.get('html_instructions', step.get('instruction', '')))
 
             # Extract distance and duration from directions
             distance = 0
@@ -853,7 +861,7 @@ class RouteOptimizer:
                 "route_coordinates": route_coords,
                 "instructions": instructions,
                 "weather_data": weather_data,
-                "has_traffic_data": directions and directions.get('has_traffic_data', False),
+                "has_traffic_data": (directions[0].get('has_traffic_data', False) if isinstance(directions, list) and directions else directions.get('has_traffic_data', False)) if directions else False,
                 "traffic_level": traffic_level
             })
             
@@ -891,7 +899,7 @@ class RouteOptimizer:
         
         for i, segment in enumerate(segments):
             duration_seconds = segment["duration_seconds"]
-            current_time += timedelta(seconds=duration_seconds)
+            current_time += timedelta(seconds=float(duration_seconds))
             stop_id = segment["to_stop"]
             arrivals[stop_id] = current_time
         
@@ -1022,7 +1030,14 @@ class RouteOptimizer:
         rider_info: Optional[Dict],
         departure_time: Optional[datetime]
     ) -> Tuple[Dict, Dict]:
-        """Process directions into a route segment with safety/weather data."""
+        """Process directions into a route segment with safety/weather data.
+        
+        `directions` can be a dict (single route) or a list (multiple alternatives).
+        We always work with the first/best one.
+        """
+        # Normalise: always work with a single dict
+        if isinstance(directions, list):
+            directions = directions[0] if directions else {}
         
         # Extract basic metrics
         distance = 0
@@ -1038,8 +1053,18 @@ class RouteOptimizer:
         else:
             distance = self.maps_service.calculate_straight_distance(start_point, end_point)
             duration = distance / 8.33
-            
+        
         route_coords = directions.get('route_coordinates')
+        
+        # Decode polyline if route_coords missing
+        if not route_coords and directions.get('overview_polyline', {}).get('points'):
+            try:
+                import polyline as polyline_lib
+                decoded = polyline_lib.decode(directions['overview_polyline']['points'])
+                route_coords = [{'lat': p[0], 'lng': p[1]} for p in decoded]
+            except Exception as poly_err:
+                logger.warning(f"Polyline decode failed in _process_segment_data: {poly_err}")
+        
         instructions = directions.get('instructions')
         
         # Weather

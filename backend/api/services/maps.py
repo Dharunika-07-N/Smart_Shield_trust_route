@@ -125,12 +125,10 @@ class MapsService:
         # 2. Try GraphHopper as fallback or primary alternative
         if self.graphhopper:
             try:
-                gh_route = self.graphhopper.get_directions(orig, dest, waypoint_list, **kwargs)
+                # Only pass kwargs that GraphHopper supports
+                gh_kwargs = {k: v for k, v in kwargs.items() if k in ('vehicle', 'locale')}
+                gh_route = self.graphhopper.get_directions(orig, dest, waypoint_list, **gh_kwargs)
                 if gh_route:
-                    # Wrap in list to match directions format
-                    # Since GH by default returns one path, we can request alternatives if needed
-                    # but for now we return the primary GH route
-                    # Note: We can expand GraphHopperService to support multiple paths if their plan allows
                     return [gh_route]
             except Exception as e:
                 logger.warning(f"GraphHopper API error: {e}. Trying OSRM...")
@@ -138,18 +136,24 @@ class MapsService:
         # 3. Try OSRM (Free, no key needed)
         if self.osrm:
             try:
-                # OSRM is async in its original implementation? Let me check.
-                # In osrm_service.py it is 'async def get_directions'.
-                # MapsService is synchronous. I'll need to handle this.
                 import asyncio
-                try:
-                    loop = asyncio.get_event_loop()
-                except RuntimeError:
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
+                import concurrent.futures
                 
                 if asyncio.iscoroutinefunction(self.osrm.get_directions):
-                    osrm_routes = loop.run_until_complete(self.osrm.get_directions(orig, dest, waypoint_list, alternatives=alternatives))
+                    # Run async OSRM call in a separate thread to avoid blocking event loop conflicts
+                    def run_osrm():
+                        new_loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(new_loop)
+                        try:
+                            return new_loop.run_until_complete(
+                                self.osrm.get_directions(orig, dest, waypoint_list, alternatives=alternatives)
+                            )
+                        finally:
+                            new_loop.close()
+                    
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(run_osrm)
+                        osrm_routes = future.result(timeout=15)
                 else:
                     osrm_routes = self.osrm.get_directions(orig, dest, waypoint_list, alternatives=alternatives)
                 

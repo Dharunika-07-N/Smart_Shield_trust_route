@@ -73,6 +73,16 @@ class GraphHopperService:
         # GraphHopper uses [lng, lat] for points in its encoded format if decoded?
         # Actually points_encoded=true returns a string.
         
+        # Decode polyline to get route_coordinates
+        route_coordinates = []
+        polyline_str = path.get('points', '')
+        if polyline_str:
+            try:
+                decoded_points = polyline.decode(polyline_str)
+                route_coordinates = [{'lat': p[0], 'lng': p[1]} for p in decoded_points]
+            except Exception as e:
+                logger.warning(f"Failed to decode GraphHopper polyline: {e}")
+        
         # Create a Google-like structure
         route = {
             'summary': path.get('description', 'GraphHopper Route'),
@@ -90,8 +100,9 @@ class GraphHopperService:
                 'end_address': "Coordinates Search"
             }],
             'overview_polyline': {
-                'points': path['points'] # This is a polyline string
+                'points': polyline_str # This is a polyline string
             },
+            'route_coordinates': route_coordinates,  # Decoded coords for direct use
             # Custom field for our app
             'waypoint_order': list(range(len(gh_data.get('points', [])))),
             'average_safety_score': 0 # To be calculated by SafetyScorer
