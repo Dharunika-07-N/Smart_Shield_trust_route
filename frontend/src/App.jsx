@@ -10,6 +10,7 @@ import DispatcherDashboard from './components/DispatcherDashboard';
 import DriverDashboard from './components/DriverDashboard';
 import ModernDashboard from './components/ModernDashboard';
 import CustomerDashboard from './components/CustomerDashboard';
+import LiveTracking from './components/LiveTracking';
 import { useAuth, ROLE_ROUTES } from './context/AuthContext';
 import './App.css';
 
@@ -123,6 +124,54 @@ function App() {
                 <RoleGuard allowedRoles={['customer']}>
                   <CustomerDashboard />
                 </RoleGuard>
+              }
+            />
+
+            {/* ── Live Tracking Demo (all authenticated roles) ── */}
+            <Route
+              path="/tracking"
+              element={
+                <ProtectedRoute>
+                  <div style={{
+                    minHeight: '100vh',
+                    background: '#f8fafc',
+                    fontFamily: "'Inter', sans-serif",
+                    padding: '0'
+                  }}>
+                    {/* Minimal header */}
+                    <div style={{
+                      background: 'white',
+                      borderBottom: '1px solid #e5e7eb',
+                      padding: '12px 24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{
+                          width: 36, height: 36,
+                          background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+                          borderRadius: 10,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 18
+                        }}>🛡️</div>
+                        <div>
+                          <p style={{ margin: 0, fontWeight: 900, fontSize: 16, color: '#111827' }}>SmartShield</p>
+                          <p style={{ margin: 0, fontSize: 10, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Live GPS Tracking</p>
+                        </div>
+                      </div>
+                      <a href="/dashboard" style={{
+                        fontSize: 12, color: '#4f46e5', fontWeight: 700,
+                        textDecoration: 'none', padding: '6px 14px',
+                        background: '#ede9fe', borderRadius: 8
+                      }}>← Back to Dashboard</a>
+                    </div>
+                    {/* Live Tracking Component */}
+                    <div style={{ padding: '24px' }}>
+                      <LiveTracking />
+                    </div>
+                  </div>
+                </ProtectedRoute>
               }
             />
 
