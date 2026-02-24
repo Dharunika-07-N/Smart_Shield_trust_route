@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
     FiPackage, FiMapPin, FiSearch, FiLogOut, FiShield,
     FiAlertCircle, FiClock, FiUser, FiPhone, FiCheckCircle,
-    FiMessageSquare, FiStar, FiFlag, FiArrowRight
+    FiMessageSquare, FiStar, FiFlag, FiArrowRight, FiWifi, FiWifiOff
 } from 'react-icons/fi';
 import RouteMap from './RouteMap';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useRealTimeTracking } from '../hooks/useRealTimeTracking';
 
 const CustomerDashboard = () => {
     const { user, logout } = useAuth();
@@ -41,27 +42,28 @@ const CustomerDashboard = () => {
         }
     };
 
-    // Live tracking effect
+    // ── Real-time WebSocket tracking (replaces polling) ──────────────────
+    // When order is found, connect to WS channel for that delivery.
+    // Backend pushes GPS updates every 5-15s — no polling needed.
+    const liveTracking = useRealTimeTracking(
+        isTracking && orderData?.id ? orderData.id : null,
+        { enabled: isTracking && !!orderData?.id }
+    );
+
+    // Sync live location back into orderData for map rendering
     useEffect(() => {
-        if (!isTracking || !orderData?.id) return;
-
-        const interval = setInterval(async () => {
-            try {
-                const trackingData = await api.get(`/delivery/${orderData.id}/track`);
-                if (trackingData.success && trackingData.data) {
-                    setOrderData(prev => ({
-                        ...prev,
-                        status: trackingData.data.status,
-                        current_location: trackingData.data.current_location
-                    }));
-                }
-            } catch (e) {
-                console.error("Tracking poll failed", e);
-            }
-        }, 10000);
-
-        return () => clearInterval(interval);
-    }, [isTracking, orderData?.id]);
+        if (liveTracking.currentLocation && orderData) {
+            setOrderData(prev => ({
+                ...prev,
+                status: liveTracking.status || prev.status,
+                current_location: {
+                    lat: liveTracking.currentLocation[0],
+                    lng: liveTracking.currentLocation[1]
+                },
+                liveLocation: liveTracking.currentLocation
+            }));
+        }
+    }, [liveTracking.currentLocation, liveTracking.status]);
 
     const getStatusStep = () => {
         const statuses = ['confirmed', 'assigned', 'picked_up', 'in_transit', 'delivered'];
@@ -282,8 +284,24 @@ const CustomerDashboard = () => {
                     <RouteMap
                         variant="light-minimal"
                         route={orderData?.route}
-                        markers={orderData?.markers}
-                        center={orderData?.markers?.[0]?.position}
+                        markers={[
+                            // Live rider position from WebSocket
+                            ...(orderData?.liveLocation ? [{
+                                position: orderData.liveLocation,
+                                color: '#4f46e5',
+                                popup: '🏍 Rider'
+                            }] : (orderData?.markers || [])),
+                            // Dropoff
+                            ...(orderData?.dropoff_location ? [{
+                                position: [
+                                    orderData.dropoff_location.lat,
+                                    orderData.dropoff_location.lng
+                                ],
+                                color: '#10b981',
+                                popup: '📦 Dropoff'
+                            }] : [])
+                        ]}
+                        center={orderData?.liveLocation || orderData?.markers?.[0]?.position}
                         zoom={15}
                     />
 
@@ -300,12 +318,26 @@ const CustomerDashboard = () => {
                     {isTracking && (
                         <div className="absolute top-6 right-6 z-20">
                             <div className="bg-white/80 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-white/20 flex flex-col items-center gap-2">
-                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Signal State</div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Signal</div>
+                                {liveTracking.connected ? (
+                                    <div className="flex items-center gap-2">
+                                        <FiWifi size={14} className="text-emerald-500" />
+                                        <span className="text-[10px] font-black text-emerald-600 uppercase">
+                                            {liveTracking.connectionMode === 'sse' ? 'SSE' : 'WS'} Live
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2">
+                                        <FiWifiOff size={14} className="text-slate-400" />
+                                        <span className="text-[10px] font-black text-slate-500 uppercase">Connecting</span>
+                                    </div>
+                                )}
                                 <div className="flex gap-1">
-                                    <div className="w-1 h-3 bg-indigo-600 rounded-full animate-pulse"></div>
-                                    <div className="w-1 h-4 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                                    <div className="w-1 h-3 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                                    <div className="w-1 h-5 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.6s' }}></div>
+                                    {[0, 1, 2, 3].map(i => (
+                                        <div key={i} className={`w-1 rounded-full ${liveTracking.connected ? 'bg-indigo-600 animate-pulse' : 'bg-slate-200'}`}
+                                            style={{ height: `${(i + 1) * 4 + 4}px`, animationDelay: `${i * 0.15}s` }}
+                                        />
+                                    ))}
                                 </div>
                             </div>
                         </div>
