@@ -150,8 +150,23 @@ export const api = {
   getTrafficSegment: (data) => apiClient.post('/traffic/segment', data),
   getTrafficRoute: (data) => apiClient.post('/traffic/route', data),
 
-  // Delivery Tracking
-  updateLocation: (data) => apiClient.post('/delivery/location-update', data),
+  // Real-Time GPS Tracking (push-based, cache-first)
+  // Primary endpoint: updates in-memory cache + broadcasts via WebSocket
+  updateLocation: (data) => apiClient.post('/tracking/location', data),
+
+  // Cache-first location read (O(1), no DB hit)
+  getCurrentLocation: (deliveryId) => apiClient.get(`/tracking/current/${deliveryId}`),
+
+  // Fleet-wide snapshot (all active riders from cache)
+  getFleetLocations: () => apiClient.get('/tracking/fleet'),
+
+  // Cache performance metrics
+  getCacheStats: () => apiClient.get('/tracking/cache/stats'),
+
+  // GPS simulation for demos
+  simulateGPS: (deliveryId) => apiClient.post(`/tracking/simulate/${deliveryId}`),
+
+  // Legacy endpoint (kept for compatibility)
   trackDelivery: (deliveryId) => apiClient.get(`/delivery/${deliveryId}/track`),
   reoptimizeRoute: (routeId, data) => apiClient.post(`/delivery/routes/${routeId}/reoptimize`, data),
 
