@@ -9,6 +9,15 @@ from pathlib import Path
 import json
 from datetime import datetime
 import asyncio
+import os
+
+# Redis is optional — if not installed, we gracefully fall back to in-memory cache
+try:
+    import redis.asyncio as redis_async
+    _REDIS_AVAILABLE = True
+except ImportError:
+    _REDIS_AVAILABLE = False
+    redis_async = None
 
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
@@ -36,6 +45,19 @@ logger.info("Using MapsService hub for routing (Google/GraphHopper/OSRM)")
 router = APIRouter()
 route_optimizer = RouteOptimizer()
 route_monitor = RouteMonitor()
+
+# Redis client (optional) — falls back to in-memory cache if unavailable
+if _REDIS_AVAILABLE:
+    try:
+        REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+        redis_client = redis_async.from_url(REDIS_URL, encoding="utf-8", decode_responses=True)
+    except Exception:
+        redis_client = None
+else:
+    redis_client = None
+
+# In-memory cache fallback (always available)
+from api.services.location_cache import location_cache as _inmem_cache
 
 @router.post("/optimize-route")
 async def optimize_route_simple(
@@ -316,24 +338,76 @@ async def update_location(
     try:
         logger.info(f"Location update received for delivery {request.delivery_id}")
         
-        # Save location update to database
-        db_service = DatabaseService(db)
-        location_data = {
+        # Prepare data for broadcast and cache
+        broadcast_data = {
+            "type": "location_update",
             "delivery_id": request.delivery_id,
-            "route_id": request.route_id,
-            "rider_id": request.rider_id,
-            "current_location": {
+            "timestamp": datetime.utcnow().isoformat(),
+            "location": {
                 "latitude": request.current_location.latitude,
                 "longitude": request.current_location.longitude
             },
             "status": request.status.value if hasattr(request.status, 'value') else request.status,
             "speed_kmh": request.speed_kmh,
             "heading": request.heading,
-            "battery_level": request.battery_level,
-            "timestamp": datetime.utcnow()
+            "battery_level": request.battery_level
         }
+
+        # 1. Update in-memory cache immediately (fast path — no Redis needed)
+        await _inmem_cache.set_location(
+            delivery_id=request.delivery_id,
+            rider_id=request.rider_id or "",
+            latitude=request.current_location.latitude,
+            longitude=request.current_location.longitude,
+            status=request.status.value if hasattr(request.status, 'value') else request.status,
+            speed_kmh=request.speed_kmh,
+            heading=request.heading,
+            battery_level=request.battery_level
+        )
+
+        # 1b. Also cache in Redis if available
+        if redis_client:
+            try:
+                redis_key = f"delivery:{request.delivery_id}:location"
+                await redis_client.set(redis_key, json.dumps(broadcast_data), ex=3600)
+            except Exception:
+                pass  # Redis failure is non-fatal
+
+        # 2. DB Throttling: only write to DB every 10 seconds
+        should_write_db = True
+        if redis_client:
+            try:
+                throttle_key = f"delivery:{request.delivery_id}:db_throttle"
+                should_write_db = await redis_client.get(throttle_key) is None
+            except Exception:
+                pass
         
-        update_id = db_service.save_location_update(location_data)
+        update_id = None
+        if should_write_db:
+            # Save location update to database
+            db_service = DatabaseService(db)
+            location_data = {
+                "delivery_id": request.delivery_id,
+                "route_id": request.route_id,
+                "rider_id": request.rider_id,
+                "current_location": {
+                    "latitude": request.current_location.latitude,
+                    "longitude": request.current_location.longitude
+                },
+                "status": request.status.value if hasattr(request.status, 'value') else request.status,
+                "speed_kmh": request.speed_kmh,
+                "heading": request.heading,
+                "battery_level": request.battery_level,
+                "timestamp": datetime.utcnow()
+            }
+            update_id = db_service.save_location_update(location_data)
+            # Throttle DB writes via Redis if available
+            if redis_client:
+                try:
+                    throttle_key = f"delivery:{request.delivery_id}:db_throttle"
+                    await redis_client.set(throttle_key, "1", ex=10)
+                except Exception:
+                    pass
         
         # Check for route deviation if route_id is provided
         reoptimization_needed = False
@@ -348,21 +422,8 @@ async def update_location(
             )
             reoptimization_needed = needs_reopt
         
-        # Prepare broadcast data
-        broadcast_data = {
-            "type": "location_update",
-            "delivery_id": request.delivery_id,
-            "timestamp": datetime.utcnow().isoformat(),
-            "location": {
-                "latitude": request.current_location.latitude,
-                "longitude": request.current_location.longitude
-            },
-            "status": request.status.value if hasattr(request.status, 'value') else request.status,
-            "speed_kmh": request.speed_kmh,
-            "heading": request.heading,
-            "battery_level": request.battery_level,
-            "reoptimization_needed": reoptimization_needed
-        }
+        # Add reoptimization flag to broadcast
+        broadcast_data["reoptimization_needed"] = reoptimization_needed
         
         # Broadcast to all connected clients tracking this delivery
         await manager.broadcast_location_update(request.delivery_id, broadcast_data)
@@ -521,25 +582,50 @@ async def websocket_tracking(websocket: WebSocket, delivery_id: str):
     await manager.connect(websocket, delivery_id)
     
     try:
-        # Send initial location if available
-        db_gen = get_db()
-        db = next(db_gen)
-        try:
-            db_service = DatabaseService(db)
-            latest = db_service.get_latest_location(delivery_id)
-            
-            if latest:
-                await websocket.send_json({
-                    "type": "initial_location",
-                    "delivery_id": delivery_id,
-                    "location": latest.current_location,
-                    "status": latest.status,
-                    "timestamp": latest.timestamp.isoformat(),
-                    "speed_kmh": latest.speed_kmh,
-                    "heading": latest.heading
-                })
-        finally:
-            db.close()
+        # 1. Try in-memory cache first (always fast)
+        cached_mem = await _inmem_cache.get_by_delivery(delivery_id)
+        
+        if cached_mem:
+            await websocket.send_json({
+                "type": "initial_location",
+                "delivery_id": delivery_id,
+                "location": {"latitude": cached_mem["latitude"], "longitude": cached_mem["longitude"]},
+                "status": cached_mem.get("status", "in_transit"),
+                "timestamp": cached_mem.get("timestamp"),
+                "speed_kmh": cached_mem.get("speed_kmh"),
+                "heading": cached_mem.get("heading")
+            })
+        elif redis_client:
+            # 2. Try Redis cache
+            try:
+                redis_key = f"delivery:{delivery_id}:location"
+                cached_data = await redis_client.get(redis_key)
+                if cached_data:
+                    await websocket.send_json(json.loads(cached_data))
+                    cached_mem = True
+            except Exception:
+                pass
+
+        if not cached_mem:
+            # 3. Fallback to DB if not in cache (Slow path)
+            db_gen = get_db()
+            db = next(db_gen)
+            try:
+                db_service = DatabaseService(db)
+                latest = db_service.get_latest_location(delivery_id)
+                
+                if latest:
+                    await websocket.send_json({
+                        "type": "initial_location",
+                        "delivery_id": delivery_id,
+                        "location": latest.current_location,
+                        "status": latest.status,
+                        "timestamp": latest.timestamp.isoformat(),
+                        "speed_kmh": latest.speed_kmh,
+                        "heading": latest.heading
+                    })
+            finally:
+                db.close()
         
         # Keep connection alive and handle client messages
         while True:
@@ -556,4 +642,3 @@ async def websocket_tracking(websocket: WebSocket, delivery_id: str):
         logger.error(f"WebSocket error for delivery {delivery_id}: {e}")
     finally:
         manager.disconnect(websocket, delivery_id)
-
