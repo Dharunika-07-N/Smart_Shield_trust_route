@@ -113,14 +113,19 @@ async def root():
 @app.on_event("startup")
 async def startup_event():
     """Run startup tasks like seeding the database."""
+    import asyncio
     # Initialize database tables
     from database.database import init_db, SessionLocal
     from database.models import User
     from api.services.security import get_password_hash
+    from api.routes.tracking import periodic_cache_cleanup
 
-    
     await init_db()
-    
+
+    # Start background task: cleanup stale GPS cache entries every 60s
+    asyncio.create_task(periodic_cache_cleanup())
+    logger.info("📦 Location cache cleanup task started (runs every 60s)")
+
     # Seed a default developer user if it doesn't exist
     db = SessionLocal()
     try:
