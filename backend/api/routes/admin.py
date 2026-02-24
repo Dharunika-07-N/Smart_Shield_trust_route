@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database.database import get_db
 from database.models import User, Delivery, PanicAlert, DeliveryFeedback, DeliveryStatus
-from api.deps import get_current_admin
+from api.deps import get_current_admin, get_current_dispatcher, get_current_active_user
 from datetime import datetime, timedelta
 import csv
 import io
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/admin", tags=["Admin"])
 @router.get("/summary")
 def get_system_summary(
     db: Session = Depends(get_db),
-    admin: User = Depends(get_current_admin)
+    admin: User = Depends(get_current_dispatcher)
 ):
     """Retrieve high-level system statistics for the Admin Dashboard."""
     # Active nodes: users with role 'rider' or 'driver'
@@ -67,7 +67,7 @@ async def broadcast_message(
 @router.get("/analytics-trends")
 def get_analytics_trends(
     db: Session = Depends(get_db),
-    admin: User = Depends(get_current_admin)
+    admin: User = Depends(get_current_dispatcher)
 ):
     """Get real trend data for charts."""
     # Mock some trend data based on real day counts
@@ -82,7 +82,7 @@ def get_analytics_trends(
 @router.get("/fleet-events")
 def get_recent_fleet_events(
     db: Session = Depends(get_db),
-    admin: User = Depends(get_current_admin)
+    admin: User = Depends(get_current_dispatcher)
 ):
     """Retrieve recent activities for the event feed."""
     from database.models import Delivery, PanicAlert
@@ -118,7 +118,7 @@ def get_recent_fleet_events(
 @router.get("/riders-status")
 def get_riders_live_status(
     db: Session = Depends(get_db),
-    admin: User = Depends(get_current_admin)
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Get all riders/drivers with their live location, active delivery info, 
