@@ -12,6 +12,7 @@ import { api } from '../services/api';
 import useLocation from '../hooks/useLocation';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { useRiderGPS } from '../hooks/useRealTimeTracking';
 
 const DriverDashboard = () => {
     const { user, logout } = useAuth();
@@ -45,30 +46,19 @@ const DriverDashboard = () => {
         if (user) fetchDeliveries();
     }, [user, driverId]);
 
-    // Periodically send location updates if online and have active delivery
-    useEffect(() => {
-        if (!isOnline || !currentLocation) return;
+    // Use the useRiderGPS hook for reliable 5-second GPS broadcasting
+    // This sends location to /tracking/location which:
+    // 1. Updates the in-memory cache
+    // 2. Broadcasts via WebSocket to all order watchers
+    // 3. Persists to DB for history
+    const riderGps = useRiderGPS(
+        activeDelivery?.id || 'idle',
+        activeDelivery?.route_id || null,
+        { enabled: isOnline, intervalMs: 5000 }
+    );
 
-        const interval = setInterval(async () => {
-            try {
-                // Update general tracking location
-                await api.updateLocation({
-                    delivery_id: activeDelivery?.id || 'idle',
-                    route_id: activeDelivery?.route_id,
-                    rider_id: driverId,
-                    current_location: {
-                        latitude: currentLocation.latitude,
-                        longitude: currentLocation.longitude
-                    },
-                    status: activeDelivery ? activeDelivery.status : 'available'
-                });
-            } catch (e) {
-                console.error("Location update failed", e);
-            }
-        }, 15000); // More frequent updates for better tracking
-
-        return () => clearInterval(interval);
-    }, [isOnline, currentLocation, activeDelivery, driverId]);
+    // Use hook location, fallback to useLocation hook
+    const effectiveLocation = riderGps.currentLocation || currentLocation;
 
     const fetchDeliveries = async () => {
         setLoading(true);
