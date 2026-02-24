@@ -1,8 +1,8 @@
 """
 Generative AI Service for Smart Shield
-Integrates OpenAI GPT models for enhanced feedback analysis and safety recommendations
+Integrates Google Gemini models for enhanced feedback analysis and safety recommendations
 """
-import openai
+import google.generativeai as genai
 import json
 import asyncio
 from typing import Dict, List, Optional, Any
@@ -13,32 +13,28 @@ from functools import lru_cache
 import hashlib
 
 class GenAIService:
-    """Service for integrating Generative AI capabilities"""
+    """Service for integrating Generative AI capabilities using Google Gemini"""
 
     def __init__(self):
-        self.api_key = os.getenv("OPENAI_API_KEY")
-        self.model = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
-        self.max_tokens = int(os.getenv("OPENAI_MAX_TOKENS", "1000"))
-        self.temperature = float(os.getenv("OPENAI_TEMPERATURE", "0.7"))
+        self.api_key = os.getenv("GOOGLE_API_KEY")
+        self.model_name = os.getenv("GEMINI_MODEL", "gemini-pro")
 
-        if not self.api_key:
-            logger.warning("OpenAI API key not found. GenAI features will be disabled.")
+        if not self.api_key or "placeholder" in self.api_key.lower():
+            logger.warning("Google API key not found or placeholder. GenAI features will be disabled.")
             self.enabled = False
         else:
-            openai.api_key = self.api_key
-            self.enabled = True
-            logger.info(f"GenAI service initialized with model: {self.model}")
+            try:
+                genai.configure(api_key=self.api_key)
+                self.model = genai.GenerativeModel(self.model_name)
+                self.enabled = True
+                logger.info(f"GenAI service initialized with model: {self.model_name}")
+            except Exception as e:
+                logger.error(f"Failed to initialize Gemini: {e}")
+                self.enabled = False
 
     async def analyze_feedback_sentiment(self, feedback_text: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Analyze rider feedback using GPT to extract safety concerns and sentiment
-
-        Args:
-            feedback_text: Raw feedback text from rider
-            context: Additional context (route_id, time, location, etc.)
-
-        Returns:
-            Dict containing sentiment analysis, safety concerns, and recommendations
+        Analyze rider feedback using Gemini to extract safety concerns and sentiment
         """
         if not self.enabled:
             return self._fallback_sentiment_analysis(feedback_text, context)
@@ -67,17 +63,19 @@ class GenAIService:
 
             response = await asyncio.get_event_loop().run_in_executor(
                 None,
-                lambda: openai.ChatCompletion.create(
-                    model=self.model,
-                    messages=[{"role": "user", "content": prompt}],
-                    max_tokens=self.max_tokens,
-                    temperature=self.temperature
-                )
+                lambda: self.model.generate_content(prompt)
             )
 
-            result = json.loads(response.choices[0].message.content.strip())
+            # Extract JSON from response text (Gemini might wrap it in markdown)
+            text = response.text
+            if "```json" in text:
+                text = text.split("```json")[1].split("```")[0].strip()
+            elif "```" in text:
+                text = text.split("```")[1].split("```")[0].strip()
+            
+            result = json.loads(text)
             result["analyzed_at"] = datetime.utcnow().isoformat()
-            result["ai_model"] = self.model
+            result["ai_model"] = self.model_name
 
             logger.info(f"AI feedback analysis completed for route {context.get('route_id')}")
             return result
@@ -89,13 +87,6 @@ class GenAIService:
     async def generate_safety_briefing(self, route_data: Dict[str, Any], rider_profile: Dict[str, Any]) -> Dict[str, Any]:
         """
         Generate personalized safety briefing for riders before route start
-
-        Args:
-            route_data: Route details (stops, time, distance, safety scores)
-            rider_profile: Rider information (experience, gender, preferences)
-
-        Returns:
-            Dict containing safety tips, risk areas, and emergency contacts
         """
         if not self.enabled:
             return self._fallback_safety_briefing(route_data, rider_profile)
@@ -127,20 +118,15 @@ class GenAIService:
 
             response = await asyncio.get_event_loop().run_in_executor(
                 None,
-                lambda: openai.ChatCompletion.create(
-                    model=self.model,
-                    messages=[{"role": "user", "content": prompt}],
-                    max_tokens=500,
-                    temperature=0.3  # Lower temperature for safety content
-                )
+                lambda: self.model.generate_content(prompt)
             )
 
-            briefing_text = response.choices[0].message.content.strip()
+            briefing_text = response.text.strip()
 
             return {
                 "briefing": briefing_text,
                 "generated_at": datetime.utcnow().isoformat(),
-                "ai_model": self.model,
+                "ai_model": self.model_name,
                 "personalized": True
             }
 
@@ -151,13 +137,6 @@ class GenAIService:
     async def optimize_route_with_ai(self, route_options: List[Dict[str, Any]], constraints: Dict[str, Any]) -> Dict[str, Any]:
         """
         Use AI to analyze multiple route options and recommend the best one
-
-        Args:
-            route_options: List of route alternatives with metrics
-            constraints: User preferences (safety priority, time limits, etc.)
-
-        Returns:
-            Dict with AI-recommended route and reasoning
         """
         if not self.enabled:
             return self._fallback_route_optimization(route_options, constraints)
@@ -198,17 +177,18 @@ class GenAIService:
 
             response = await asyncio.get_event_loop().run_in_executor(
                 None,
-                lambda: openai.ChatCompletion.create(
-                    model=self.model,
-                    messages=[{"role": "user", "content": prompt}],
-                    max_tokens=self.max_tokens,
-                    temperature=0.2  # Lower temperature for decision-making
-                )
+                lambda: self.model.generate_content(prompt)
             )
 
-            result = json.loads(response.choices[0].message.content.strip())
+            text = response.text
+            if "```json" in text:
+                text = text.split("```json")[1].split("```")[0].strip()
+            elif "```" in text:
+                text = text.split("```")[1].split("```")[0].strip()
+
+            result = json.loads(text)
             result["analyzed_at"] = datetime.utcnow().isoformat()
-            result["ai_model"] = self.model
+            result["ai_model"] = self.model_name
 
             return result
 

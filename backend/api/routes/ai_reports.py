@@ -142,7 +142,7 @@ def aggregate_ml_model_data(db: Session):
 async def generate_user_summary(payload: Dict[str, Any], db: Session = Depends(get_db)):
     try:
         time_period = payload.get('time_period', 'weekly')
-        provider = payload.get('provider', os.getenv('DEFAULT_AI_PROVIDER', 'openai'))
+        provider = payload.get('provider', os.getenv('DEFAULT_AI_PROVIDER', 'gemini'))
         output_format = payload.get('format', 'json')
         
         start_date, end_date = get_date_range(time_period)
@@ -163,7 +163,7 @@ async def generate_user_summary(payload: Dict[str, Any], db: Session = Depends(g
 async def generate_rider_summary(payload: Dict[str, Any], db: Session = Depends(get_db)):
     try:
         time_period = payload.get('time_period', 'weekly')
-        provider = payload.get('provider', os.getenv('DEFAULT_AI_PROVIDER', 'openai'))
+        provider = payload.get('provider', os.getenv('DEFAULT_AI_PROVIDER', 'gemini'))
         output_format = payload.get('format', 'json')
         
         start_date, end_date = get_date_range(time_period)
@@ -184,7 +184,7 @@ async def generate_rider_summary(payload: Dict[str, Any], db: Session = Depends(
 async def generate_feedback_summary(payload: Dict[str, Any], db: Session = Depends(get_db)):
     try:
         time_period = payload.get('time_period', 'weekly')
-        provider = payload.get('provider', os.getenv('DEFAULT_AI_PROVIDER', 'openai'))
+        provider = payload.get('provider', os.getenv('DEFAULT_AI_PROVIDER', 'gemini'))
         output_format = payload.get('format', 'json')
         
         start_date, end_date = get_date_range(time_period)
@@ -204,7 +204,7 @@ async def generate_feedback_summary(payload: Dict[str, Any], db: Session = Depen
 @router.post("/ml-performance")
 async def generate_ml_performance_summary(payload: Dict[str, Any], db: Session = Depends(get_db)):
     try:
-        provider = payload.get('provider', os.getenv('DEFAULT_AI_PROVIDER', 'openai'))
+        provider = payload.get('provider', os.getenv('DEFAULT_AI_PROVIDER', 'gemini'))
         output_format = payload.get('format', 'json')
         
         ml_data = aggregate_ml_model_data(db)
@@ -224,7 +224,7 @@ async def generate_ml_performance_summary(payload: Dict[str, Any], db: Session =
 async def generate_executive_dashboard(payload: Dict[str, Any], db: Session = Depends(get_db)):
     try:
         time_period = payload.get('time_period', 'weekly')
-        provider = payload.get('provider', os.getenv('DEFAULT_AI_PROVIDER', 'openai'))
+        provider = payload.get('provider', os.getenv('DEFAULT_AI_PROVIDER', 'gemini'))
         output_format = payload.get('format', 'json')
         
         start_date, end_date = get_date_range(time_period)

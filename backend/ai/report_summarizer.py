@@ -7,8 +7,6 @@ import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import json
-from openai import OpenAI
-from anthropic import Anthropic
 import google.generativeai as genai
 from loguru import logger
 
@@ -19,48 +17,26 @@ class ReportSummarizer:
     Supports multiple LLM providers: OpenAI, Anthropic, Google Gemini
     """
     
-    def __init__(self, provider: str = "openai"):
+    def __init__(self, provider: str = "gemini"):
         """
         Initialize the summarizer with specified AI provider
         
         Args:
-            provider: 'openai', 'anthropic', or 'gemini'
+            provider: 'gemini' (others removed as they are paid)
         """
-        self.provider = provider.lower()
+        self.provider = "gemini" # Force gemini
         self.is_mock = False
         
         # Check for placeholder keys
-        openai_key = os.getenv('OPENAI_API_KEY')
-        anthropic_key = os.getenv('ANTHROPIC_API_KEY')
         gemini_key = os.getenv('GOOGLE_API_KEY')
-        
-        is_openai_placeholder = not openai_key or "placeholder" in openai_key.lower() or "your-real-key" in openai_key.lower()
-        is_anthropic_placeholder = not anthropic_key or "placeholder" in anthropic_key.lower() or "your-real-key" in anthropic_key.lower()
         is_gemini_placeholder = not gemini_key or "placeholder" in gemini_key.lower() or "your-real-key" in gemini_key.lower()
         
-        if self.provider == "openai":
-            if is_openai_placeholder:
-                self.is_mock = True
-                logger.warning("OPENAI_API_KEY is a placeholder or missing. Using mock summarizer.")
-            else:
-                self.client = OpenAI(api_key=openai_key)
-                self.model = "gpt-4-turbo-preview"
-        elif self.provider == "anthropic":
-            if is_anthropic_placeholder:
-                self.is_mock = True
-                logger.warning("ANTHROPIC_API_KEY is a placeholder or missing. Using mock summarizer.")
-            else:
-                self.client = Anthropic(api_key=anthropic_key)
-                self.model = "claude-3-sonnet-20240229"
-        elif self.provider == "gemini":
-            if is_gemini_placeholder:
-                self.is_mock = True
-                logger.warning("GOOGLE_API_KEY is a placeholder or missing. Using mock summarizer.")
-            else:
-                genai.configure(api_key=gemini_key)
-                self.model = genai.GenerativeModel('gemini-pro')
+        if is_gemini_placeholder:
+            self.is_mock = True
+            logger.warning("GOOGLE_API_KEY is a placeholder or missing. Using mock summarizer.")
         else:
-            raise ValueError(f"Unsupported provider: {provider}")
+            genai.configure(api_key=gemini_key)
+            self.model = genai.GenerativeModel('gemini-pro')
     
     def _generate_mock_summary(self, prompt: str) -> str:
         """Generate a convincing mock summary when API keys are missing."""
@@ -82,46 +58,22 @@ The current safety metrics indicate a robust operational period with high user e
 - Increase police patrol synchronization in the North-East quadrant.
 - Implement additional well-lit area indicators in the Route Optimization algorithm.
 
-*Note: This summary was generated using the platform's rule-based fallback system because no valid AI provider key was found.*"""
+*Note: This summary was generated using the platform's rule-based fallback system because no valid Google Gemini key was found.*"""
 
     def _generate_summary(self, prompt: str, system_context: str = None) -> str:
         """
-        Generate summary using the configured LLM provider
+        Generate summary using the configured LLM provider (Gemini)
         """
         if self.is_mock:
             return self._generate_mock_summary(prompt)
             
         try:
-            if self.provider == "openai":
-                messages = []
-                if system_context:
-                    messages.append({"role": "system", "content": system_context})
-                messages.append({"role": "user", "content": prompt})
-                
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    temperature=0.3,  # Lower temperature for more factual summaries
-                    max_tokens=1500
-                )
-                return response.choices[0].message.content
-            
-            elif self.provider == "anthropic":
-                response = self.client.messages.create(
-                    model=self.model,
-                    max_tokens=1500,
-                    temperature=0.3,
-                    system=system_context or "",
-                    messages=[{"role": "user", "content": prompt}]
-                )
-                return response.content[0].text
-            
-            elif self.provider == "gemini":
-                full_prompt = f"{system_context}\n\n{prompt}" if system_context else prompt
-                response = self.model.generate_content(full_prompt)
-                return response.text
+            full_prompt = f"{system_context}\n\n{prompt}" if system_context else prompt
+            response = self.model.generate_content(full_prompt)
+            return response.text
                 
         except Exception as e:
+            logger.error(f"Gemini generation failed: {e}")
             return f"Error generating summary: {str(e)}"
     
     def summarize_user_report(self, user_data: Dict[str, Any], 
