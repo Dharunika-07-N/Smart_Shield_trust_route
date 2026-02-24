@@ -262,7 +262,7 @@ const DispatcherDashboard = () => {
                                                 </button>
                                             </div>
                                         </div>
-                                        <div className="h-[400px] rounded-3xl overflow-hidden border border-slate-200">
+                                        <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
                                             <LiveTracking />
                                         </div>
                                     </div>
