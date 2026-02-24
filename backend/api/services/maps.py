@@ -15,6 +15,7 @@ from config.config import settings
 # Providers
 from api.services.graphhopper import GraphHopperService
 from api.services.osrm_service import OSRMService
+from api.services.positionstack import PositionStackService
 
 class MapsService:
     """Unified maps service with intelligent fallbacks."""
@@ -33,6 +34,15 @@ class MapsService:
             self.gmaps = None
             logger.warning("Google Maps API key missing or invalid")
 
+        # Initialize PositionStack (High Accuracy Geocoding)
+        self.ps_api_key = settings.POSITIONSTACK_API_KEY
+        if self.ps_api_key and not self.ps_api_key.startswith('your_'):
+            self.positionstack = PositionStackService(api_key=self.ps_api_key)
+            logger.info("PositionStack Geocoding Service initialized")
+        else:
+            self.positionstack = None
+            logger.warning("PositionStack API key missing")
+
         # Initialize GraphHopper
         self.gh_api_key = settings.GRAPHHOPPER_API_KEY
         if self.gh_api_key and not self.gh_api_key.startswith('YOUR_'):
@@ -49,6 +59,96 @@ class MapsService:
         except Exception as e:
             logger.error(f"Failed to initialize OSRM: {e}")
             self.osrm = None
+
+    def geocode(self, query: str) -> Optional[Coordinate]:
+        """
+        Geocode an address string to coordinates.
+        Priority: PositionStack -> Google -> GraphHopper -> OSRM.
+        """
+        # 1. Try PositionStack (Dedicated Geocoder)
+        if self.positionstack:
+            try:
+                # Sync wrap for async call
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                res = loop.run_until_complete(self.positionstack.geocode(query))
+                loop.close()
+                if res: return res
+            except Exception as e:
+                logger.debug(f"PositionStack Geocoding failed: {e}")
+
+        # 2. Try Google Maps
+        if self.gmaps:
+            try:
+                res = self.gmaps.geocode(query)
+                if res:
+                    loc = res[0]['geometry']['location']
+                    return Coordinate(latitude=loc['lat'], longitude=loc['lng'])
+            except Exception as e:
+                logger.debug(f"Google Geocoding failed: {e}")
+
+        # 3. Try GraphHopper
+        if self.graphhopper:
+            try:
+                res = self.graphhopper.geocode(query)
+                if res:
+                    return Coordinate(latitude=res['lat'], longitude=res['lng'])
+            except Exception as e:
+                logger.debug(f"GraphHopper Geocoding failed: {e}")
+
+        # 4. Try OSRM / Nominatim (Free)
+        if self.osrm:
+            try:
+                # OSRM service has a geocode method
+                return self.osrm.geocode(query)
+            except Exception as e:
+                logger.debug(f"OSRM Geocoding failed: {e}")
+
+        return None
+
+    def reverse_geocode(self, lat: float, lng: float) -> str:
+        """
+        Convert coordinates to address string.
+        """
+        # 1. Try PositionStack
+        if self.positionstack:
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                res = loop.run_until_complete(self.positionstack.reverse_geocode(lat, lng))
+                loop.close()
+                if res: return res
+            except Exception as e:
+                logger.debug(f"PositionStack Reverse Geocoding failed: {e}")
+
+        # 2. Try Google Maps
+        if self.gmaps:
+            try:
+                res = self.gmaps.reverse_geocode((lat, lng))
+                if res: return res[0]['formatted_address']
+            except Exception as e:
+                logger.debug(f"Google Reverse Geocoding failed: {e}")
+
+        # 3. Try GraphHopper
+        if self.graphhopper:
+            try:
+                res = self.graphhopper.reverse_geocode(lat, lng)
+                if res: return res
+            except Exception as e:
+                logger.debug(f"GraphHopper Reverse Geocoding failed: {e}")
+
+        # 4. Try OSRM / Nominatim
+        if self.osrm:
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                res = loop.run_until_complete(self.osrm.reverse_geocode(lat, lng))
+                loop.close()
+                if res: return res
+            except Exception as e:
+                logger.debug(f"OSRM Reverse Geocoding failed: {e}")
+
+        return f"{lat}, {lng}"
 
     def _get_lat_lng(self, point: any) -> Tuple[float, float]:
         """Convert various point formats to (lat, lng) tuple."""

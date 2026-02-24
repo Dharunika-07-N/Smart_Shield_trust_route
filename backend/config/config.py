@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     GRAPHHOPPER_API_KEY: str = os.getenv("GRAPHHOPPER_API_KEY", "")
     MAPBOX_TOKEN: str = os.getenv("MAPBOX_TOKEN", "")
     SAFEGRAPH_API_KEY: str = os.getenv("SAFEGRAPH_API_KEY", "")
+    POSITIONSTACK_API_KEY: str = os.getenv("POSITIONSTACK_API_KEY", "")
     
     # Security
     SECRET_KEY: str = os.getenv("SECRET_KEY", "change-me-in-production")
