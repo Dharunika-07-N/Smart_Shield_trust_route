@@ -1184,7 +1184,8 @@ class RouteOptimizer:
             "instructions": instructions,
             "weather_data": weather_data,
             "has_traffic_data": directions.get('has_traffic_data', False),
-            "traffic_level": traffic_level
+            "traffic_level": traffic_level,
+            "provider": directions.get('provider', 'unknown')
         }
         
         stats = {
