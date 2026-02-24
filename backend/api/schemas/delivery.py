@@ -99,6 +99,7 @@ class RouteSegment(BaseModel):
     traffic_level: Optional[str] = Field("low", description="Traffic level: low, medium, high")
     route_coordinates: Optional[List[Dict]] = Field(None, description="Detailed route coordinates for mapping")
     instructions: Optional[List[str]] = Field(None, description="Turn-by-turn instructions")
+    provider: Optional[str] = Field("unknown", description="Routing provider used")
 
 
 class OptimizedRoute(BaseModel):
