@@ -206,44 +206,79 @@ const ModernDashboard = () => {
         }
     }, [activeTab]);
 
-    // Generate simulated delivery partner locations based on delivery queue
-    const generateDeliveryPartnerLocations = () => {
-        if (deliveryQueue.length === 0) return;
+    // Unified fleet data fetch and simulation
+    const [fleetRiders, setFleetRiders] = useState([]);
 
-        // Base coordinates for Chennai area
-        const baseCoords = {
-            lat: 13.0827,
-            lng: 80.2707
-        };
+    const fetchFleetData = async () => {
+        try {
+            // Using getRidersStatus as it provides more detail (active delivery etc)
+            // It was recently opened for non-admins too
+            const data = await api.getRidersStatus();
+            if (Array.isArray(data)) {
+                // Filter out current user if needed, or show all
+                setFleetRiders(data.map(r => ({
+                    ...r,
+                    // Store initial simulated position if real location is static
+                    simLat: r.last_location?.latitude || (11.0168 + (Math.random() - 0.5) * 0.04),
+                    simLng: r.last_location?.longitude || (76.9558 + (Math.random() - 0.5) * 0.04),
+                    drift: {
+                        lat: (Math.random() - 0.5) * 0.0005,
+                        lng: (Math.random() - 0.5) * 0.0005
+                    }
+                })));
+            }
+        } catch (err) {
+            console.error("Failed to fetch fleet for simulation", err);
+        }
+    };
 
-        const markers = deliveryQueue.map((delivery, index) => {
-            // Generate random offset within ~10km radius
-            const latOffset = (Math.random() - 0.5) * 0.15;
-            const lngOffset = (Math.random() - 0.5) * 0.15;
+    // Simulated movement loop
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setFleetRiders(prev => prev.map(r => ({
+                ...r,
+                simLat: r.simLat + r.drift.lat * (Math.random() * 0.5 + 0.5),
+                simLng: r.simLng + r.drift.lng * (Math.random() * 0.5 + 0.5),
+                // Occasionally change drift direction
+                drift: Math.random() > 0.9 ? {
+                    lat: (Math.random() - 0.5) * 0.0005,
+                    lng: (Math.random() - 0.5) * 0.0005
+                } : r.drift
+            })));
+        }, 3000);
+        return () => clearInterval(interval);
+    }, []);
 
-            const lat = baseCoords.lat + latOffset;
-            const lng = baseCoords.lng + lngOffset;
+    // Transform fleet data into map markers
+    useEffect(() => {
+        if (fleetRiders.length === 0) return;
 
-            // Determine color based on status
-            let color = '#10b981'; // green for normal
-            if (delivery.status === 'urgent') color = '#ef4444'; // red
-            else if (delivery.status === 'normal') color = '#f59e0b'; // amber
-            else if (delivery.status === 'scheduled') color = '#3b82f6'; // blue
+        const markers = fleetRiders.map((rider) => {
+            const isSelf = rider.rider_id === user?.username;
+            const status = rider.is_online ? 'online' : 'offline';
+
+            // Determine color based on role and status
+            let color = '#10b981'; // green for online
+            if (!rider.is_online) color = '#94a3b8'; // gray
+            else if (rider.active_delivery) color = '#6366f1'; // indigo for active
 
             return {
-                position: [lat, lng],
+                id: rider.rider_id,
+                position: [rider.simLat, rider.simLng],
                 color: color,
                 popup: `
-                    <div style="min-width: 200px;">
-                        <div style="font-weight: bold; font-size: 14px; margin-bottom: 4px;">${delivery.name}</div>
-                        <div style="font-size: 12px; color: #64748b; margin-bottom: 8px;">${delivery.location}</div>
-                        <div style="display: flex; gap: 8px; margin-bottom: 4px;">
-                            <span style="background: ${color}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold;">${delivery.status.toUpperCase()}</span>
-                            <span style="background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold;">Score: ${delivery.score}</span>
-                        </div>
-                        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">
-                            <div>📍 ${delivery.distance}</div>
-                            <div>⏱️ ${delivery.time}</div>
+                    <div style="min-width: 180px; font-family: 'Inter', sans-serif;">
+                        <div style="font-weight: 800; font-size: 13px; color: #1e293b; margin-bottom: 2px;">${rider.name}</div>
+                        <div style="font-size: 10px; color: #64748b; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;">${rider.role} • ${status}</div>
+                        ${rider.active_delivery ? `
+                            <div style="background: #f1f5f9; padding: 8px; border-radius: 8px; margin-bottom: 8px;">
+                                <div style="font-size: 9px; color: #94a3b8; font-weight: bold; text-transform: uppercase;">Active Task</div>
+                                <div style="font-size: 11px; font-weight: 700; color: #475569;">${rider.active_delivery.order_id}</div>
+                            </div>
+                        ` : ''}
+                        <div style="display: flex; justify-between items-center; font-size: 10px; color: #94a3b8;">
+                            <span>⚡ ${Math.round(rider.speed_kmh || 0)} km/h</span>
+                            <span style="margin-left: auto;">🔋 ${rider.battery_level || 100}%</span>
                         </div>
                     </div>
                 `,
@@ -252,51 +287,48 @@ const ModernDashboard = () => {
                     html: `
                         <div style="position: relative;">
                             <div style="
-                                width: 32px;
-                                height: 32px;
-                                background: ${color};
-                                border: 3px solid white;
-                                border-radius: 50%;
-                                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                                width: 34px;
+                                height: 34px;
+                                background: ${isSelf ? '#f0f9ff' : 'white'};
+                                border: 3px solid ${color};
+                                border-radius: 10px;
+                                box-shadow: 0 4px 12px ${color}33;
                                 display: flex;
                                 align-items: center;
                                 justify-content: center;
-                                font-size: 16px;
-                                animation: pulse 2s infinite;
-                            ">🏍️</div>
-                            <div style="
-                                position: absolute;
-                                top: -8px;
-                                right: -8px;
-                                background: white;
-                                border: 2px solid ${color};
-                                border-radius: 50%;
-                                width: 20px;
-                                height: 20px;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                                font-size: 10px;
-                                font-weight: bold;
-                                color: ${color};
-                            ">${delivery.score}</div>
+                                font-size: 18px;
+                                transform: ${isSelf ? 'scale(1.1)' : 'none'};
+                            ">${rider.role === 'driver' ? '🚗' : '🛵'}</div>
+                            ${rider.active_delivery ? `
+                                <div style="
+                                    position: absolute;
+                                    top: -6px;
+                                    right: -6px;
+                                    background: #6366f1;
+                                    width: 14px;
+                                    height: 14px;
+                                    border-radius: 50%;
+                                    border: 2px solid white;
+                                    box-shadow: 0 0 10px #6366f166;
+                                "></div>
+                            ` : ''}
                         </div>
                     `,
-                    iconSize: [32, 32],
-                    iconAnchor: [16, 16]
+                    iconSize: [34, 34],
+                    iconAnchor: [17, 17]
                 })
             };
         });
 
         setDeliveryPartnerMarkers(markers);
-    };
+    }, [fleetRiders, user?.username]);
 
-    // Update delivery partner locations when delivery queue changes
+    // Initial fetch for fleet
     useEffect(() => {
-        if (deliveryQueue.length > 0) {
-            generateDeliveryPartnerLocations();
-        }
-    }, [deliveryQueue]);
+        fetchFleetData();
+        const intv = setInterval(fetchFleetData, 60000); // Sync with DB every min
+        return () => clearInterval(intv);
+    }, []);
 
     const handleOptimizeRoute = async () => {
         try {
