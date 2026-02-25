@@ -51,10 +51,10 @@ async def calculate_safety_score(
             rider_info=rider_info
         )
         return SafetyScoreResponse(
-            route_safety_score=safety_data["route_safety_score"],
-            average_score=safety_data["average_score"],
-            segment_scores=[],
-            improvement_suggestions=[]
+            route_safety_score=safety_data.get("route_safety_score", 0),
+            average_score=safety_data.get("average_score", 0),
+            segment_scores=safety_data.get("segment_scores", []),
+            improvement_suggestions=safety_data.get("improvement_suggestions", [])
         )
     except Exception as e:
         logger.error(f"Error: {e}")
