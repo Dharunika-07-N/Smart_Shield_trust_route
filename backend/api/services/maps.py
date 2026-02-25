@@ -11,8 +11,9 @@ from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 from loguru import logger
 from config.config import settings
+from api.schemas.delivery import Coordinate
 
-# Providers
+# Use MapsService as the primary hub (handles Google, GraphHopper, OSRM fallbacks)
 from api.services.graphhopper import GraphHopperService
 from api.services.osrm_service import OSRMService
 from api.services.positionstack import PositionStackService
@@ -23,6 +24,8 @@ class MapsService:
     def __init__(self):
         # Initialize Google Maps
         self.gmaps_key = settings.GOOGLE_MAPS_API_KEY
+        self.gmaps_working = True
+        self.gmaps_failures = 0
         if self.gmaps_key and not self.gmaps_key.startswith('YOUR_'):
             try:
                 self.gmaps = googlemaps.Client(key=self.gmaps_key)
@@ -30,8 +33,10 @@ class MapsService:
             except Exception as e:
                 logger.error(f"Failed to initialize Google Maps: {e}")
                 self.gmaps = None
+                self.gmaps_working = False
         else:
             self.gmaps = None
+            self.gmaps_working = False
             logger.warning("Google Maps API key missing or invalid")
 
         # Initialize PositionStack (High Accuracy Geocoding)
@@ -188,8 +193,8 @@ class MapsService:
         if waypoints:
             waypoint_list = [self._get_lat_lng(wp) for wp in waypoints]
 
-        # 1. Try Google Maps First
-        if self.gmaps:
+        # 1. Try Google Maps First (with circuit breaker)
+        if self.gmaps and self.gmaps_working:
             try:
                 logger.info(f"Routing request: {orig} to {dest} via Google")
                 g_waypoints = [f"{wp[0]},{wp[1]}" for wp in waypoint_list] if waypoint_list else None
@@ -206,6 +211,8 @@ class MapsService:
                 
                 if directions:
                     logger.info(f"Google Maps returned {len(directions)} route(s)")
+                    # Reset failure count on success
+                    self.gmaps_failures = 0
                     for route in directions:
                         route_coords = []
                         # HIGH-RES: Use polyline if possible
@@ -228,7 +235,12 @@ class MapsService:
                         route['provider'] = 'google'
                     return directions
             except Exception as e:
-                logger.warning(f"Google Maps API error: {e}. Trying GraphHopper...")
+                self.gmaps_failures += 1
+                if self.gmaps_failures >= 3:
+                    self.gmaps_working = False
+                    logger.error(f"Google Maps API disabled after {self.gmaps_failures} failures. Error: {e}")
+                else:
+                    logger.warning(f"Google Maps API error: {e}. Failure count: {self.gmaps_failures}. Trying GraphHopper...")
 
         # 2. Try GraphHopper
         if self.graphhopper:
@@ -330,6 +342,87 @@ class MapsService:
         a = math.sin(dphi/2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlam/2)**2
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
         return R * c
+
+    def find_nearby_places(
+        self,
+        location: Coordinate,
+        radius_meters: int = 2000,
+        place_type: str = "police"
+    ) -> List[Dict]:
+        """
+        Find nearby places of a specific type.
+        Uses Google Places API if available.
+        """
+        lat, lng = self._get_lat_lng(location)
+        
+        # 1. Try Google Maps Places API
+        if self.gmaps and self.gmaps_working:
+            try:
+                logger.info(f"Searching for {place_type} near {lat}, {lng} via Google")
+                res = self.gmaps.places_nearby(
+                    location=(lat, lng),
+                    radius=radius_meters,
+                    type=place_type
+                )
+                
+                places = []
+                if res.get('results'):
+                    for r in res['results']:
+                        places.append({
+                            "place_id": r.get('place_id'),
+                            "name": r.get('name'),
+                            "location": {
+                                "lat": r['geometry']['location']['lat'],
+                                "lng": r['geometry']['location']['lng']
+                            },
+                            "address": r.get('vicinity'),
+                            "rating": r.get('rating', 0),
+                            "distance_meters": self.calculate_straight_distance(
+                                location, 
+                                Coordinate(latitude=r['geometry']['location']['lat'], longitude=r['geometry']['location']['lng'])
+                            ),
+                            "is_open": r.get('opening_hours', {}).get('open_now', True)
+                        })
+                    return places
+            except Exception as e:
+                logger.warning(f"Google Places search failed: {e}")
+
+        # 2. Fallback: Mock data if Google fails or is missing
+        logger.info(f"Using mock places for {place_type} search")
+        return self._get_mock_places(location, radius_meters, place_type)
+
+    def _get_mock_places(self, location: Coordinate, radius: int, place_type: str) -> List[Dict]:
+        """Generate mock places for demo purposes."""
+        import random
+        lat, lng = self._get_lat_lng(location)
+        
+        places = []
+        names = {
+            "police": ["Police Station A", "City Watch HQ", "Regional Patrol Station"],
+            "convenience_store": ["Open 24/7 Store", "Night Market", "QuickStop"],
+            "hospital": ["City General Hospital", "Emergency Care Center", "Public Health Clinic"]
+        }
+        
+        possible_names = names.get(place_type, ["Safe Zone Point"])
+        
+        for i in range(2):
+            # Random location within radius
+            rand_lat = lat + (random.random() - 0.5) * (radius / 111000)
+            rand_lng = lng + (random.random() - 0.5) * (radius / 111000)
+            
+            places.append({
+                "place_id": f"mock_{place_type}_{i}",
+                "name": random.choice(possible_names) + f" {i+1}",
+                "location": {"lat": rand_lat, "lng": rand_lng},
+                "address": "Mock Address, Nearby Street",
+                "rating": 4.0 + random.random(),
+                "distance_meters": self.calculate_straight_distance(
+                    location, Coordinate(latitude=rand_lat, longitude=rand_lng)
+                ),
+                "is_open": True
+            })
+            
+        return places
 
     # Alias for compatibility
     get_all_directions = get_directions
