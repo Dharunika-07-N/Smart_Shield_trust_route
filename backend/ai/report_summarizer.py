@@ -7,8 +7,16 @@ import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import json
-import google.generativeai as genai
-from loguru import logger
+try:
+    import google.generativeai as genai
+    GENAI_AVAILABLE = True
+except ImportError:
+    GENAI_AVAILABLE = False
+try:
+    from loguru import logger
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
 
 
 class ReportSummarizer:
@@ -31,12 +39,19 @@ class ReportSummarizer:
         gemini_key = os.getenv('GOOGLE_API_KEY')
         is_gemini_placeholder = not gemini_key or "placeholder" in gemini_key.lower() or "your-real-key" in gemini_key.lower()
         
-        if is_gemini_placeholder:
+        if not GENAI_AVAILABLE or is_gemini_placeholder:
             self.is_mock = True
-            logger.warning("GOOGLE_API_KEY is a placeholder or missing. Using mock summarizer.")
+            if not GENAI_AVAILABLE:
+                logger.warning("google-generativeai package not installed. Using mock summarizer.")
+            else:
+                logger.warning("GOOGLE_API_KEY is a placeholder or missing. Using mock summarizer.")
         else:
-            genai.configure(api_key=gemini_key)
-            self.model = genai.GenerativeModel('gemini-pro')
+            try:
+                genai.configure(api_key=gemini_key)
+                self.model = genai.GenerativeModel('gemini-2.0-flash')
+            except Exception as e:
+                logger.error(f"Failed to initialize Gemini: {e}")
+                self.is_mock = True
     
     def _generate_mock_summary(self, prompt: str) -> str:
         """Generate a convincing mock summary when API keys are missing."""
