@@ -26,6 +26,12 @@ const DispatcherDashboard = () => {
     const [activities, setActivities] = useState([
         { id: 1, driver: 'SYSTEM', msg: 'Network monitor active and stable', time: 'Just now' }
     ]);
+    const [isOptimizing, setIsOptimizing] = useState(false);
+    const [viewFilter, setViewFilter] = useState('all'); // all, pending, critical
+    const [optimizingProgress, setOptimizingProgress] = useState(0);
+
+    // Notification sound
+    const notificationAudio = useRef(new Audio('/notification.mp3'));
 
     // Handle incoming notifications to update activities
     useEffect(() => {
@@ -103,16 +109,52 @@ const DispatcherDashboard = () => {
     }, [activeTab]);
 
     const handleAutoDispatch = async () => {
-        if (!window.confirm("Trigger automated AI delivery assignment?")) return;
-        setLoading(true);
+        setIsOptimizing(true);
+        setOptimizingProgress(0);
+
+        // Simulation of optimization progress
+        const interval = setInterval(() => {
+            setOptimizingProgress(prev => {
+                if (prev >= 100) {
+                    clearInterval(interval);
+                    return 100;
+                }
+                return prev + 10;
+            });
+        }, 150);
+
         try {
-            await api.post('/deliveries/auto-dispatch');
-            alert("Auto-dispatch triggered successfully! Dispatching pending orders...");
-            fetchData();
+            const result = await api.post('/deliveries/auto-dispatch');
+
+            // Add system activity
+            setActivities(prev => [{
+                id: Date.now(),
+                driver: 'AI_OPTIMIZER',
+                msg: result.message || `Optimized ${result.assigned_count} unassigned deliveries.`,
+                time: 'Just now'
+            }, ...prev]);
+
+            // Refresh data
+            await fetchData();
+
+            // Play notification sound
+            try {
+                notificationAudio.current.play().catch(e => console.warn("Audio play blocked by browser policy", e));
+            } catch (e) {
+                console.error("Audio error", e);
+            }
+
+            // Short delay to show 100% progress
+            setTimeout(() => {
+                setIsOptimizing(false);
+                setOptimizingProgress(0);
+            }, 500);
+
         } catch (e) {
-            alert("Failed to trigger auto-dispatch: " + e.message);
-        } finally {
-            setLoading(false);
+            console.error("Auto-dispatch failed", e);
+            setIsOptimizing(false);
+            setOptimizingProgress(0);
+            alert("Optimization engine reported an error: " + e.message);
         }
     };
 
@@ -121,8 +163,46 @@ const DispatcherDashboard = () => {
     };
 
     const handleFilterView = () => {
-        setSearchQuery(searchQuery === 'pending' ? '' : 'pending');
+        const filters = ['all', 'pending', 'critical'];
+        const nextIdx = (filters.indexOf(viewFilter) + 1) % filters.length;
+        const nextFilter = filters[nextIdx];
+        setViewFilter(nextFilter);
+
+        // Update search query to reflect filter for simple logic
+        if (nextFilter === 'pending') {
+            setSearchQuery('pending');
+        } else if (nextFilter === 'critical') {
+            setSearchQuery('80%'); // Filter for high safety score orders as a mock for 'critical' (since we use it in text search)
+        } else {
+            setSearchQuery('');
+        }
     };
+
+    const filteredQueue = queue.filter(item => {
+        // Search query filter (matches ID, Order ID, or Address)
+        const matchesSearch = !searchQuery ||
+            item.order_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.customer_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.dropoff_location?.address?.toLowerCase().includes(searchQuery.toLowerCase());
+
+        if (!matchesSearch) return false;
+
+        // View filter
+        if (viewFilter === 'pending') return item.status === 'pending';
+        if (viewFilter === 'critical') return (item.safety_score || 100) < 85;
+        return true;
+    });
+
+    const filteredOnlineDrivers = onlineDrivers.filter(dr => {
+        const matchesSearch = !searchQuery ||
+            dr.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            dr.username?.toLowerCase().includes(searchQuery.toLowerCase());
+
+        if (!matchesSearch) return false;
+
+        if (viewFilter === 'critical') return dr.status === 'alert' || Math.random() > 0.9; // Simulated critical status for demo
+        return true;
+    });
 
     const stats = [
         { label: 'Total Fleet', value: fleetStats.totalFleet, icon: FiTruck, color: 'text-blue-400' },
@@ -246,19 +326,28 @@ const DispatcherDashboard = () => {
                                 <div className="lg:col-span-2 space-y-8">
                                     <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
                                         <div className="flex items-center justify-between mb-8">
-                                            <h3 className="text-lg font-bold text-slate-900">Live Operations Command</h3>
+                                            <div>
+                                                <h3 className="text-lg font-bold text-slate-900">Live Operations Command</h3>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                                                    Viewing: <span className="text-indigo-600">{viewFilter.toUpperCase()}</span>
+                                                    {isOptimizing && <span className="ml-4 animate-pulse text-emerald-500">· OPTIMIZING FLEET {optimizingProgress}%</span>}
+                                                </p>
+                                            </div>
                                             <div className="flex gap-2">
                                                 <button
                                                     onClick={handleOptimizeAll}
-                                                    className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-500/20 transition-all active:scale-95"
+                                                    disabled={isOptimizing}
+                                                    className={`px-4 py-2 text-white text-xs font-bold rounded-xl shadow-lg transition-all active:scale-95 flex items-center gap-2 ${isOptimizing ? 'bg-slate-400' : 'bg-indigo-600 shadow-indigo-500/20'}`}
                                                 >
-                                                    Optimize All
+                                                    {isOptimizing ? <FiRefreshCw className="animate-spin" /> : <FiZap />}
+                                                    {isOptimizing ? 'Optimizing...' : 'Optimize All'}
                                                 </button>
                                                 <button
                                                     onClick={handleFilterView}
-                                                    className="px-4 py-2 bg-white text-slate-600 text-xs font-bold rounded-xl border border-slate-200 hover:bg-slate-50 transition-all"
+                                                    className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all flex items-center gap-2 ${viewFilter !== 'all' ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
                                                 >
-                                                    Filter View
+                                                    <FiSearch />
+                                                    {viewFilter === 'all' ? 'Filter View' : `Filter: ${viewFilter}`}
                                                 </button>
                                             </div>
                                         </div>
@@ -352,12 +441,7 @@ const DispatcherDashboard = () => {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50">
-                                            {queue.filter(item =>
-                                                !searchQuery ||
-                                                item.order_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                                item.customer_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                                item.dropoff_location?.address?.toLowerCase().includes(searchQuery.toLowerCase())
-                                            ).map(item => (
+                                            {filteredQueue.map(item => (
                                                 <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
                                                     <td className="px-6 py-4">
                                                         <p className="font-bold text-slate-800">{item.order_id}</p>
@@ -397,79 +481,65 @@ const DispatcherDashboard = () => {
                         <div className="space-y-6">
                             <h2 className="text-2xl font-black text-slate-900">Active Fleet</h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {onlineDrivers.filter(dr =>
-                                    !searchQuery ||
-                                    dr.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                    dr.username?.toLowerCase().includes(searchQuery.toLowerCase())
-                                ).length === 0 ? (
-                                    <div className="col-span-full py-20 text-center bg-white rounded-3xl border border-slate-200 border-dashed">
-                                        <FiUsers size={48} className="mx-auto text-slate-100 mb-4" />
-                                        <p className="text-slate-400 font-bold">No matching drivers found</p>
-                                    </div>
-                                ) : (
-                                    onlineDrivers.filter(dr =>
-                                        !searchQuery ||
-                                        dr.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                        dr.username?.toLowerCase().includes(searchQuery.toLowerCase())
-                                    ).map(dr => (
-                                        <div key={dr.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
-                                            <div className="flex items-center gap-4 mb-4">
-                                                <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center font-black text-xl border border-indigo-100">
-                                                    {dr.full_name?.charAt(0) || dr.username?.charAt(0)}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <h3 className="font-bold text-slate-900 truncate">{dr.full_name || dr.username}</h3>
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                                                        <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Active Now</span>
-                                                    </div>
-                                                </div>
+                                {filteredOnlineDrivers.map(dr => (
+                                    <div key={dr.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
+                                        <div className="flex items-center gap-4 mb-4">
+                                            <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center font-black text-xl border border-indigo-100">
+                                                {dr.full_name?.charAt(0) || dr.username?.charAt(0)}
                                             </div>
-                                            <div className="space-y-2 mb-6">
-                                                <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase">
-                                                    <span>Signal Strength</span>
-                                                    <span className="text-slate-900">Optimal</span>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="font-bold text-slate-900 truncate">{dr.full_name || dr.username}</h3>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                                                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Active Now</span>
                                                 </div>
-                                                <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-indigo-500 w-[92%]"></div>
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedOrder({
-                                                            order_id: `DOSSIER_${dr.id}`,
-                                                            full_name: dr.full_name || dr.username,
-                                                            status: 'ACTIVE_PROFILE',
-                                                            safety_score: 98,
-                                                            dropoff_location: { address: 'Verified Fleet Member' }
-                                                        });
-                                                    }}
-                                                    className="py-2 bg-slate-50 text-slate-600 text-[10px] font-black uppercase rounded-xl border border-slate-200 hover:bg-slate-100"
-                                                >
-                                                    Profile
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        const msg = window.prompt(`Message to ${dr.full_name || dr.username}:`);
-                                                        if (msg) {
-                                                            alert(`Message sent via Secure Hub: "${msg}"`);
-                                                            setActivities(prev => [{
-                                                                id: Date.now(),
-                                                                driver: dr.username,
-                                                                msg: 'Remote command acknowledged',
-                                                                time: 'Just now'
-                                                            }, ...prev]);
-                                                        }
-                                                    }}
-                                                    className="py-2 bg-indigo-600 text-white text-[10px] font-black uppercase rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-500/10"
-                                                >
-                                                    Channel
-                                                </button>
                                             </div>
                                         </div>
-                                    ))
-                                )}
+                                        <div className="space-y-2 mb-6">
+                                            <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase">
+                                                <span>Signal Strength</span>
+                                                <span className="text-slate-900">Optimal</span>
+                                            </div>
+                                            <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+                                                <div className="h-full bg-indigo-500 w-[92%]"></div>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedOrder({
+                                                        order_id: `DOSSIER_${dr.id}`,
+                                                        full_name: dr.full_name || dr.username,
+                                                        status: 'ACTIVE_PROFILE',
+                                                        safety_score: 98,
+                                                        dropoff_location: { address: 'Verified Fleet Member' }
+                                                    });
+                                                }}
+                                                className="py-2 bg-slate-50 text-slate-600 text-[10px] font-black uppercase rounded-xl border border-slate-200 hover:bg-slate-100"
+                                            >
+                                                Profile
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    const msg = window.prompt(`Message to ${dr.full_name || dr.username}:`);
+                                                    if (msg) {
+                                                        alert(`Message sent via Secure Hub: "${msg}"`);
+                                                        setActivities(prev => [{
+                                                            id: Date.now(),
+                                                            driver: dr.username,
+                                                            msg: 'Remote command acknowledged',
+                                                            time: 'Just now'
+                                                        }, ...prev]);
+                                                    }
+                                                }}
+                                                className="py-2 bg-indigo-600 text-white text-[10px] font-black uppercase rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-500/10"
+                                            >
+                                                Channel
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))
+                                }
                             </div>
                         </div>
                     )}
