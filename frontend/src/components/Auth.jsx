@@ -176,11 +176,22 @@ const Auth = ({ setAuth }) => {
     const handleDevBypass = async () => {
         setLoading(true);
         try {
-            const payload = {
-                username: 'dharunikaktm@gmail.com',
-                password: 'password123',
-                role: 'rider'
+            // Map selected role to default credentials from seed
+            const credentialsMap = {
+                admin: { username: 'admin@smartshield.com', password: 'Admin@123' },
+                dispatcher: { username: 'dispatcher@smartshield.com', password: 'Dispatch@123' },
+                rider: { username: 'rider@smartshield.com', password: 'Rider@123' },
+                customer: { username: 'dharunika07@gmail.com', password: 'password123' }
             };
+
+            const creds = credentialsMap[role] || credentialsMap.rider;
+
+            const payload = {
+                username: creds.username,
+                password: creds.password,
+                role: role
+            };
+
             const response = await axios.post(`${API_URL}/auth/login`, payload);
             const loginData = {
                 access_token: response.data.access_token,
@@ -188,22 +199,14 @@ const Auth = ({ setAuth }) => {
                 role: response.data.role,
                 user_id: response.data.user_id,
                 full_name: response.data.full_name,
+                email: response.data.email,
             };
             setAuth(loginData);
             const roleRoute = ROLE_ROUTES[response.data.role] || '/rider/dashboard';
             navigate(roleRoute);
         } catch (err) {
-            console.error("Dev bypass failed, using mock session:", err);
-            // Fallback: use the selected role in the form
-            const mockRole = role || 'rider';
-            setAuth({
-                access_token: 'dev_token',
-                username: 'Dev_User',
-                role: mockRole,
-                user_id: 'DEV_001',
-                full_name: 'Dev User',
-            });
-            navigate(ROLE_ROUTES[mockRole] || '/rider/dashboard');
+            console.error("Dev bypass failed:", err);
+            setGlobalError("Dev bypass failed: " + (err.response?.data?.detail || err.message));
         } finally {
             setLoading(false);
         }
