@@ -10,12 +10,13 @@ import io
 from fastapi.responses import StreamingResponse
 
 from api.services.geospatial import geo_service
+from api.services.location_cache import location_cache
 from config.config import settings
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
 @router.get("/summary")
-def get_system_summary(
+async def get_system_summary(
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_dispatcher)
 ):
@@ -41,8 +42,12 @@ def get_system_summary(
     else:
         utilization = "0%"
 
+    # Real-time online count from cache
+    online_count = len(await location_cache.get_all_fleet())
+
     return {
         "activeDrivers": fleet_count,
+        "onlineDrivers": online_count,
         "fleetUtilization": utilization,
         "safetyScore": round(float(avg_safety), 1),
         "activeAlerts": active_alerts,
@@ -116,7 +121,7 @@ def get_recent_fleet_events(
     return events[:10]
 
 @router.get("/riders-status")
-def get_riders_live_status(
+async def get_riders_live_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -132,15 +137,21 @@ def get_riders_live_status(
 
     result = []
     for rider in riders:
-        # Get the latest DeliveryStatus entry for this rider
-        latest_track = (
-            db.query(DeliveryStatus)
-            .filter(DeliveryStatus.rider_id == rider.id)
-            .order_by(DeliveryStatus.timestamp.desc())
-            .first()
-        )
+        # 1. OPTIMIZATION: Check in-memory cache first (Redis-like O(1) jump)
+        # This allows us to see simulated riders who haven't hit the DB yet
+        cached = await location_cache.get_by_rider(rider.id)
 
-        # Get rider's current active delivery
+        # 2. Fall back to DB for history
+        latest_track = None
+        if not cached:
+            latest_track = (
+                db.query(DeliveryStatus)
+                .filter(DeliveryStatus.rider_id == rider.id)
+                .order_by(DeliveryStatus.timestamp.desc())
+                .first()
+            )
+
+        # 3. Get rider's current active delivery
         active_delivery = (
             db.query(Delivery)
             .filter(
@@ -159,12 +170,16 @@ def get_riders_live_status(
             "email": rider.email,
             "role": rider.role,
             "status": rider.status,
-            # Location data
-            "last_location": latest_track.current_location if latest_track else None,
-            "last_seen": latest_track.timestamp.isoformat() if latest_track else None,
-            "speed_kmh": latest_track.speed_kmh if latest_track else None,
-            "heading": latest_track.heading if latest_track else None,
-            "battery_level": latest_track.battery_level if latest_track else None,
+            # Location data (prefer cache)
+            "last_location": {
+                "latitude": cached["latitude"], 
+                "longitude": cached["longitude"]
+            } if cached else (latest_track.current_location if latest_track else None),
+            
+            "last_seen": cached["timestamp"] if cached else (latest_track.timestamp.isoformat() if latest_track else None),
+            "speed_kmh": cached["speed_kmh"] if cached else (latest_track.speed_kmh if latest_track else None),
+            "heading": cached["heading"] if cached else (latest_track.heading if latest_track else None),
+            "battery_level": cached["battery_level"] if cached else (latest_track.battery_level if latest_track else None),
             # Delivery data
             "active_delivery": {
                 "id": active_delivery.id,
@@ -178,18 +193,20 @@ def get_riders_live_status(
                 "created_at": active_delivery.created_at.isoformat() if active_delivery.created_at else None,
             } if active_delivery else None,
             # Computed fields
-            "is_online": latest_track is not None and (
+            "is_online": cached is not None or (latest_track is not None and (
                 datetime.utcnow() - latest_track.timestamp
-            ).total_seconds() < 300,  # online if updated within 5 min
+            ).total_seconds() < 300),  # online if cached OR updated within 5 min
             "deliveries_today": db.query(Delivery).filter(
                 Delivery.assigned_rider_id == rider.id,
                 Delivery.status == "delivered",
                 Delivery.delivered_at >= datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
             ).count(),
-            "h3_index": geo_service.get_hex_id(
-                latest_track.current_location.get("latitude"),
-                latest_track.current_location.get("longitude")
-            ) if latest_track and latest_track.current_location else None
+            "h3_index": cached.get("h3_index") if cached else (
+                geo_service.get_hex_id(
+                    latest_track.current_location.get("latitude"),
+                    latest_track.current_location.get("longitude")
+                ) if latest_track and latest_track.current_location else None
+            )
         }
         result.append(entry)
 
@@ -288,7 +305,7 @@ def export_incident_reports(
     writer.writerow(["ID", "Rider ID", "Status", "Created At", "Resolution Notes"])
     
     for alert in alerts:
-        writer.writerow([alert.id, alert.rider_id, alert.status, alert.created_at, alert.resolution_notes])
+        writer.writerow([alert.id, alert.rider_id, alert.status, alert.created_at, alert.resolved_at])
     
     output.seek(0)
     return StreamingResponse(

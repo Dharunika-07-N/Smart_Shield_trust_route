@@ -520,15 +520,10 @@ async def simulate_gps_movement(
     """
     GPS simulation for testing without a real device.
     Moves a simulated rider along an ACTUAL street-following path.
-    
-    Logic:
-    1. Try to fetch delivery from DB to get real locations.
-    2. Use MapsService (Google/GH/OSRM) to get detailed route coordinates.
-    3. Iterate through real street points for a high-fidelity simulation.
+    Runs for 10 minutes to allow thorough testing.
     """
     import random
     maps_service = MapsService()
-    db_service = DatabaseService(db)
     
     # Default points in Coimbatore if routing fails
     fallback_path = [
@@ -542,7 +537,6 @@ async def simulate_gps_movement(
     try:
         delivery = db.query(Delivery).filter(Delivery.order_id == delivery_id).first()
         if not delivery:
-            # Try by UUID
             delivery = db.query(Delivery).filter(Delivery.id == delivery_id).first()
             
         if delivery:
@@ -553,99 +547,87 @@ async def simulate_gps_movement(
             routes = maps_service.get_directions(origin, destination)
             if routes and routes[0].get('route_coordinates'):
                 coords = routes[0]['route_coordinates']
-                # Sample points if too many (aim for ~30 points for demo)
                 if len(coords) > 40:
                     step = len(coords) // 30
                     final_path = [(p['lat'], p['lng']) for p in coords[::step]]
                 else:
                     final_path = [(p['lat'], p['lng']) for p in coords]
-                logger.info(f"[SIM] Using real {routes[0]['provider']} path with {len(final_path)} points")
         
         if not final_path:
-            # Try a default route between two points in Coimbatore if no delivery found
             routes = maps_service.get_directions(fallback_path[0], fallback_path[-1])
             if routes and routes[0].get('route_coordinates'):
                 coords = routes[0]['route_coordinates']
                 step = max(1, len(coords) // 25)
                 final_path = [(p['lat'], p['lng']) for p in coords[::step]]
-                logger.info(f"[SIM] Using default street-following path for Coimbatore")
 
     except Exception as e:
         logger.warning(f"[SIM] Path lookup failed: {e}")
 
     if not final_path:
         final_path = fallback_path
-        logger.info("[SIM] Falling back to sparse hardcoded path")
 
-    # Run simulation in background — don't block the response
+    # Run simulation in background
     async def run_simulation():
-        for i, (lat, lng) in enumerate(final_path):
-            # Simulation speed: slower in turns/start, faster elsewhere
-            speed = random.uniform(25, 50)
-            
-            # Add small random jitter to simulate real GPS (1-2 meters)
-            lat += random.uniform(-0.00002, 0.00002)
-            lng += random.uniform(-0.00002, 0.00002)
-            
-            # Calculate heading based on next point
-            heading = 0
-            if i < len(final_path) - 1:
-                import math
-                next_lat, next_lng = final_path[i+1]
-                heading = math.degrees(math.atan2(next_lng - lng, next_lat - lat)) % 360
+        start_time = datetime.utcnow()
+        duration_minutes = 10
+        
+        logger.info(f"[SIM] Starting 10-minute simulation for {delivery_id} (Rider: {current_user.id})")
+        
+        while (datetime.utcnow() - start_time).total_seconds() < (duration_minutes * 60):
+            for i, (lat, lng) in enumerate(final_path):
+                if (datetime.utcnow() - start_time).total_seconds() > (duration_minutes * 60):
+                    break
+                    
+                speed = random.uniform(25, 50)
+                lat += random.uniform(-0.00002, 0.00002)
+                lng += random.uniform(-0.00002, 0.00002)
+                
+                heading = 0
+                if i < len(final_path) - 1:
+                    import math
+                    next_lat, next_lng = final_path[i+1]
+                    heading = math.degrees(math.atan2(next_lng - lng, next_lat - lat)) % 360
 
-            await location_cache.set_location(
-                delivery_id=delivery_id,
-                rider_id=current_user.id,
-                latitude=lat,
-                longitude=lng,
-                status="in_transit",
-                speed_kmh=speed,
-                heading=heading,
-                battery_level=max(15, 98 - (i * 2))
-            )
+                await location_cache.set_location(
+                    delivery_id=delivery_id,
+                    rider_id=current_user.id,
+                    latitude=lat,
+                    longitude=lng,
+                    status="in_transit",
+                    speed_kmh=speed,
+                    heading=heading,
+                    battery_level=max(15, 98 - ((i % 20) * 2))
+                )
 
-            broadcast_data = {
-                "type": "location_update",
-                "rider_id": current_user.id,
-                "delivery_id": delivery_id,
-                "location": {"latitude": lat, "longitude": lng},
-                "status": "in_transit",
-                "speed_kmh": speed,
-                "heading": heading,
-                "battery_level": max(15, 98 - (i * 2)),
-                "timestamp": datetime.utcnow().isoformat(),
-                "reoptimization_needed": False,
-                "is_simulated": True
-            }
+                broadcast_data = {
+                    "type": "location_update",
+                    "rider_id": current_user.id,
+                    "delivery_id": delivery_id,
+                    "location": {"latitude": lat, "longitude": lng},
+                    "status": "in_transit",
+                    "speed_kmh": speed,
+                    "heading": heading,
+                    "battery_level": max(15, 98 - ((i % 20) * 2)),
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "reoptimization_needed": False,
+                    "is_simulated": True
+                }
 
-            await manager.broadcast(delivery_id, broadcast_data)
-            await manager.broadcast("live_fleet", broadcast_data)
-            await _push_to_sse_subscribers(delivery_id, broadcast_data)
+                await manager.broadcast(delivery_id, broadcast_data)
+                await manager.broadcast("live_fleet", broadcast_data)
+                await _push_to_sse_subscribers(delivery_id, broadcast_data)
 
-            # High fidelity simulation (1.5s interval for smooth movement)
-            await asyncio.sleep(1.5)
+                await asyncio.sleep(1.5)
 
-        # Mark delivery as completed
-        final_data = {
-            "type": "status_change",
-            "delivery_id": delivery_id,
-            "status": "delivered",
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        await manager.broadcast(delivery_id, final_data)
-        await _push_to_sse_subscribers(delivery_id, final_data)
-        logger.info(f"[SIM] High-fidelity GPS simulation completed for {delivery_id}")
+        # Mark as finished
+        logger.info(f"[SIM] Simulation finished for {delivery_id}")
 
-    # Start simulation as background task
     asyncio.create_task(run_simulation())
 
     return {
         "success": True,
-        "message": f"High-fidelity GPS simulation started for delivery {delivery_id}",
-        "waypoints": len(final_path),
-        "interval_seconds": 1.5,
-        "total_duration_seconds": len(final_path) * 1.5
+        "message": f"10-minute high-fidelity GPS simulation started for delivery {delivery_id}",
+        "waypoints": len(final_path)
     }
 
 
