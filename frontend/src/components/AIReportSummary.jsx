@@ -24,7 +24,7 @@ const AIReportSummary = () => {
     const [summaries, setSummaries] = useState({});
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [aiProvider, setAiProvider] = useState('openai');
+    const [aiProvider, setAiProvider] = useState('gemini');
     const [expandedSections, setExpandedSections] = useState({});
 
     const reportTypes = [
@@ -42,9 +42,7 @@ const AIReportSummary = () => {
     ];
 
     const aiProviders = [
-        { value: 'openai', label: 'GPT-4', icon: '🤖' },
-        { value: 'anthropic', label: 'Claude', icon: '🧠' },
-        { value: 'gemini', label: 'Gemini', icon: '✨' }
+        { value: 'gemini', label: 'Gemini AI', icon: '✨' }
     ];
 
     useEffect(() => {
