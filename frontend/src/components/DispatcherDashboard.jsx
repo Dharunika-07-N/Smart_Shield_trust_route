@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     FiShield, FiPackage, FiActivity, FiMap, FiUsers,
     FiAlertTriangle, FiNavigation, FiBarChart2, FiLogOut,

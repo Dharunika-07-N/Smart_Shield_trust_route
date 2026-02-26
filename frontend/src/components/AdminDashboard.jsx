@@ -111,6 +111,7 @@ const AdminDashboard = () => {
       const data = await api.get('/admin/summary');
       setStats({
         activeDrivers: data.activeDrivers,
+        onlineDrivers: data.onlineDrivers,
         fleetUtilization: data.fleetUtilization,
         safetyScore: data.safetyScore,
         activeAlerts: data.activeAlerts
@@ -337,9 +338,9 @@ const AdminDashboard = () => {
                       Open Optimizer
                     </button>
                   </div>
-                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Active Fleet</p>
+                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Fleet (Online/Total)</p>
                   <p className="text-3xl font-black text-slate-900 mt-1">
-                    {stats.activeDrivers !== null ? stats.activeDrivers : <FiRefreshCw className="animate-spin text-indigo-500 opacity-20" />}
+                    {stats.activeDrivers !== null ? `${stats.onlineDrivers || 0} / ${stats.activeDrivers}` : <FiRefreshCw className="animate-spin text-indigo-500 opacity-20" />}
                   </p>
                 </div>
                 <div className="bg-white p-6 rounded-3xl border border-slate-200 hover:border-blue-500/30 transition-all group shadow-sm">
