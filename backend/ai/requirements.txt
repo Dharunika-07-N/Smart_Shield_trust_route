@@ -13,3 +13,4 @@ google-generativeai>=0.3.0
 # Additional utilities (if not already installed)
 python-dotenv>=1.0.0
 requests>=2.31.0
+h3>=4.4.2
