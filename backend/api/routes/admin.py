@@ -44,6 +44,13 @@ async def get_system_summary(
 
     # Real-time online count from cache
     online_count = len(await location_cache.get_all_fleet())
+    
+    # Fallback to DB if cache is empty (likely due to simulation or separate process)
+    if online_count == 0:
+        cutoff = datetime.utcnow() - timedelta(minutes=15)
+        online_count = db.query(DeliveryStatus.rider_id).filter(
+            DeliveryStatus.timestamp >= cutoff
+        ).distinct().count()
 
     return {
         "activeDrivers": fleet_count,

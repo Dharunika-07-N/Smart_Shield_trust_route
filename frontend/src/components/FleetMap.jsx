@@ -2,7 +2,8 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { api } from '../services/api';
-import { FiUsers, FiActivity, FiMapPin, FiTruck } from 'react-icons/fi';
+import { FiUsers, FiActivity, FiMapPin, FiTruck, FiShield } from 'react-icons/fi';
+import SafetyHeatmap from './SafetyHeatmap';
 
 // Component to handle map view updates
 const MapAutoCenter = ({ center }) => {
@@ -17,6 +18,7 @@ const FleetMap = () => {
     const [fleet, setFleet] = useState([]);
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({ online: 0, active: 0, areas: 0 });
+    const [showHeatmap, setShowHeatmap] = useState(true);
 
     const fetchFleetData = async () => {
         try {
@@ -80,6 +82,18 @@ const FleetMap = () => {
                             <p className="text-xl font-black text-emerald-600">{fleet.filter(f => f.status === 'online').length}</p>
                         </div>
                     </div>
+                    <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <FiShield size={14} className={showHeatmap ? "text-indigo-600" : "text-slate-400"} />
+                            <span className="text-[10px] font-black text-slate-500 uppercase">H3 Heatmap Layer</span>
+                        </div>
+                        <button
+                            onClick={() => setShowHeatmap(!showHeatmap)}
+                            className={`w-10 h-5 rounded-full transition-all relative ${showHeatmap ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                        >
+                            <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${showHeatmap ? 'left-6' : 'left-1'}`} />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="bg-white/80 backdrop-blur-xl p-4 rounded-2xl border border-white/40 shadow-xl">
@@ -113,6 +127,8 @@ const FleetMap = () => {
                         url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     />
+
+                    <SafetyHeatmap show={showHeatmap} />
 
                     {simulatedFleet.map((driver) => (
                         <Marker

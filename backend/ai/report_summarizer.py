@@ -48,7 +48,7 @@ class ReportSummarizer:
         else:
             try:
                 genai.configure(api_key=gemini_key)
-                self.model = genai.GenerativeModel('gemini-2.0-flash')
+                self.model = genai.GenerativeModel('gemini-1.5-flash')
             except Exception as e:
                 logger.error(f"Failed to initialize Gemini: {e}")
                 self.is_mock = True
@@ -89,7 +89,9 @@ The current safety metrics indicate a robust operational period with high user e
                 
         except Exception as e:
             logger.error(f"Gemini generation failed: {e}")
-            return f"Error generating summary: {str(e)}"
+            # If real generation fails (e.g. quota exceeded), fall back to mock
+            logger.warning("Falling back to mock summary due to API error.")
+            return self._generate_mock_summary(prompt)
     
     def summarize_user_report(self, user_data: Dict[str, Any], 
                              time_period: str = "weekly") -> Dict[str, str]:

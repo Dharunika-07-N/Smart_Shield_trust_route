@@ -3,8 +3,9 @@ import {
     FiRefreshCw, FiMapPin, FiUser, FiPhone, FiPackage,
     FiActivity, FiWifi, FiWifiOff, FiBattery, FiNavigation,
     FiAlertTriangle, FiCheckCircle, FiSearch, FiFilter,
-    FiTruck, FiClock, FiStar, FiArrowUp, FiChevronDown
+    FiTruck, FiClock, FiStar, FiArrowUp, FiChevronDown, FiShield
 } from 'react-icons/fi';
+import SafetyHeatmap from './SafetyHeatmap';
 import { api } from '../services/api';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -53,6 +54,7 @@ const FleetOverviewMap = ({ riders, onSelectRider, selectedRiderId }) => {
                     url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
                     attribution='&copy; OpenStreetMap contributors &copy; CARTO'
                 />
+                <SafetyHeatmap show={true} />
                 {onlineRiders.map(rider => {
                     const lat = rider.last_location?.latitude || rider.last_location?.lat;
                     const lng = rider.last_location?.longitude || rider.last_location?.lng;
