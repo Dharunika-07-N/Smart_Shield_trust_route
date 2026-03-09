@@ -431,6 +431,8 @@ class DeliveryFeedback(Base):
     
     # Comments
     feedback_text = Column(String, nullable=True)
+    
+    route = relationship("DeliveryRoute", back_populates="feedback")
 
 
 class AlertPreferences(Base):
@@ -469,8 +471,6 @@ class AlertPreferences(Base):
     
     # Metadata
     submitted_at = Column(DateTime, default=datetime.utcnow)
-    
-    route = relationship("DeliveryRoute", back_populates="feedback")
 
 
 class HistoricalDelivery(Base):
