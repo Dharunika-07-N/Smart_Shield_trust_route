@@ -82,14 +82,46 @@ const dashboardApi = {
     /**
      * Get recent alerts
      */
-    getRecentAlerts: async (limit = 5) => {
+    getRecentAlerts: async (limit = 5, userId = null) => {
         try {
+            const params = { limit };
+            if (userId) params.user_id = userId;
+            
             const response = await axios.get(`${API_BASE_URL}/dashboard/alerts/recent`, {
-                params: { limit }
+                params
             });
             return response.data;
         } catch (error) {
             console.error('Error fetching alerts:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Get user's alert preferences
+     */
+    getAlertPreferences: async (userId) => {
+        try {
+            const response = await axios.get(`${API_BASE_URL}/dashboard/alert-preferences/${userId}`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching alert preferences:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Update user's alert preferences
+     */
+    updateAlertPreferences: async (userId, preferences) => {
+        try {
+            const response = await axios.put(
+                `${API_BASE_URL}/dashboard/alert-preferences/${userId}`,
+                preferences
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error updating alert preferences:', error);
             throw error;
         }
     }

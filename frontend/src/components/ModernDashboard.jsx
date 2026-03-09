@@ -83,6 +83,35 @@ const ModernDashboard = () => {
         share_location: true
     });
 
+    // Alert Preferences State
+    const [alertPreferences, setAlertPreferences] = useState({
+        alert_types: {
+            suspicious_activity: true,
+            road_hazard: true,
+            poor_lighting: true,
+            high_crime_area: true,
+            traffic_congestion: true,
+            accident: true,
+            construction: true,
+            weather_hazard: true,
+            safety_concern: true,
+            general_alert: true
+        },
+        severity_levels: {
+            high: true,
+            medium: true,
+            low: true
+        },
+        time_preferences: {
+            night_alerts_only: false
+        },
+        notification_channels: {
+            push: true,
+            email: false
+        }
+    });
+    const [preferencesLoading, setPreferencesLoading] = useState(false);
+
     const handleSettingsChange = (e) => {
         const { name, value, type, checked } = e.target;
         setSettingsForm(prev => ({
@@ -122,6 +151,78 @@ const ModernDashboard = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    // Fetch alert preferences
+    const fetchAlertPreferences = async () => {
+        try {
+            setPreferencesLoading(true);
+            const userId = user?.id || user?.username || 'demo_user';
+            const response = await dashboardApi.getAlertPreferences(userId);
+            
+            if (response.status === 'success') {
+                setAlertPreferences({
+                    alert_types: response.data.alert_types,
+                    severity_levels: response.data.severity_levels,
+                    time_preferences: response.data.time_preferences,
+                    notification_channels: response.data.notification_channels
+                });
+            }
+        } catch (error) {
+            console.error("Failed to fetch alert preferences:", error);
+        } finally {
+            setPreferencesLoading(false);
+        }
+    };
+
+    // Save alert preferences
+    const handleSaveAlertPreferences = async () => {
+        try {
+            setPreferencesLoading(true);
+            const userId = user?.id || user?.username || 'demo_user';
+            
+            await dashboardApi.updateAlertPreferences(userId, alertPreferences);
+            alert("Alert preferences saved successfully!");
+        } catch (error) {
+            console.error("Failed to save alert preferences:", error);
+            const details = error.response?.data?.detail || error.message;
+            alert(`Failed to save alert preferences: ${details}`);
+        } finally {
+            setPreferencesLoading(false);
+        }
+    };
+
+    // Toggle alert type preference
+    const toggleAlertType = (type) => {
+        setAlertPreferences(prev => ({
+            ...prev,
+            alert_types: {
+                ...prev.alert_types,
+                [type]: !prev.alert_types[type]
+            }
+        }));
+    };
+
+    // Toggle severity level preference
+    const toggleSeverityLevel = (level) => {
+        setAlertPreferences(prev => ({
+            ...prev,
+            severity_levels: {
+                ...prev.severity_levels,
+                [level]: !prev.severity_levels[level]
+            }
+        }));
+    };
+
+    // Toggle notification channel
+    const toggleNotificationChannel = (channel) => {
+        setAlertPreferences(prev => ({
+            ...prev,
+            notification_channels: {
+                ...prev.notification_channels,
+                [channel]: !prev.notification_channels[channel]
+            }
+        }));
     };
 
 
@@ -223,7 +324,8 @@ const ModernDashboard = () => {
         if (activeTab === 'Alerts') {
             const fetchAlerts = async () => {
                 try {
-                    const res = await dashboardApi.getRecentAlerts();
+                    const userId = user?.id || user?.username || null;
+                    const res = await dashboardApi.getRecentAlerts(10, userId);
                     if (res.data) setAlerts(res.data);
                 } catch (err) {
                     console.error("Failed to fetch alerts", err);
@@ -231,14 +333,22 @@ const ModernDashboard = () => {
             };
             fetchAlerts();
         }
-    }, [activeTab]);
+    }, [activeTab, user]);
+
+    // Fetch alert preferences when Settings tab is active
+    useEffect(() => {
+        if (activeTab === 'Settings') {
+            fetchAlertPreferences();
+        }
+    }, [activeTab, user]);
 
     // Fetch recent alerts on mount so the sidebar badge reflects actual alerts
     useEffect(() => {
         let mounted = true;
         const fetchRecent = async () => {
             try {
-                const res = await dashboardApi.getRecentAlerts(5);
+                const userId = user?.id || user?.username || null;
+                const res = await dashboardApi.getRecentAlerts(5, userId);
                 if (mounted && res.data) setAlerts(res.data);
             } catch (err) {
                 console.error('Failed to fetch recent alerts on mount', err);
@@ -247,7 +357,7 @@ const ModernDashboard = () => {
         fetchRecent();
         const iv = setInterval(fetchRecent, 30000);
         return () => { mounted = false; clearInterval(iv); };
-    }, []);
+    }, [user]);
 
     // Unified fleet data fetch and simulation
     const [fleetRiders, setFleetRiders] = useState([]);
@@ -1131,6 +1241,133 @@ const ModernDashboard = () => {
                                         disabled={loading}
                                     >
                                         Save Changes
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Alert Preferences Card */}
+                            <div className="premium-card p-8">
+                                <div className="flex items-center justify-between mb-6">
+                                    <div>
+                                        <h3 className="text-xl font-bold text-slate-800">Alert Preferences</h3>
+                                        <p className="text-sm text-slate-500 mt-1">Customize which alerts you want to receive</p>
+                                    </div>
+                                    <FiBell className="text-3xl text-indigo-600" />
+                                </div>
+
+                                {/* Alert Types */}
+                                <div className="space-y-6">
+                                    <div>
+                                        <h4 className="font-bold text-slate-700 border-b border-slate-100 pb-2 mb-4">Alert Types</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {Object.entries({
+                                                suspicious_activity: 'Suspicious Activity',
+                                                road_hazard: 'Road Hazards',
+                                                poor_lighting: 'Poor Lighting',
+                                                high_crime_area: 'High Crime Areas',
+                                                traffic_congestion: 'Traffic Congestion',
+                                                accident: 'Accidents',
+                                                construction: 'Road Construction',
+                                                weather_hazard: 'Weather Hazards',
+                                                safety_concern: 'Safety Concerns',
+                                                general_alert: 'General Alerts'
+                                            }).map(([key, label]) => (
+                                                <label key={key} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={alertPreferences.alert_types[key]}
+                                                        onChange={() => toggleAlertType(key)}
+                                                        className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                                    />
+                                                    <span className="text-sm text-slate-700">{label}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Severity Levels */}
+                                    <div>
+                                        <h4 className="font-bold text-slate-700 border-b border-slate-100 pb-2 mb-4">Severity Levels</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                            {[
+                                                { key: 'high', label: 'High Severity', color: 'text-red-600', bg: 'bg-red-50' },
+                                                { key: 'medium', label: 'Medium Severity', color: 'text-orange-600', bg: 'bg-orange-50' },
+                                                { key: 'low', label: 'Low Severity', color: 'text-blue-600', bg: 'bg-blue-50' }
+                                            ].map(({ key, label, color, bg }) => (
+                                                <label key={key} className={`flex items-center gap-3 p-4 ${bg} rounded-lg cursor-pointer hover:opacity-80 transition-opacity`}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={alertPreferences.severity_levels[key]}
+                                                        onChange={() => toggleSeverityLevel(key)}
+                                                        className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                                    />
+                                                    <span className={`text-sm font-semibold ${color}`}>{label}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Notification Channels */}
+                                    <div>
+                                        <h4 className="font-bold text-slate-700 border-b border-slate-100 pb-2 mb-4">Notification Channels</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={alertPreferences.notification_channels.push}
+                                                    onChange={() => toggleNotificationChannel('push')}
+                                                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                                />
+                                                <FiBell className="text-indigo-600" />
+                                                <span className="text-sm text-slate-700">Push Notifications</span>
+                                            </label>
+                                            <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={alertPreferences.notification_channels.email}
+                                                    onChange={() => toggleNotificationChannel('email')}
+                                                    className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                                />
+                                                <FiUser className="text-indigo-600" />
+                                                <span className="text-sm text-slate-700">Email Notifications</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    {/* Time Preferences */}
+                                    <div>
+                                        <h4 className="font-bold text-slate-700 border-b border-slate-100 pb-2 mb-4">Time Preferences</h4>
+                                        <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors">
+                                            <input
+                                                type="checkbox"
+                                                checked={alertPreferences.time_preferences.night_alerts_only}
+                                                onChange={() => setAlertPreferences(prev => ({
+                                                    ...prev,
+                                                    time_preferences: {
+                                                        ...prev.time_preferences,
+                                                        night_alerts_only: !prev.time_preferences.night_alerts_only
+                                                    }
+                                                }))}
+                                                className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                            />
+                                            <span className="text-sm text-slate-700">Only show alerts during night hours (6 PM - 6 AM)</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div className="mt-8 flex justify-end gap-4">
+                                    <button 
+                                        className="px-6 py-2 text-slate-500 font-bold hover:text-slate-800 transition-colors"
+                                        onClick={() => fetchAlertPreferences()}
+                                    >
+                                        Reset
+                                    </button>
+                                    <button
+                                        className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-50"
+                                        onClick={handleSaveAlertPreferences}
+                                        disabled={preferencesLoading}
+                                    >
+                                        {preferencesLoading ? 'Saving...' : 'Save Preferences'}
                                     </button>
                                 </div>
                             </div>

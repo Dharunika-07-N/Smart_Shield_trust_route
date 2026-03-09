@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from loguru import logger
 import random
 
-from database.models import User, Route, SafetyFeedback, DeliveryStatus, Delivery, HistoricalDelivery, CrimeData
+from database.models import User, Route, SafetyFeedback, DeliveryStatus, Delivery, HistoricalDelivery, CrimeData, AlertPreferences
 from api.services.weather import WeatherService
 from api.schemas.delivery import Coordinate
 from sqlalchemy import func
@@ -214,13 +214,21 @@ async def optimize_current_route(
 @router.get("/alerts/recent")
 async def get_recent_alerts(
     limit: int = 5,
+    user_id: Optional[str] = None,
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
-    """Get recent safety alerts."""
+    """Get recent safety alerts, filtered by user preferences if user_id provided."""
     try:
         alerts = db.query(SafetyFeedback).order_by(
             SafetyFeedback.date_submitted.desc()
-        ).limit(limit).all()
+        ).limit(limit * 3).all()  # Fetch more to account for filtering
+        
+        # Get user preferences if user_id provided
+        preferences = None
+        if user_id:
+            preferences = db.query(AlertPreferences).filter(
+                AlertPreferences.user_id == user_id
+            ).first()
         
         # Generate title based on incident type
         def get_alert_title(incident_type, feedback_type):
@@ -234,23 +242,71 @@ async def get_recent_alerts(
                 'construction': 'Road Construction',
                 'weather_hazard': 'Weather Hazard',
                 'safety': 'Safety Concern',
-                'general': 'General Alert'
+                'safety_concern': 'Safety Concern',
+                'general': 'General Alert',
+                'general_alert': 'General Alert'
             }
             return titles.get(incident_type or feedback_type, 'Safety Feedback')
         
+        # Map alert type to preference field
+        def get_preference_field(alert_type):
+            mapping = {
+                'suspicious_activity': 'suspicious_activity',
+                'road_hazard': 'road_hazard',
+                'poor_lighting': 'poor_lighting',
+                'high_crime_area': 'high_crime_area',
+                'traffic_congestion': 'traffic_congestion',
+                'accident': 'accident',
+                'construction': 'construction',
+                'weather_hazard': 'weather_hazard',
+                'safety': 'safety_concern',
+                'safety_concern': 'safety_concern',
+                'general': 'general_alert',
+                'general_alert': 'general_alert'
+            }
+            return mapping.get(alert_type, 'general_alert')
+        
         alert_data = []
         for alert in alerts:
+            alert_type = alert.incident_type or alert.feedback_type or 'general'
+            severity = "high" if alert.rating <= 2 else "medium" if alert.rating <= 3 else "low"
+            
+            # Apply preference filters if preferences exist
+            if preferences:
+                # Check alert type preference
+                pref_field = get_preference_field(alert_type)
+                if not getattr(preferences, pref_field, True):
+                    continue
+                
+                # Check severity level preference
+                if severity == "high" and not preferences.show_high_severity:
+                    continue
+                if severity == "medium" and not preferences.show_medium_severity:
+                    continue
+                if severity == "low" and not preferences.show_low_severity:
+                    continue
+                
+                # Check time preference (night alerts only)
+                if preferences.night_alerts_only:
+                    time_of_day = alert.time_of_day or "day"
+                    if time_of_day != "night":
+                        continue
+            
             # Map feedback fields to expected dashboard alert structure
             alert_data.append({
                 "id": alert.id,
-                "type": alert.incident_type or alert.feedback_type or 'general',
+                "type": alert_type,
                 "title": get_alert_title(alert.incident_type, alert.feedback_type),
                 "message": alert.comments or 'Safety feedback received',
                 "location": alert.location if isinstance(alert.location, dict) else {},
-                "severity": "high" if alert.rating <= 2 else "medium" if alert.rating <= 3 else "low",
+                "severity": severity,
                 "created_at": alert.date_submitted.isoformat() if alert.date_submitted else None,
                 "time_of_day": alert.time_of_day or "day"
             })
+            
+            # Stop if we have enough alerts
+            if len(alert_data) >= limit:
+                break
         
         return {
             "status": "success",
@@ -259,4 +315,131 @@ async def get_recent_alerts(
         }
     except Exception as e:
         logger.error(f"Error fetching alerts: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/alert-preferences/{user_id}")
+async def get_alert_preferences(
+    user_id: str,
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """Get user's alert notification preferences."""
+    try:
+        # Check if preferences exist
+        preferences = db.query(AlertPreferences).filter(
+            AlertPreferences.user_id == user_id
+        ).first()
+        
+        # If no preferences exist, create default ones
+        if not preferences:
+            preferences = AlertPreferences(user_id=user_id)
+            db.add(preferences)
+            db.commit()
+            db.refresh(preferences)
+        
+        return {
+            "status": "success",
+            "data": {
+                "user_id": preferences.user_id,
+                "alert_types": {
+                    "suspicious_activity": preferences.suspicious_activity,
+                    "road_hazard": preferences.road_hazard,
+                    "poor_lighting": preferences.poor_lighting,
+                    "high_crime_area": preferences.high_crime_area,
+                    "traffic_congestion": preferences.traffic_congestion,
+                    "accident": preferences.accident,
+                    "construction": preferences.construction,
+                    "weather_hazard": preferences.weather_hazard,
+                    "safety_concern": preferences.safety_concern,
+                    "general_alert": preferences.general_alert
+                },
+                "severity_levels": {
+                    "high": preferences.show_high_severity,
+                    "medium": preferences.show_medium_severity,
+                    "low": preferences.show_low_severity
+                },
+                "time_preferences": {
+                    "night_alerts_only": preferences.night_alerts_only
+                },
+                "notification_channels": {
+                    "push": preferences.push_notifications,
+                    "email": preferences.email_notifications
+                },
+                "updated_at": preferences.updated_at.isoformat() if preferences.updated_at else None
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error fetching alert preferences: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class AlertPreferencesUpdate(BaseModel):
+    """Schema for updating alert preferences."""
+    alert_types: Optional[Dict[str, bool]] = None
+    severity_levels: Optional[Dict[str, bool]] = None
+    time_preferences: Optional[Dict[str, bool]] = None
+    notification_channels: Optional[Dict[str, bool]] = None
+
+
+@router.put("/alert-preferences/{user_id}")
+async def update_alert_preferences(
+    user_id: str,
+    preferences_update: AlertPreferencesUpdate,
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """Update user's alert notification preferences."""
+    try:
+        # Get or create preferences
+        preferences = db.query(AlertPreferences).filter(
+            AlertPreferences.user_id == user_id
+        ).first()
+        
+        if not preferences:
+            preferences = AlertPreferences(user_id=user_id)
+            db.add(preferences)
+        
+        # Update alert types
+        if preferences_update.alert_types:
+            for alert_type, enabled in preferences_update.alert_types.items():
+                if hasattr(preferences, alert_type):
+                    setattr(preferences, alert_type, enabled)
+        
+        # Update severity levels
+        if preferences_update.severity_levels:
+            severity_map = {
+                "high": "show_high_severity",
+                "medium": "show_medium_severity",
+                "low": "show_low_severity"
+            }
+            for severity, enabled in preferences_update.severity_levels.items():
+                db_field = severity_map.get(severity)
+                if db_field:
+                    setattr(preferences, db_field, enabled)
+        
+        # Update time preferences
+        if preferences_update.time_preferences:
+            if "night_alerts_only" in preferences_update.time_preferences:
+                preferences.night_alerts_only = preferences_update.time_preferences["night_alerts_only"]
+        
+        # Update notification channels
+        if preferences_update.notification_channels:
+            if "push" in preferences_update.notification_channels:
+                preferences.push_notifications = preferences_update.notification_channels["push"]
+            if "email" in preferences_update.notification_channels:
+                preferences.email_notifications = preferences_update.notification_channels["email"]
+        
+        db.commit()
+        db.refresh(preferences)
+        
+        return {
+            "status": "success",
+            "message": "Alert preferences updated successfully",
+            "data": {
+                "user_id": preferences.user_id,
+                "updated_at": preferences.updated_at.isoformat()
+            }
+        }
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating alert preferences: {e}")
         raise HTTPException(status_code=500, detail=str(e))

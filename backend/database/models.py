@@ -431,6 +431,41 @@ class DeliveryFeedback(Base):
     
     # Comments
     feedback_text = Column(String, nullable=True)
+
+
+class AlertPreferences(Base):
+    """Alert notification preferences for riders."""
+    __tablename__ = "alert_preferences"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), unique=True, index=True)
+    
+    # Alert type preferences (enabled/disabled)
+    suspicious_activity = Column(Boolean, default=True)
+    road_hazard = Column(Boolean, default=True)
+    poor_lighting = Column(Boolean, default=True)
+    high_crime_area = Column(Boolean, default=True)
+    traffic_congestion = Column(Boolean, default=True)
+    accident = Column(Boolean, default=True)
+    construction = Column(Boolean, default=True)
+    weather_hazard = Column(Boolean, default=True)
+    safety_concern = Column(Boolean, default=True)
+    general_alert = Column(Boolean, default=True)
+    
+    # Severity level preferences
+    show_high_severity = Column(Boolean, default=True)
+    show_medium_severity = Column(Boolean, default=True)
+    show_low_severity = Column(Boolean, default=True)
+    
+    # Time-based preferences
+    night_alerts_only = Column(Boolean, default=False)  # Only show alerts during night hours
+    
+    # Notification preferences
+    push_notifications = Column(Boolean, default=True)
+    email_notifications = Column(Boolean, default=False)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Metadata
     submitted_at = Column(DateTime, default=datetime.utcnow)
