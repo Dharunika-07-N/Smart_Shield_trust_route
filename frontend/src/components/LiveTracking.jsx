@@ -236,15 +236,7 @@ const LiveTracking = ({ deliveryId: propDeliveryId, isRider = false }) => {
             {isSimulating ? '⏳ Simulating…' : '▶ Demo GPS'}
           </button>
         )}
-        <div style={{
-          flex: '1 1 100%', padding: '8px 14px',
-          background: '#f0f4ff', borderRadius: 8, border: '1px solid #c7d2fe'
-        }}>
-          <p style={{ margin: 0, fontSize: 11, color: '#4338ca', fontWeight: 600 }}>
-            🏗️ <strong>Architecture:</strong> Rider GPS → Backend → WebSocket push → Marker update (no page reload).
-            Location stored in <strong>in-memory cache</strong> for instant access. DB not on hot path.
-          </p>
-        </div>
+
       </div>
 
       {/* ══ ALERTS ════════════════════════════════════════════════════════════ */}
@@ -459,32 +451,6 @@ const LiveTracking = ({ deliveryId: propDeliveryId, isRider = false }) => {
         </div>
       </div>
 
-      {/* ══ ARCHITECTURE CARD ═════════════════════════════════════════════════ */}
-      <div style={{
-        marginTop: 16, padding: 20,
-        background: 'linear-gradient(135deg,#1e1b4b,#312e81)',
-        borderRadius: 16, border: 'none'
-      }}>
-        <p style={{ margin: '0 0 14px', fontSize: 11, fontWeight: 800, color: '#c7d2fe', textTransform: 'uppercase', letterSpacing: 1 }}>
-          ⚡ System Architecture — How Real-Time GPS Works
-        </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 12 }}>
-          {[
-            { icon: '📱', title: 'GPS Events', desc: 'Rider sends coords every 5-15s via lightweight POST' },
-            { icon: '⚡', title: 'Push-Based', desc: 'Backend pushes via WebSocket — no polling, no page refresh' },
-            { icon: '🔑', title: 'Per-Order Channel', desc: 'order_id → isolated WS channel. Only relevant users receive updates' },
-            { icon: '📦', title: 'In-Memory Cache', desc: 'Latest location in dict (Redis-like). DB not on hot path' },
-            { icon: '🗺️', title: 'Marker-Only Update', desc: 'Only the rider dot moves. Map tiles never reload' },
-            { icon: '🌐', title: 'SSE Fallback', desc: 'If WS is blocked, EventSource takes over automatically' },
-          ].map(({ icon, title, desc }) => (
-            <div key={title} style={{ background: 'rgba(255,255,255,.08)', borderRadius: 10, padding: '12px 14px' }}>
-              <p style={{ margin: '0 0 4px', fontSize: 18 }}>{icon}</p>
-              <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 800, color: '#e0e7ff' }}>{title}</p>
-              <p style={{ margin: 0, fontSize: 11, color: '#a5b4fc', lineHeight: 1.5 }}>{desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 };
