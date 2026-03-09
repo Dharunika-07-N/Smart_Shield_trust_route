@@ -54,6 +54,7 @@ const ModernDashboard = () => {
         vehicle_number: 'TN-01-AB-1234',
         emergency_contact_name: 'Rahul Kumar',
         emergency_contact_phone: '+91 98765 43210',
+        emergency_contact_email: user?.emergency_contact_email || user?.emergency_email || 'dharunika0708@gmail.com',
         share_location: true
     });
 
@@ -74,7 +75,8 @@ const ModernDashboard = () => {
                 emergency_contacts: [
                     {
                         name: settingsForm.emergency_contact_name,
-                        phone: settingsForm.emergency_contact_phone
+                        phone: settingsForm.emergency_contact_phone,
+                        email: settingsForm.emergency_contact_email
                     }
                 ],
                 theme: 'light',
@@ -385,7 +387,8 @@ const ModernDashboard = () => {
                     rider_id: riderId,
                     location: { latitude: currentLocation?.latitude || 13.0827, longitude: currentLocation?.longitude || 80.2707 },
                     route_id: "current_route",
-                    delivery_id: null
+                    delivery_id: null,
+                    emergency_email: settingsForm.emergency_contact_email || 'dharunika0708@gmail.com'
                 });
 
                 setSosActive(true);
@@ -661,7 +664,7 @@ const ModernDashboard = () => {
                                                     };
 
                                                     return (
-                                                        <div key={del.id || idx} className="bg-slate-50 border border-slate-100 rounded-2xl p-4 hover:border-slate-200 transition-all group">
+                                                        <div key={del.id || idx} className="bg-slate-50 border border-slate-100 rounded-2xl p-4 hover:border-slate-200 transition-all group cursor-pointer" onClick={() => alert(`Delivery Information:\n- Order ID: ${del.id}\n- Customer: ${del.customer_name}\n- Destination: ${del.address}\n- Status: ${del.status}\n- Priority: ${del.priority}\n- Estimated Time: ${del.estimated_time}\n- Distance: ${del.distance}\n- Safety Score: ${del.safety_score}`)}>
                                                             <div className="flex items-start justify-between mb-4">
                                                                 <div className="flex items-center gap-3">
                                                                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{del.id}</div>
@@ -921,6 +924,16 @@ const ModernDashboard = () => {
                                                 type="tel"
                                                 name="emergency_contact_phone"
                                                 value={settingsForm.emergency_contact_phone}
+                                                onChange={handleSettingsChange}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Primary Contact Email</label>
+                                            <input
+                                                type="email"
+                                                name="emergency_contact_email"
+                                                value={settingsForm.emergency_contact_email}
                                                 onChange={handleSettingsChange}
                                                 className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-indigo-500"
                                             />
