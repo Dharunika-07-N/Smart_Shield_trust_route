@@ -95,7 +95,8 @@ async def trigger_panic_button(
             rider_id=request.rider_id,
             location=request.location,
             route_id=request.route_id,
-            delivery_id=request.delivery_id
+            delivery_id=request.delivery_id,
+            emergency_email=request.emergency_email
         )
         return PanicButtonResponse(**result)
     except Exception as e:
