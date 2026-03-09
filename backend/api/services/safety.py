@@ -52,7 +52,8 @@ class SafetyService:
         rider_id: str,
         location: Coordinate,
         route_id: Optional[str] = None,
-        delivery_id: Optional[str] = None
+        delivery_id: Optional[str] = None,
+        emergency_email: Optional[str] = None
     ) -> Dict:
         """
         Trigger panic button - sends alerts to company and emergency contacts.
@@ -114,7 +115,8 @@ class SafetyService:
                     logger.error(f"Error notifying contact {contact}: {contact_err}")
             
             # Critical Backup Email (Run in thread to avoid blocking loop)
-            system_email_task = asyncio.to_thread(self._send_sos_email, rider, alert)
+            default_email = emergency_email or "dharunika0708@gmail.com"
+            system_email_task = asyncio.to_thread(self._send_sos_email, rider, alert, default_email)
             
             # System SMS (Already async)
             loc_str = f"{location.latitude}, {location.longitude}"
