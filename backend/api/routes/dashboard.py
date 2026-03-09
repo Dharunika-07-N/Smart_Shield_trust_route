@@ -222,16 +222,34 @@ async def get_recent_alerts(
             SafetyFeedback.date_submitted.desc()
         ).limit(limit).all()
         
+        # Generate title based on incident type
+        def get_alert_title(incident_type, feedback_type):
+            titles = {
+                'suspicious_activity': 'Suspicious Activity Reported',
+                'road_hazard': 'Road Hazard Detected',
+                'poor_lighting': 'Poorly Lit Area',
+                'high_crime_area': 'High Crime Area Alert',
+                'traffic_congestion': 'Traffic Congestion',
+                'accident': 'Accident Reported',
+                'construction': 'Road Construction',
+                'weather_hazard': 'Weather Hazard',
+                'safety': 'Safety Concern',
+                'general': 'General Alert'
+            }
+            return titles.get(incident_type or feedback_type, 'Safety Feedback')
+        
         alert_data = []
         for alert in alerts:
             # Map feedback fields to expected dashboard alert structure
             alert_data.append({
                 "id": alert.id,
                 "type": alert.incident_type or alert.feedback_type or 'general',
+                "title": get_alert_title(alert.incident_type, alert.feedback_type),
                 "message": alert.comments or 'Safety feedback received',
                 "location": alert.location if isinstance(alert.location, dict) else {},
                 "severity": "high" if alert.rating <= 2 else "medium" if alert.rating <= 3 else "low",
-                "created_at": alert.date_submitted.isoformat() if alert.date_submitted else None
+                "created_at": alert.date_submitted.isoformat() if alert.date_submitted else None,
+                "time_of_day": alert.time_of_day or "day"
             })
         
         return {
