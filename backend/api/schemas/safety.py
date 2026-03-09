@@ -78,6 +78,7 @@ class PanicButtonRequest(BaseModel):
     location: Coordinate
     route_id: Optional[str] = None
     delivery_id: Optional[str] = None
+    emergency_email: Optional[str] = None
 
 
 class PanicButtonResponse(BaseModel):
