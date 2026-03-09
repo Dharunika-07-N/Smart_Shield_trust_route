@@ -4,7 +4,7 @@ import {
     FiShield, FiMap, FiPackage, FiZap, FiAlertTriangle, FiBarChart2,
     FiSettings, FiMessageSquare, FiSearch, FiBell, FiUser, FiChevronRight,
     FiNavigation, FiClock, FiWind, FiDroplet, FiEye, FiActivity, FiLayers,
-    FiPlus, FiMinus, FiTarget, FiPhone, FiMapPin, FiLogOut
+    FiPlus, FiMinus, FiTarget, FiPhone, FiMapPin, FiLogOut, FiRefreshCw, FiCheckCircle
 } from 'react-icons/fi';
 import RouteMap from './RouteMap';
 import L from 'leaflet';
@@ -21,9 +21,9 @@ import { useAuth } from '../context/AuthContext';
 // Helper function for relative time formatting
 const getTimeAgo = (date) => {
     if (!date || !(date instanceof Date) || isNaN(date)) return 'Unknown time';
-    
+
     const seconds = Math.floor((new Date() - date) / 1000);
-    
+
     const intervals = {
         year: 31536000,
         month: 2592000,
@@ -32,14 +32,14 @@ const getTimeAgo = (date) => {
         hour: 3600,
         minute: 60
     };
-    
+
     for (const [unit, secondsInUnit] of Object.entries(intervals)) {
         const interval = Math.floor(seconds / secondsInUnit);
         if (interval >= 1) {
             return `${interval} ${unit}${interval > 1 ? 's' : ''} ago`;
         }
     }
-    
+
     return 'Just now';
 };
 
@@ -66,6 +66,8 @@ const ModernDashboard = () => {
     const [showMapLayers, setShowMapLayers] = useState(false);
     const [deliveryPartnerMarkers, setDeliveryPartnerMarkers] = useState([]);
     const [alerts, setAlerts] = useState([]);
+    const [severityFilter, setSeverityFilter] = useState('all');
+    const [alertSearch, setAlertSearch] = useState('');
 
     // SOS State
     const [sosActive, setSosActive] = useState(false);
@@ -159,7 +161,7 @@ const ModernDashboard = () => {
             setPreferencesLoading(true);
             const userId = user?.id || user?.username || 'demo_user';
             const response = await dashboardApi.getAlertPreferences(userId);
-            
+
             if (response.status === 'success') {
                 setAlertPreferences({
                     alert_types: response.data.alert_types,
@@ -180,7 +182,7 @@ const ModernDashboard = () => {
         try {
             setPreferencesLoading(true);
             const userId = user?.id || user?.username || 'demo_user';
-            
+
             await dashboardApi.updateAlertPreferences(userId, alertPreferences);
             alert("Alert preferences saved successfully!");
         } catch (error) {
@@ -994,62 +996,111 @@ const ModernDashboard = () => {
                     {activeTab === 'Analytics' && <Analytics />}
                     {activeTab === 'Safety Zones' && <RouteMap showSafeZones={true} />}
                     {activeTab === 'Alerts' && (
-                        <div className="space-y-6">
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             {/* Alerts Header with Filters */}
                             <div className="premium-card p-6">
-                                <div className="flex items-center justify-between mb-6">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                                     <div>
                                         <h3 className="text-2xl font-bold text-slate-800">Safety Alerts</h3>
                                         <p className="text-sm text-slate-500 mt-1">
-                                            {alerts.length} {alerts.length === 1 ? 'alert' : 'alerts'} found
+                                            {alerts.filter(a =>
+                                                (severityFilter === 'all' || (a.severity || 'low') === severityFilter) &&
+                                                (a.message?.toLowerCase().includes(alertSearch.toLowerCase()) ||
+                                                    a.type?.toLowerCase().includes(alertSearch.toLowerCase()))
+                                            ).length} alerts found matching your filters
                                         </p>
                                     </div>
-                                    <button
-                                        onClick={() => window.location.reload()}
-                                        className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors text-sm font-semibold"
-                                    >
-                                        <FiRefreshCw size={16} />
-                                        Refresh
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => {
+                                                if (window.confirm('Mark all alerts as acknowledged?')) {
+                                                    setAlerts([]);
+                                                }
+                                            }}
+                                            className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors text-sm font-semibold"
+                                        >
+                                            <FiCheckCircle size={16} />
+                                            Mark All Read
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                const fetchRecent = async () => {
+                                                    try {
+                                                        const userId = user?.id || user?.username || null;
+                                                        const res = await dashboardApi.getRecentAlerts(10, userId);
+                                                        if (res.data) setAlerts(res.data);
+                                                    } catch (err) {
+                                                        console.error('Failed to refresh alerts', err);
+                                                    }
+                                                };
+                                                fetchRecent();
+                                            }}
+                                            className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors text-sm font-semibold"
+                                        >
+                                            <FiRefreshCw size={16} />
+                                            Refresh
+                                        </button>
+                                    </div>
                                 </div>
 
-                                {/* Filter Buttons */}
-                                <div className="flex flex-wrap gap-2 mb-4">
-                                    {['all', 'high', 'medium', 'low'].map(sev => (
-                                        <button
-                                            key={sev}
-                                            onClick={() => {
-                                                const filterBtn = document.getElementById('severity-filter');
-                                                if (filterBtn) filterBtn.dataset.filter = sev;
-                                                setAlerts([...alerts]);
-                                            }}
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                                                sev === 'all' ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' :
-                                                sev === 'high' ? 'bg-red-50 text-red-600 hover:bg-red-100' :
-                                                sev === 'medium' ? 'bg-orange-50 text-orange-600 hover:bg-orange-100' :
-                                                'bg-blue-50 text-blue-600 hover:bg-blue-100'
-                                            }`}
-                                        >
-                                            {sev === 'all' ? 'All' : sev.charAt(0).toUpperCase() + sev.slice(1)} Severity
-                                        </button>
-                                    ))}
+                                <div className="flex flex-col lg:flex-row gap-4">
+                                    {/* Search input for alerts */}
+                                    <div className="relative flex-1">
+                                        <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Filter alerts by keyword or type..."
+                                            value={alertSearch}
+                                            onChange={(e) => setAlertSearch(e.target.value)}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-indigo-500 transition-all"
+                                        />
+                                    </div>
+
+                                    {/* Filter Buttons */}
+                                    <div className="flex flex-wrap gap-2">
+                                        {['all', 'high', 'medium', 'low'].map(sev => (
+                                            <button
+                                                key={sev}
+                                                onClick={() => setSeverityFilter(sev)}
+                                                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all border ${severityFilter === sev
+                                                        ? (sev === 'all' ? 'bg-slate-800 text-white border-slate-800' :
+                                                            sev === 'high' ? 'bg-red-600 text-white border-red-600' :
+                                                                sev === 'medium' ? 'bg-orange-500 text-white border-orange-500' :
+                                                                    'bg-blue-600 text-white border-blue-600')
+                                                        : (sev === 'all' ? 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100' :
+                                                            sev === 'high' ? 'bg-red-50 text-red-600 border-red-100 hover:bg-red-100' :
+                                                                sev === 'medium' ? 'bg-orange-50 text-orange-600 border-orange-100 hover:bg-orange-100' :
+                                                                    'bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100')
+                                                    }`}
+                                            >
+                                                {sev === 'all' ? 'All Alerts' : sev.charAt(0).toUpperCase() + sev.slice(1)}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
-                                <div id="severity-filter" data-filter="all" style={{ display: 'none' }}></div>
                             </div>
 
                             {/* Alerts List */}
-                            <div className="space-y-3">
-                                {alerts.length > 0 ? (
-                                    alerts.map((alert, idx) => {
+                            <div className="space-y-4">
+                                {alerts.filter(a =>
+                                    (severityFilter === 'all' || (a.severity || 'low') === severityFilter) &&
+                                    (a.message?.toLowerCase().includes(alertSearch.toLowerCase()) ||
+                                        a.type?.toLowerCase().includes(alertSearch.toLowerCase()))
+                                ).length > 0 ? (
+                                    alerts.filter(a =>
+                                        (severityFilter === 'all' || (a.severity || 'low') === severityFilter) &&
+                                        (a.message?.toLowerCase().includes(alertSearch.toLowerCase()) ||
+                                            a.type?.toLowerCase().includes(alertSearch.toLowerCase()))
+                                    ).map((alert, idx) => {
                                         const severity = alert.severity || 'low';
                                         const createdAt = alert.created_at || alert.timestamp;
                                         const timeAgo = createdAt ? getTimeAgo(new Date(createdAt)) : 'Unknown time';
-                                        
+
                                         // Severity styling
                                         const severityStyles = {
-                                            high: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', icon: 'text-red-500' },
-                                            medium: { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', icon: 'text-orange-500' },
-                                            low: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', icon: 'text-blue-500' }
+                                            high: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', icon: 'text-red-500', shadow: 'shadow-red-900/5' },
+                                            medium: { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', icon: 'text-orange-500', shadow: 'shadow-orange-900/5' },
+                                            low: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', icon: 'text-blue-500', shadow: 'shadow-blue-900/5' }
                                         };
                                         const style = severityStyles[severity] || severityStyles.low;
 
@@ -1065,24 +1116,32 @@ const ModernDashboard = () => {
                                         return (
                                             <div
                                                 key={alert.id || idx}
-                                                className={`premium-card p-5 border-l-4 ${style.border} ${style.bg} transition-all hover:shadow-lg`}
+                                                className={`premium-card p-5 border-l-4 ${style.border} ${style.bg} transition-all hover:shadow-xl hover:scale-[1.01] ${style.shadow} group overflow-hidden relative`}
                                             >
-                                                <div className="flex items-start gap-4">
-                                                    <div className={`w-10 h-10 rounded-full ${style.bg} border-2 ${style.border} flex items-center justify-center flex-shrink-0`}>
-                                                        <AlertIcon className={`${style.icon} text-lg`} />
+                                                {/* Decorative background pulse for high severity */}
+                                                {severity === 'high' && (
+                                                    <div className="absolute inset-0 bg-red-400/5 animate-pulse pointer-events-none"></div>
+                                                )}
+
+                                                <div className="flex items-start gap-4 relative z-10">
+                                                    <div className={`w-12 h-12 rounded-xl ${style.bg} border-2 ${style.border} flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform`}>
+                                                        <AlertIcon className={`${style.icon} text-xl`} />
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-start justify-between gap-3 mb-2">
                                                             <div>
-                                                                <div className="flex items-center gap-2 mb-1">
-                                                                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${style.bg} ${style.text} border ${style.border}`}>
+                                                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                                                    <span className={`text-[10px] font-black uppercase tracking-tighter px-2 py-0.5 rounded-full border shadow-sm ${severity === 'high' ? 'bg-red-600 text-white border-red-700' :
+                                                                            severity === 'medium' ? 'bg-orange-500 text-white border-orange-600' :
+                                                                                'bg-blue-600 text-white border-blue-700'
+                                                                        }`}>
                                                                         {severity} severity
                                                                     </span>
-                                                                    <span className="text-xs text-slate-500">
+                                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-white/50 px-2 py-0.5 rounded border border-slate-100">
                                                                         {alert.type?.replace(/_/g, ' ') || 'General'}
                                                                     </span>
                                                                 </div>
-                                                                <p className={`font-bold text-base ${style.text}`}>
+                                                                <p className={`font-black text-lg leading-tight mb-1 ${style.text}`}>
                                                                     {alert.message || 'Safety alert received'}
                                                                 </p>
                                                             </div>
@@ -1092,31 +1151,41 @@ const ModernDashboard = () => {
                                                                         setAlerts(alerts.filter(a => a.id !== alert.id));
                                                                     }
                                                                 }}
-                                                                className="text-slate-400 hover:text-slate-600 transition-colors"
+                                                                className="w-10 h-10 flex items-center justify-center rounded-full text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 transition-all group-hover:text-slate-500"
                                                                 title="Acknowledge & dismiss"
                                                             >
-                                                                <FiCheckCircle size={18} />
+                                                                <FiCheckCircle size={22} className="group-hover:scale-110 transition-transform" />
                                                             </button>
                                                         </div>
-                                                        
+
                                                         {/* Location if available */}
-                                                        {alert.location && (alert.location.area || alert.location.address) && (
-                                                            <div className="flex items-center gap-1.5 text-xs text-slate-600 mb-2">
-                                                                <FiMapPin size={12} className="text-slate-400" />
-                                                                <span>{alert.location.area || alert.location.address}</span>
+                                                        {alert.location && (alert.location.area || alert.location.address || alert.location.lat) && (
+                                                            <div className="flex items-center gap-2 bg-white/40 p-2 rounded-lg border border-white/50 mb-3 w-fit">
+                                                                <div className={`p-1.5 rounded-md ${style.bg} ${style.icon}`}>
+                                                                    <FiMapPin size={14} />
+                                                                </div>
+                                                                <span className="text-xs font-bold text-slate-600">
+                                                                    {alert.location.area || alert.location.address || `${alert.location.lat.toFixed(4)}, ${alert.location.lng.toFixed(4)}`}
+                                                                </span>
                                                             </div>
                                                         )}
-                                                        
-                                                        <div className="flex items-center gap-3 text-xs text-slate-500">
-                                                            <div className="flex items-center gap-1">
-                                                                <FiClock size={12} />
-                                                                {timeAgo}
-                                                            </div>
-                                                            {createdAt && (
-                                                                <div className="text-[10px] opacity-60">
-                                                                    {new Date(createdAt).toLocaleString()}
+
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <FiClock size={12} className="text-indigo-400" />
+                                                                    {timeAgo}
                                                                 </div>
-                                                            )}
+                                                                {createdAt && (
+                                                                    <div className="hidden sm:block opacity-60">
+                                                                        {new Date(createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <button className="text-[10px] font-bold text-indigo-600 hover:underline">View on Map</button>
+                                                                <button className="text-[10px] font-bold text-slate-500 hover:underline">Report Incorrect</button>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1124,14 +1193,21 @@ const ModernDashboard = () => {
                                         );
                                     })
                                 ) : (
-                                    <div className="premium-card p-12 text-center">
-                                        <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-emerald-50 flex items-center justify-center">
-                                            <FiCheckCircle className="text-4xl text-emerald-500" />
+                                    <div className="premium-card p-16 text-center animate-in zoom-in duration-500">
+                                        <div className="w-24 h-24 mx-auto mb-6 rounded-3xl bg-emerald-500/10 flex items-center justify-center relative">
+                                            <FiCheckCircle className="text-5xl text-emerald-500 relative z-10" />
+                                            <div className="absolute inset-0 bg-emerald-500/5 rounded-3xl animate-ping opacity-20"></div>
                                         </div>
-                                        <h4 className="text-lg font-bold text-slate-800 mb-2">All Clear!</h4>
-                                        <p className="text-sm text-slate-500">
-                                            No safety alerts at this time. Stay vigilant and report any concerns.
+                                        <h4 className="text-2xl font-black text-slate-800 mb-2">All Safe & Sound!</h4>
+                                        <p className="text-slate-500 max-w-md mx-auto">
+                                            No {severityFilter !== 'all' ? `${severityFilter} severity` : ''} alerts found {alertSearch ? `matching "${alertSearch}"` : 'in your area'}. Your trust route is currently clear.
                                         </p>
+                                        <button
+                                            onClick={() => { setSeverityFilter('all'); setAlertSearch(''); }}
+                                            className="mt-6 text-sm font-bold text-indigo-600 hover:text-indigo-700"
+                                        >
+                                            Clear all filters
+                                        </button>
                                     </div>
                                 )}
                             </div>
@@ -1356,7 +1432,7 @@ const ModernDashboard = () => {
                                 </div>
 
                                 <div className="mt-8 flex justify-end gap-4">
-                                    <button 
+                                    <button
                                         className="px-6 py-2 text-slate-500 font-bold hover:text-slate-800 transition-colors"
                                         onClick={() => fetchAlertPreferences()}
                                     >

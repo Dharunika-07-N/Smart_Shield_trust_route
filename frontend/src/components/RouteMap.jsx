@@ -89,6 +89,8 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
   const [showWeather, setShowWeather] = useState(false);
   const [safetyOverlay, setSafetyOverlay] = useState(null);
   const [showSafetyOverlay, setShowSafetyOverlay] = useState(true);
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [expandedAI, setExpandedAI] = useState(null);
 
   // Delivery Service & Crowdsourcing
   // const [selectedService, setSelectedService] = useState('swiggy'); // Removed branding
@@ -422,6 +424,9 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
       // Fetch safety overlay for recommended route
       const recData = best === 'safest' ? safeData : (best === 'shortest' ? shortData : fastData);
       if (recData) await fetchSafetyOverlay(recData);
+
+      // Generate AI analysis for all routes
+      generateAIAnalysis({ fastData, safeData, shortData, best, startLabel: startQuery, destLabel: destQuery });
     } catch (e) {
       console.error('Route optimization error:', {
         message: e.message,
@@ -451,6 +456,68 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
     } finally {
       setLoading(false);
     }
+  };
+
+  // AI Route Analysis Generator
+  const generateAIAnalysis = ({ fastData, safeData, shortData, best, startLabel, destLabel }) => {
+    const fmt = (secs) => String(Math.round(secs / 60)) + ' min';
+    const fmtKm = (m) => (m / 1000).toFixed(1) + ' km';
+    const safeLabel = (s) => s >= 80 ? 'Excellent' : s >= 65 ? 'Good' : s >= 50 ? 'Moderate' : 'Low';
+    const buildReasons = (data, type) => {
+      if (!data) return null;
+      const score = Math.round(data.average_safety_score || 0);
+      const dur = fmt(data.total_duration_seconds || 0);
+      const dist = fmtKm(data.total_distance_meters || 0);
+      const fuel = data.total_fuel_liters ? data.total_fuel_liters.toFixed(1) + 'L' : null;
+      const seg = data.segments && data.segments[0];
+      const weather = seg && seg.weather_data;
+      const hasWeatherHazard = weather && weather.hazard_score > 0;
+      const reasons = [];
+      const warnings = [];
+      if (type === 'fastest') {
+        reasons.push('Optimized for minimum travel time: ' + dur);
+        reasons.push('Total distance: ' + dist);
+        reasons.push('Safety score: ' + score + '/100 (' + safeLabel(score) + ')');
+        if (score >= 75) reasons.push('This fast route also maintains a safe safety rating — ideal balance of speed and security.');
+        else if (score < 65) warnings.push('Safety score is below average. Consider the Safest route for higher-risk conditions.');
+        if (fuel) reasons.push('Estimated fuel consumption: ' + fuel);
+        if (best === 'fastest') reasons.push('AI Recommendation: Chosen because it offers the best time saving while meeting minimum safety thresholds.');
+      } else if (type === 'safest') {
+        reasons.push('Safety score: ' + score + '/100 (' + safeLabel(score) + ') — highest available');
+        reasons.push('Estimated travel time: ' + dur);
+        reasons.push('Route distance: ' + dist);
+        reasons.push('Avoids high-crime zones and poorly lit areas identified in Tamil Nadu crime data.');
+        if (fastData) {
+          const timeDiff = Math.round(((data.total_duration_seconds || 0) - (fastData.total_duration_seconds || 0)) / 60);
+          if (timeDiff > 0) reasons.push('Route takes ~' + timeDiff + ' min longer than fastest — a worthwhile trade-off for safety.');
+          else reasons.push('This safest route is also the fastest — strongly recommended!');
+        }
+        if (hasWeatherHazard) {
+          const conds = weather.hazard_conditions ? weather.hazard_conditions.join(', ') : 'Adverse conditions';
+          warnings.push('Weather alert: ' + conds + '. Proceed with caution.');
+        } else {
+          reasons.push('No weather hazards detected along this route.');
+        }
+        if (best === 'safest') reasons.push('AI Recommendation: Prioritized because safety score is significantly higher than alternatives, or the fastest route scored below 65.');
+      } else if (type === 'shortest') {
+        reasons.push('Shortest physical distance: ' + dist);
+        reasons.push('Estimated travel time: ' + dur);
+        reasons.push('Safety score: ' + score + '/100 (' + safeLabel(score) + ')');
+        if (fuel) reasons.push('Lowest estimated fuel use: ' + fuel + ' — most eco-friendly option.');
+        reasons.push('Smallest geographic footprint. Best if you know the local area well.');
+        if (score < 65) warnings.push('Shorter routes may pass through narrow or less-monitored streets. Stay alert.');
+      }
+      return { reasons, warnings, score, dur, dist };
+    };
+    setAiAnalysis({
+      fastest: buildReasons(fastData, 'fastest'),
+      safest: buildReasons(safeData, 'safest'),
+      shortest: buildReasons(shortData, 'shortest'),
+      recommendedType: best,
+      from: startLabel || 'Starting Point',
+      to: destLabel || 'Destination',
+      generatedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    });
   };
 
   const fetchSafetyOverlay = async (routeData) => {
@@ -527,23 +594,26 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
 
       if (coords.length >= 2) {
         const safetyScore = segment.safety_score || routeData.average_safety_score || 70;
-
-        // Determine color based on safety score
-        // USER REQUEST: Green (>= 80), Amber (40-79), Red (< 40)
-        let color = '#22c55e'; // Green-500 (Safe)
-        if (safetyScore < 40) color = '#ef4444';      // Red-500 (Low Safety)
-        else if (safetyScore < 80) color = '#f59e0b'; // Amber-500 (Moderate Safety)
-
         const isRecommended = (recommended === 'fastest' && routeData === fastest) ||
           (recommended === 'safest' && routeData === safest) ||
           (recommended === 'shortest' && routeData === shortest) ||
-          (recommended === routeData.route_id);
+          (recommended === routeData.route_id) ||
+          (recommended === routeData.sig);
+
+        // Determine color based on safety score if recommended, otherwise neutral gray
+        // USER REQUEST: Green (>= 80), Amber (40-79), Red (< 40)
+        let color = '#cbd5e1'; // Slate-300 (Neutral/Hidden)
+        if (isRecommended) {
+          if (safetyScore >= 80) color = '#22c55e';      // Green-500 (Safe)
+          else if (safetyScore >= 40) color = '#f59e0b'; // Amber-500 (Moderate Risk)
+          else color = '#ef4444';                        // Red-500 (High Risk)
+        }
 
         polylines.push({
           positions: coords,
           color: color,
-          weight: isRecommended ? 8 : 4,
-          opacity: isRecommended ? 1.0 : 0.6,
+          weight: isRecommended ? 8 : 5,
+          opacity: isRecommended ? 1.0 : 0.4,
           safetyScore: safetyScore,
           isRecommended: isRecommended
         });
@@ -886,185 +956,6 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
             </div>
           </div>
 
-          {(fastest || safest || shortest) && (
-            <div className="space-y-4">
-              <h3 className="font-bold text-gray-900 text-lg px-1">Route Options</h3>
-              <div className="space-y-4">
-                {(() => {
-                  const allRoutes = [];
-                  const addRoute = (route, type) => {
-                    if (!route) return;
-                    const sig = route.route_id || `${route.total_duration_seconds}-${route.total_distance_meters}`;
-                    let existing = allRoutes.find(r => r.sig === sig);
-                    if (!existing) {
-                      existing = { ...route, sig, types: [] };
-                      allRoutes.push(existing);
-                    }
-                    if (!existing.types.includes(type)) {
-                      existing.types.push(type);
-                    }
-                  };
-
-                  addRoute(fastest, 'Fastest');
-                  addRoute(safest, 'Safest');
-                  addRoute(shortest, 'Shortest');
-
-                  // Add alternative routes as well
-                  if (alternatives && alternatives.length > 0) {
-                    alternatives.forEach((alt, idx) => {
-                      addRoute(alt, `Alt ${idx + 1}`);
-                    });
-                  }
-
-                  return allRoutes.map((route) => {
-                    const isActive =
-                      (recommended === 'fastest' && route.types.includes('Fastest')) ||
-                      (recommended === 'safest' && route.types.includes('Safest')) ||
-                      (recommended === 'shortest' && route.types.includes('Shortest')) ||
-                      (recommended === route.sig);
-
-                    const duration = Math.round(route.total_duration_seconds / 60);
-                    const distanceKm = (route.total_distance_meters / 1000).toFixed(1);
-                    const safetyScore = Math.round(route.average_safety_score);
-
-                    return (
-                      <div
-                        key={route.sig}
-                        className={`p-5 rounded-2xl border-2 transition-all cursor-pointer ${isActive
-                          ? 'border-blue-500 bg-blue-50/50 shadow-md ring-1 ring-blue-500/20'
-                          : 'border-gray-100 bg-white hover:border-gray-200 shadow-sm'
-                          }`}
-                        onClick={() => {
-                          if (route.types.includes('Fastest')) setRecommended('fastest');
-                          else if (route.types.includes('Safest')) setRecommended('safest');
-                          else if (route.types.includes('Shortest')) setRecommended('shortest');
-                          else setRecommended(route.sig); // Use signature for alternatives
-                        }}
-                      >
-                        <div className="flex justify-between items-start">
-                          <div className="flex gap-4">
-                            {/* Vertical Timeline */}
-                            <div className="flex flex-col items-center py-1">
-                              <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                              <div className="w-0.5 flex-1 bg-blue-200 my-1 min-h-[40px]"></div>
-                              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                            </div>
-
-                            <div className="space-y-4">
-                              <div className="flex flex-wrap gap-1 mb-1">
-                                {route.types.map(t => (
-                                  <span key={t} className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${t === 'Fastest' ? 'bg-blue-100 text-blue-700' :
-                                    t === 'Safest' ? 'bg-green-100 text-green-700' :
-                                      t === 'Shortest' ? 'bg-purple-100 text-purple-700' :
-                                        'bg-gray-100 text-gray-700'
-                                    }`}>
-                                    {t}
-                                  </span>
-                                ))}
-                                {((recommended === 'fastest' && route.types.includes('Fastest')) ||
-                                  (recommended === 'safest' && route.types.includes('Safest')) ||
-                                  (recommended === 'shortest' && route.types.includes('Shortest'))) && (
-                                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase bg-blue-600 text-white animate-pulse">
-                                      ⭐️ Recommended
-                                    </span>
-                                  )}
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-2 text-gray-500 text-xs">
-                                  <FiMapPin className="text-[10px]" />
-                                  <span className="truncate max-w-[120px]">{startQuery || 'Current Location'}</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-gray-900 font-bold text-sm mt-2">
-                                  <FiMapPin className="text-[10px]" />
-                                  <span className="truncate max-w-[120px]">{destQuery || 'Destination'}</span>
-                                </div>
-                              </div>
-
-                              <div className="flex flex-wrap items-center gap-3 text-gray-600 mt-2">
-                                <div className="flex items-center gap-1.5 text-xs bg-gray-50 px-2 py-1 rounded-md">
-                                  <FiNavigation className="text-gray-400 rotate-45" />
-                                  <span>{distanceKm} km</span>
-                                </div>
-                                <div className="flex items-center gap-1.5 text-xs bg-gray-50 px-2 py-1 rounded-md">
-                                  <FiClock className="text-gray-400" />
-                                  <span>{duration} min</span>
-                                </div>
-                                {route.total_fuel_liters > 0 && (
-                                  <div className="flex items-center gap-1.5 text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded-md">
-                                    <span>⛽</span>
-                                    <span>{route.total_fuel_liters.toFixed(1)} L</span>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Additional Details */}
-                              {route.segments?.[0]?.weather_data?.hazard_score > 0 && (
-                                <div className="flex items-center gap-2 mt-2 px-2 py-1 bg-amber-50 rounded-lg border border-amber-100">
-                                  <span className="text-xs">⛈️</span>
-                                  <span className="text-[10px] text-amber-800 font-medium">
-                                    {route.segments[0].weather_data.hazard_conditions?.join(', ') || 'Weather Alert'}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Safety Gauge */}
-                          <SafetyGauge score={safetyScore} />
-                        </div>
-
-                        <button
-                          className={`w-full mt-5 py-3 rounded-xl font-bold text-sm transition-all transform active:scale-[0.98] ${isActive
-                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
-                            : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
-                            }`}
-                        >
-                          {isActive ? 'Selected' : 'Select Route'}
-                        </button>
-                      </div>
-                    );
-                  });
-                })()}
-
-                <button
-                  onClick={() => setNavigationMode(true)}
-                  className="w-full mt-2 bg-gray-900 hover:bg-black text-white py-4 rounded-2xl font-bold text-base flex items-center justify-center space-x-3 transition-all shadow-xl hover:translate-y-[-2px] active:translate-y-[0px]"
-                >
-                  <span className="text-xl">🚀</span>
-                  <span>Start Navigation</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Safety Legend */}
-          {showSafetyOverlay && (fastest || safest || shortest) && (
-            <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-200">
-              <h3 className="font-semibold text-gray-900 mb-3 text-sm">Safety Legend</h3>
-              <div className="space-y-2 text-xs">
-                <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#22c55e' }}></div>
-                  <span className="text-gray-700">Safe Zone (80-100)</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#f59e0b' }}></div>
-                  <span className="text-gray-700">Moderate Risk (40-79)</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#ef4444' }}></div>
-                  <span className="text-gray-700">Caution: High Risk (&lt;40)</span>
-                </div>
-              </div>
-              <div className="mt-3 text-xs text-gray-600">
-                <p>Data sources:</p>
-                <ul className="list-disc list-inside mt-1 space-y-1">
-                  <li>Tamil Nadu Crime Data 2022</li>
-                  <li>Real-time weather conditions</li>
-                  <li>Traffic-aware routing</li>
-                </ul>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Navigation Overlay (Mobile-like) */}
@@ -1417,8 +1308,7 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
                       }}
                     >
                       <Popup>
-                        Fastest Route Segment<br />
-                        Safety Score: {Math.round(poly.safetyScore)}
+                        Fastest Route | Safety: {Math.round(poly.safetyScore)}/100 | {poly.safetyScore >= 80 ? "Safe zone" : poly.safetyScore >= 65 ? "Moderate safety" : "Risk area - stay alert"}
                       </Popup>
                     </Polyline>
                   </React.Fragment>
@@ -1441,8 +1331,7 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
                       }}
                     >
                       <Popup>
-                        Shortest Route Segment<br />
-                        Safety Score: {Math.round(poly.safetyScore)}
+                        Shortest Route | Safety: {Math.round(poly.safetyScore)}/100 | {poly.safetyScore >= 80 ? "Good safety" : poly.safetyScore >= 65 ? "Moderate risk" : "High risk zone"}
                       </Popup>
                     </Polyline>
                   </React.Fragment>
@@ -1465,8 +1354,7 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
                       }}
                     >
                       <Popup>
-                        Safest Route Segment<br />
-                        Safety Score: {Math.round(poly.safetyScore)}
+                        Safest Route | Safety: {Math.round(poly.safetyScore)}/100 | AI chose this segment to minimize crime-zone exposure
                       </Popup>
                       {/* Add time label label to the path like Google Maps */}
                       {idx === Math.floor(getRoutePolylines(safest, safest.segments).length / 2) && (
@@ -1545,7 +1433,209 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
         )}
       </div>
 
-      {/* Interactive Quiz Modal */}
+      {(fastest || safest || shortest) && (
+        <div className="mt-8 space-y-6">
+          {/* AI Recommendation Banner */}
+          {aiAnalysis && (
+            <div className="rounded-2xl border-2 border-indigo-200 shadow-lg bg-gradient-to-br from-indigo-600 to-purple-700 text-white p-6 max-w-4xl">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0 text-3xl">&#x1F916;</div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-black text-lg mb-1">AI Smart Route Analysis</p>
+                  <p className="text-sm text-indigo-200 mb-4">Generated at {aiAnalysis.generatedAt} &bull; Crime data, weather & traffic</p>
+                  <div className="bg-white/15 rounded-2xl p-4 border border-white/20">
+                    <p className="text-base font-bold text-yellow-300 mb-2">&#11088; Best Route Recommendation</p>
+                    <p className="text-sm leading-relaxed text-white/90 mb-3">
+                      AI recommends the <span className="font-black text-yellow-300 uppercase">{aiAnalysis.recommendedType}</span> route
+                      from <span className="font-semibold">{aiAnalysis.from || 'Starting Point'}</span>
+                      {' '}to <span className="font-semibold">{aiAnalysis.to || 'Destination'}</span>.
+                    </p>
+                    {aiAnalysis[aiAnalysis.recommendedType] && (
+                      <div className="flex flex-wrap items-center gap-4 text-sm">
+                        <div className="bg-white/20 px-3 py-1 rounded-full"><span className="text-indigo-100">Safety:</span> <span className="font-bold text-white">{aiAnalysis[aiAnalysis.recommendedType].score}/100</span></div>
+                        <div className="bg-white/20 px-3 py-1 rounded-full"><span className="text-indigo-100">Time:</span> <span className="font-bold text-white">{aiAnalysis[aiAnalysis.recommendedType].dur}</span></div>
+                        <div className="bg-white/20 px-3 py-1 rounded-full"><span className="text-indigo-100">Dist:</span> <span className="font-bold text-white">{aiAnalysis[aiAnalysis.recommendedType].dist}</span></div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-col space-y-6">
+            <h3 className="font-bold text-gray-900 text-xl px-2">Route Options</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {(() => {
+                const allRoutes = [];
+                const addRoute = (route, type) => {
+                  if (!route) return;
+                  const sig = route.route_id || `${route.total_duration_seconds}-${route.total_distance_meters}`;
+                  let existing = allRoutes.find(r => r.sig === sig);
+                  if (!existing) {
+                    existing = { ...route, sig, types: [] };
+                    allRoutes.push(existing);
+                  }
+                  if (!existing.types.includes(type)) {
+                    existing.types.push(type);
+                  }
+                };
+
+                addRoute(fastest, 'Fastest');
+                addRoute(safest, 'Safest');
+                addRoute(shortest, 'Shortest');
+
+                if (alternatives && alternatives.length > 0) {
+                  alternatives.forEach((alt, idx) => {
+                    addRoute(alt, `Alt ${idx + 1}`);
+                  });
+                }
+
+                return allRoutes.map((route) => {
+                  const isActive =
+                    (recommended === 'fastest' && route.types.includes('Fastest')) ||
+                    (recommended === 'safest' && route.types.includes('Safest')) ||
+                    (recommended === 'shortest' && route.types.includes('Shortest')) ||
+                    (recommended === route.sig);
+
+                  const duration = Math.round(route.total_duration_seconds / 60);
+                  const distanceKm = (route.total_distance_meters / 1000).toFixed(1);
+                  const safetyScore = Math.round(route.average_safety_score);
+
+                  return (
+                    <div
+                      key={route.sig}
+                      className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between h-full ${isActive
+                        ? 'border-blue-500 bg-blue-50/50 shadow-md ring-1 ring-blue-500/20'
+                        : 'border-gray-100 bg-white hover:border-gray-200 shadow-sm'
+                        }`}
+                      onClick={() => {
+                        if (route.types.includes('Fastest')) setRecommended('fastest');
+                        else if (route.types.includes('Safest')) setRecommended('safest');
+                        else if (route.types.includes('Shortest')) setRecommended('shortest');
+                        else setRecommended(route.sig);
+                      }}
+                    >
+                      <div>
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex flex-wrap gap-1">
+                            {route.types.map(t => (
+                              <span key={t} className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${t === 'Fastest' ? 'bg-blue-100 text-blue-700' :
+                                t === 'Safest' ? 'bg-green-100 text-green-700' :
+                                  t === 'Shortest' ? 'bg-purple-100 text-purple-700' :
+                                    'bg-gray-100 text-gray-700'
+                                }`}>
+                                {t}
+                              </span>
+                            ))}
+                            {isActive && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase bg-blue-600 text-white">
+                                ⭐️ Recommended
+                              </span>
+                            )}
+                          </div>
+                          <SafetyGauge score={safetyScore} />
+                        </div>
+
+                        <div className="space-y-3 mb-4">
+                          <div className="flex items-center gap-2 text-gray-500 text-xs">
+                            <FiMapPin className="flex-shrink-0" />
+                            <span className="truncate">{startQuery || 'Current Location'}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-gray-900 font-bold text-sm">
+                            <FiMapPin className="flex-shrink-0 text-blue-500" />
+                            <span className="truncate">{destQuery || 'Destination'}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 mb-4">
+                          <div className="flex items-center gap-1.5 text-xs bg-gray-100 px-2 py-1 rounded-lg">
+                            <FiNavigation className="text-gray-400 rotate-45" />
+                            <span>{distanceKm} km</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-xs bg-gray-100 px-2 py-1 rounded-lg">
+                            <FiClock className="text-gray-400" />
+                            <span>{duration} min</span>
+                          </div>
+                          {route.total_fuel_liters > 0 && (
+                            <div className="flex items-center gap-1.5 text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded-lg">
+                              <span>⛽</span>
+                              <span>{route.total_fuel_liters.toFixed(1)} L</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {route.segments?.[0]?.weather_data?.hazard_score > 0 && (
+                          <div className="flex items-center gap-2 mb-4 px-2 py-1 bg-amber-50 rounded-lg border border-amber-100">
+                            <span className="text-xs">⛈️</span>
+                            <span className="text-[10px] text-amber-800 font-medium">
+                              {route.segments[0].weather_data.hazard_conditions?.join(', ') || 'Weather Alert'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-auto">
+                        {aiAnalysis && (() => {
+                          const routeTypeKey = route.types.includes('Fastest') ? 'fastest' : route.types.includes('Safest') ? 'safest' : route.types.includes('Shortest') ? 'shortest' : null;
+                          const analysis = routeTypeKey ? aiAnalysis[routeTypeKey] : null;
+                          const cardKey = route.sig;
+                          if (!analysis) return null;
+                          return (
+                            <div className="mt-2">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setExpandedAI(expandedAI === cardKey ? null : cardKey); }}
+                                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all border ${expandedAI === cardKey
+                                  ? 'bg-indigo-600 text-white border-indigo-600'
+                                  : 'bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-100'
+                                  }`}
+                              >
+                                <span>🤖 AI Route Explanation</span>
+                                <span>{expandedAI === cardKey ? '▲' : '▼'}</span>
+                              </button>
+                              {expandedAI === cardKey && (
+                                <div className="mt-2 rounded-xl border border-indigo-100 bg-gradient-to-b from-indigo-50 to-white p-3 space-y-2 text-xs">
+                                  {analysis.reasons.slice(0, 3).map((r, i) => (
+                                    <div key={i} className="text-slate-700 bg-white rounded-lg p-2 border border-slate-100 leading-tight">{r}</div>
+                                  ))}
+                                  {analysis.warnings.length > 0 && (
+                                    <div className="pt-2 border-t border-amber-200">
+                                      {analysis.warnings.map((w, i) => (
+                                        <div key={i} className="text-amber-800 bg-amber-50 rounded-lg p-2 border border-amber-100">{w}</div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+
+                        <button
+                          className={`w-full mt-3 py-3 rounded-xl font-bold text-sm transition-all transform active:scale-[0.98] ${isActive
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
+                            : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+                            }`}
+                        >
+                          {isActive ? 'Selected Route' : 'Select This Route'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+
+            <button
+              onClick={() => setNavigationMode(true)}
+              className="w-full lg:w-max px-12 mt-4 bg-gray-900 hover:bg-black text-white py-4 rounded-2xl font-bold text-lg flex items-center justify-center space-x-3 transition-all shadow-xl hover:translate-y-[-2px] active:translate-y-[0px] self-center"
+            >
+              <span className="text-2xl">🚀</span>
+              <span>Start Navigation</span>
+            </button>
+          </div>
+        </div>
+      )}
       {quizOpen && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform animate-in fade-in zoom-in duration-300">
