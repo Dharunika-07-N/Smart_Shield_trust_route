@@ -92,13 +92,50 @@ class SARSARouteAgent:
         SARSA update rule
         """
         current_q = self.q_table[state][action]
-        next_q = self.q_table[next_state][next_action]
+        next_q = self.q_table[next_state][next_action] if next_state is not None and next_action is not None else 0
         
         new_q = current_q + self.alpha * (
             reward + self.gamma * next_q - current_q
         )
         
         self.q_table[state][action] = new_q
+
+    def train_from_episodes(self, episodes):
+        """
+        Offline training from historical episodes
+        """
+        total_rewards = []
+        for episode in episodes:
+            states = episode['states']
+            actions = episode['actions']
+            rewards = episode['rewards']
+            
+            for i in range(len(states) - 1):
+                self.update(
+                    states[i], 
+                    actions[i], 
+                    rewards[i], 
+                    states[i+1], 
+                    actions[i+1]
+                )
+            
+            # Final state update (terminal)
+            if states:
+                self.update(
+                    states[-1],
+                    actions[-1],
+                    rewards[-1],
+                    None,
+                    None
+                )
+            
+            total_rewards.append(sum(rewards))
+            
+        self.save_model()
+        return {
+            'avg_reward': np.mean(total_rewards) if total_rewards else 0,
+            'episodes': len(episodes)
+        }
 
     def calculate_reward(self, route_outcome):
         """
@@ -125,7 +162,7 @@ class SARSARouteAgent:
         """Save Q-table to disk"""
         with open(self.model_path, 'wb') as f:
             pickle.dump(dict(self.q_table), f)
-        print(f"✅ SARSA Q-table saved ({len(self.q_table)} states)")
+        print(f"SUCCESS: SARSA Q-table saved ({len(self.q_table)} states)")
 
     def load_model(self):
         """Load Q-table from disk"""
@@ -134,4 +171,4 @@ class SARSARouteAgent:
         with open(self.model_path, 'rb') as f:
             saved_q_table = pickle.load(f)
             self.q_table = defaultdict(lambda: defaultdict(float), saved_q_table)
-        print(f"✅ SARSA Q-table loaded")
+        print(f"SUCCESS: SARSA Q-table loaded")

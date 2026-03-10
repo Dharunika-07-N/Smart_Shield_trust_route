@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+ import React, { useEffect, useState } from 'react';
 import { useMap, Circle, Marker, Popup } from 'react-leaflet';
 import { api } from '../services/api';
 import L from 'leaflet';
@@ -64,7 +64,7 @@ const SafetyHeatmap = ({ show = true }) => {
                 .map((point, idx) => {
                     const lat = point.coordinates?.latitude || point.lat;
                     const lng = point.coordinates?.longitude || point.lng;
-                    const intensity = point.crime_score ? (100 - point.crime_score) / 100 : (point.intensity || 0.5); // Invert crime score for safety (high crime = low safety)
+                    const intensity = (point.crime_score !== undefined && point.crime_score !== null) ? (100 - point.crime_score) / 100 : (point.intensity !== undefined ? point.intensity : 0.5); // Invert crime score for safety (high crime = low safety)
 
                     if (!lat || !lng) return null;
 
@@ -72,11 +72,12 @@ const SafetyHeatmap = ({ show = true }) => {
                         <Circle
                             key={idx}
                             center={[lat, lng]}
-                            radius={500} // meters
+                            radius={300}
                             pathOptions={{
                                 fillColor: getColor(intensity),
-                                fillOpacity: 0.15,
-                                stroke: false
+                                fillOpacity: 0.1,
+                                stroke: false,
+                                className: 'heatmap-circle'
                             }}
                         />
                     );

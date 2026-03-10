@@ -576,16 +576,37 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
     return 0.9;
   };
 
-  // Convert route segments to polyline coordinates with safety coloring
-  const getRoutePolylines = (routeData, segments) => {
+  // Convert route segments to polyline coordinates with route-type coloring
+  // routeType: 'fastest' | 'safest' | 'shortest' | undefined
+  const getRoutePolylines = (routeData, segments, routeType) => {
     if (!routeData || !segments || segments.length === 0) return [];
 
     const polylines = [];
 
-    segments.forEach((segment, idx) => {
+    // Fixed signature colors per route type
+    const typeColors = {
+      fastest:  '#3b82f6', // Blue
+      safest:   '#10b981', // Emerald Green
+      shortest: '#8b5cf6', // Purple
+    };
+
+    const isSelected = (recommended === 'fastest' && routeType === 'fastest') ||
+      (recommended === 'safest'   && routeType === 'safest')   ||
+      (recommended === 'shortest' && routeType === 'shortest') ||
+      (recommended === routeData?.route_id) ||
+      (recommended === routeData?.sig);
+
+    const routeColor = typeColors[routeType] || (isSelected ? '#3b82f6' : '#94a3b8');
+    
+    // Add distinct patterns for accessibility
+    const dashArray = 
+      routeType === 'shortest' ? '1, 10' : 
+      routeType === 'fastest' ? null : 
+      null; // Safest is solid but thicker
+
+    segments.forEach((segment) => {
       const coords = [];
 
-      // Use route coordinates if available
       if (segment.route_coordinates && segment.route_coordinates.length > 0) {
         segment.route_coordinates.forEach(coord => {
           coords.push([coord.lat, coord.lng]);
@@ -594,28 +615,16 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
 
       if (coords.length >= 2) {
         const safetyScore = segment.safety_score || routeData.average_safety_score || 70;
-        const isRecommended = (recommended === 'fastest' && routeData === fastest) ||
-          (recommended === 'safest' && routeData === safest) ||
-          (recommended === 'shortest' && routeData === shortest) ||
-          (recommended === routeData.route_id) ||
-          (recommended === routeData.sig);
-
-        // Determine color based on safety score if recommended, otherwise neutral gray
-        // USER REQUEST: Green (>= 80), Amber (40-79), Red (< 40)
-        let color = '#cbd5e1'; // Slate-300 (Neutral/Hidden)
-        if (isRecommended) {
-          if (safetyScore >= 80) color = '#22c55e';      // Green-500 (Safe)
-          else if (safetyScore >= 40) color = '#f59e0b'; // Amber-500 (Moderate Risk)
-          else color = '#ef4444';                        // Red-500 (High Risk)
-        }
-
         polylines.push({
           positions: coords,
-          color: color,
-          weight: isRecommended ? 8 : 5,
-          opacity: isRecommended ? 1.0 : 0.4,
-          safetyScore: safetyScore,
-          isRecommended: isRecommended
+          color: routeColor,
+          weight: isSelected ? 10 : 5,
+          opacity: isSelected ? 1.0 : 0.4,
+          dashArray: isSelected ? null : dashArray,
+          safetyScore,
+          isRecommended: isSelected,
+          routeType,
+          className: `route-${routeType || 'alt'} ${isSelected ? 'route-selected' : ''}`
         });
       }
     });
@@ -960,15 +969,15 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
 
         {/* Navigation Overlay (Mobile-like) */}
         {navigationMode && (recommended === 'fastest' ? fastest : (recommended === 'shortest' ? shortest : safest)) && (
-          <div className="lg:col-span-2 relative h-[600px] bg-gray-900 rounded-xl overflow-hidden text-white flex flex-col">
-            <div className="absolute top-0 left-0 right-0 z-[1001] bg-gray-900/90 backdrop-blur p-4 shadow-lg">
+          <div className="lg:col-span-2 relative h-[600px] bg-white rounded-xl overflow-hidden flex flex-col border border-gray-200 shadow-sm">
+            <div className="absolute top-0 left-0 right-0 z-[1001] bg-white/95 backdrop-blur p-4 shadow-lg border-b border-gray-200">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-2xl font-bold flex items-center">
+                  <h2 className="text-2xl font-bold flex items-center text-gray-900">
                     <span className="mr-2">⬆️</span>
                     {(distanceRemaining || ((recommended === 'fastest' ? fastest : (recommended === 'shortest' ? shortest : safest)).total_distance_meters / 1000).toFixed(1))} km
                   </h2>
-                  <p className="text-gray-300 text-sm">
+                  <p className="text-gray-600 text-sm">
                     {/* Display first instruction if available */}
                     {(recommended === 'fastest' ? fastest : (recommended === 'shortest' ? shortest : safest)).segments?.[0]?.instructions?.[0]
                       ? <span dangerouslySetInnerHTML={{ __html: (recommended === 'fastest' ? fastest : (recommended === 'shortest' ? shortest : safest)).segments[0].instructions[0] }} />
@@ -982,24 +991,24 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
                   Exit
                 </button>
               </div>
-              <div className="flex justify-between items-center bg-gray-800 rounded-lg p-3">
+              <div className="flex justify-between items-center bg-blue-50 rounded-lg p-3 border border-blue-100">
                 <div className="text-center">
-                  <div className="text-xl font-bold text-green-400">
+                  <div className="text-xl font-bold text-green-600">
                     {eta || Math.round(((recommended === 'fastest' ? fastest : (recommended === 'shortest' ? shortest : safest)).total_duration_seconds) / 60)} min
                   </div>
-                  <div className="text-xs text-gray-400">ETA</div>
+                  <div className="text-xs text-gray-500">ETA</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-xl font-bold">
+                  <div className="text-xl font-bold text-gray-900">
                     {(distanceRemaining || ((recommended === 'fastest' ? fastest : (recommended === 'shortest' ? shortest : safest)).total_distance_meters / 1000).toFixed(1))} km
                   </div>
-                  <div className="text-xs text-gray-400">Remaining</div>
+                  <div className="text-xs text-gray-500">Remaining</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-xl font-bold text-blue-400">
+                  <div className="text-xl font-bold text-blue-600">
                     {Math.round((recommended === 'fastest' ? fastest : (recommended === 'shortest' ? shortest : safest)).average_safety_score)}
                   </div>
-                  <div className="text-xs text-gray-400">Safety Score</div>
+                  <div className="text-xs text-gray-500">Safety Score</div>
                 </div>
               </div>
             </div>
@@ -1014,9 +1023,8 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
                 attributionControl={false}
               >
                 <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  // Dark mode tiles for navigation feel
-                  url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                  url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
                 />
 
                 {/* User Location Arrow */}
@@ -1025,22 +1033,57 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
                   </Marker>
                 )}
 
-                {/* Route Line */}
-                {/* Route Line */}
-                {getRoutePolylines(
-                  recommended === 'fastest' ? fastest : (recommended === 'shortest' ? shortest : safest),
-                  (recommended === 'fastest' ? fastest : (recommended === 'shortest' ? shortest : safest)).segments
-                ).map((poly, idx) => (
-                  <Polyline
-                    key={`nav-poly-${idx}`}
-                    positions={poly.positions}
-                    pathOptions={{
-                      color: poly.safetyScore >= 80 ? '#39FF14' : poly.color,
-                      weight: 10,
-                      opacity: 0.9,
-                    }}
-                  />
-                ))}
+                {/* Route Line - selected route */}
+                {(() => {
+                  const activeRoute = recommended === 'fastest' ? fastest : (recommended === 'shortest' ? shortest : safest);
+                  const activeType  = recommended === 'fastest' ? 'fastest' : (recommended === 'shortest' ? 'shortest' : 'safest');
+                  const typeColors  = { fastest: '#3b82f6', safest: '#10b981', shortest: '#8b5cf6' };
+                  const lineColor   = typeColors[activeType] || '#3b82f6';
+
+                  if (!activeRoute) return null;
+
+                  const polylines = getRoutePolylines(activeRoute, activeRoute.segments, activeType);
+
+                  // If we have real polyline data render them
+                  if (polylines.length > 0) {
+                    return polylines.map((poly, idx) => (
+                      <React.Fragment key={`nav-poly-${idx}`}>
+                        {/* White halo outline */}
+                        {/* White halo outline for better visibility */}
+                        <Polyline
+                          positions={poly.positions}
+                          pathOptions={{ color: 'white', weight: 18, opacity: 0.4 }}
+                        />
+                        <Polyline
+                          positions={poly.positions}
+                          pathOptions={{ 
+                            color: lineColor, 
+                            weight: 12, 
+                            opacity: 1.0,
+                            className: 'route-active-glare'
+                          }}
+                        />
+                      </React.Fragment>
+                    ));
+                  }
+
+                  // Fallback: straight line between start and destination
+                  if (currentPos && destPos) {
+                    return (
+                      <React.Fragment key="nav-fallback">
+                        <Polyline
+                          positions={[currentPos, destPos]}
+                          pathOptions={{ color: 'white', weight: 16, opacity: 0.5 }}
+                        />
+                        <Polyline
+                          positions={[currentPos, destPos]}
+                          pathOptions={{ color: lineColor, weight: 10, opacity: 1.0, dashArray: '12 8' }}
+                        />
+                      </React.Fragment>
+                    );
+                  }
+                  return null;
+                })()}
 
                 {/* Destination */}
                 {destPos && (
@@ -1054,8 +1097,8 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
             </div>
 
             <div className="absolute bottom-6 left-4 right-4 z-[1001] pointer-events-none">
-              <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/20 text-center">
-                <p className="text-sm font-medium text-white shadow-black drop-shadow-md">
+              <div className="bg-white/90 backdrop-blur-md rounded-xl p-3 border border-gray-200 shadow-lg text-center">
+                <p className="text-sm font-medium text-gray-800">
                   ⚠️ You are on a {recommended === 'safest' ? 'Safe Route' : (recommended === 'shortest' ? 'Shortest Route' : 'Fast Route')}. High patrol area nearby.
                 </p>
               </div>
@@ -1066,7 +1109,6 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
         {/* Standard Map (Hidden in Nav Mode) */}
         {!navigationMode && (
           <div className="lg:col-span-2 bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200">
-
             <div style={{ height: '600px', width: '100%' }}>
               <MapContainer
                 center={centerPosition}
@@ -1077,9 +1119,11 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
                   url={variant === 'dark-minimal'
                     ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                    : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
                   }
                 />
+
+                <MapUpdater center={centerPosition} />
 
                 {/* Safe Zones Markers */}
                 {showSafeZones && safeZones.map((zone) => (
@@ -1207,7 +1251,8 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
                   </Marker>
                 )}
 
-                {/* Display all routes */}
+                {/* Mock Routes - Hidden to prevent confusion with real optimization results */}
+                {/* 
                 {routes.map((route) => (
                   <React.Fragment key={route.id}>
                     {route.coordinates.map((coord, index) => {
@@ -1235,6 +1280,7 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
                     </Marker>
                   </React.Fragment>
                 ))}
+                */}
 
                 {/* Destination marker */}
                 {destPos && (
@@ -1258,131 +1304,74 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
                 )}
 
                 {/* Draw route polylines with safety coloring */}
-                {/* Alternative Routes */}
-                {alternatives.map((alt, altIdx) => (
-                  <React.Fragment key={`alt-${altIdx}`}>
-                    {showSafetyOverlay && getRoutePolylines(alt, alt.segments).map((poly, idx) => (
-                      <React.Fragment key={`alt-${altIdx}-${idx}-frag`}>
-                        {poly.isRecommended && (
+
+                {/* Optimized Route Layers - Rendered in specific order to ensure selected is on top */}
+                {(() => {
+                  const items = [];
+                  if (fastest) items.push({ data: fastest, type: 'fastest' });
+                  if (shortest) items.push({ data: shortest, type: 'shortest' });
+                  if (safest) items.push({ data: safest, type: 'safest' });
+                  
+                  // Add alternative routes
+                  if (alternatives && alternatives.length > 0) {
+                    alternatives.forEach((alt, idx) => {
+                      items.push({ data: alt, type: `alt-${idx + 1}` });
+                    });
+                  }
+                  
+                  // Sort so recommended is last
+                  items.sort((a, b) => {
+                    const aSelected = (recommended === a.type) || (recommended === a.data.route_id) || (recommended === a.data.sig);
+                    const bSelected = (recommended === b.type) || (recommended === b.data.route_id) || (recommended === b.data.sig);
+                    return aSelected ? 1 : bSelected ? -1 : 0;
+                  });
+
+                  return items.map((item, itemIdx) => {
+                    const { data, type } = item;
+                    const polylines = getRoutePolylines(data, data.segments, type);
+                    
+                    return polylines.map((poly, idx) => {
+                      const isRecommended = poly.isRecommended;
+                      return (
+                        <React.Fragment key={`${type}-${itemIdx}-${idx}-${recommended}`}>
+                          {isRecommended && (
+                            <Polyline
+                              positions={poly.positions}
+                              pathOptions={{ color: 'white', weight: poly.weight + 6, opacity: 0.4 }}
+                            />
+                          )}
                           <Polyline
                             positions={poly.positions}
-                            pathOptions={{ color: 'white', weight: poly.weight + 4, opacity: 0.5 }}
-                          />
-                        )}
-                        <Polyline
-                          positions={poly.positions}
-                          pathOptions={{
-                            color: poly.color,
-                            weight: poly.weight,
-                            opacity: poly.isRecommended ? 0.9 : 0.4,
-                          }}
-                        >
-                          <Popup>
-                            <div>
-                              <strong>Alternative Route {altIdx + 1}</strong><br />
-                              Time: {Math.round((alt.total_duration_seconds || 0) / 60)} min<br />
-                              Distance: {(alt.total_distance_meters / 1000).toFixed(1)} km<br />
-                              Safety Score: {Math.round(alt.average_safety_score)}
-                            </div>
-                          </Popup>
-                        </Polyline>
-                      </React.Fragment>
-                    ))}
-                  </React.Fragment>
-                ))}
+                            pathOptions={{
+                              color: poly.color,
+                              weight: poly.weight,
+                              opacity: poly.opacity,
+                              dashArray: poly.dashArray,
+                              className: poly.className
+                            }}
+                          >
+                            <Popup>
+                              <strong>{type.charAt(0).toUpperCase() + type.slice(1)} Route</strong><br />
+                              Safety Score: {Math.round(poly.safetyScore)}
+                            </Popup>
+                            
+                            {/* Route specific labels/tooltips */}
+                            {isRecommended && idx === Math.floor(polylines.length / 2) && (
+                              <Tooltip permanent direction="center" className="route-label-tooltip">
+                                <div className="flex items-center gap-1">
+                                  <span className="font-bold">{Math.round((data.total_duration_seconds || 0) / 60)} min</span>
+                                  {type === 'safest' && <span className="text-xs">🛡️</span>}
+                                  {type === 'fastest' && <span className="text-xs">⚡</span>}
+                                </div>
+                              </Tooltip>
+                            )}
+                          </Polyline>
+                        </React.Fragment>
+                      );
+                    });
+                  });
+                })()}
 
-                {fastest && showSafetyOverlay && getRoutePolylines(fastest, fastest.segments).map((poly, idx) => (
-                  <React.Fragment key={`fastest-frag-${idx}`}>
-                    {poly.isRecommended && (
-                      <Polyline
-                        positions={poly.positions}
-                        pathOptions={{ color: 'white', weight: poly.weight + 4, opacity: 0.5 }}
-                      />
-                    )}
-                    <Polyline
-                      positions={poly.positions}
-                      pathOptions={{
-                        color: poly.color,
-                        weight: poly.weight,
-                        opacity: poly.opacity
-                      }}
-                    >
-                      <Popup>
-                        Fastest Route | Safety: {Math.round(poly.safetyScore)}/100 | {poly.safetyScore >= 80 ? "Safe zone" : poly.safetyScore >= 65 ? "Moderate safety" : "Risk area - stay alert"}
-                      </Popup>
-                    </Polyline>
-                  </React.Fragment>
-                ))}
-
-                {shortest && showSafetyOverlay && getRoutePolylines(shortest, shortest.segments).map((poly, idx) => (
-                  <React.Fragment key={`shortest-frag-${idx}`}>
-                    {poly.isRecommended && (
-                      <Polyline
-                        positions={poly.positions}
-                        pathOptions={{ color: 'white', weight: poly.weight + 4, opacity: 0.5 }}
-                      />
-                    )}
-                    <Polyline
-                      positions={poly.positions}
-                      pathOptions={{
-                        color: poly.color,
-                        weight: poly.weight,
-                        opacity: poly.opacity
-                      }}
-                    >
-                      <Popup>
-                        Shortest Route | Safety: {Math.round(poly.safetyScore)}/100 | {poly.safetyScore >= 80 ? "Good safety" : poly.safetyScore >= 65 ? "Moderate risk" : "High risk zone"}
-                      </Popup>
-                    </Polyline>
-                  </React.Fragment>
-                ))}
-
-                {safest && showSafetyOverlay && getRoutePolylines(safest, safest.segments).map((poly, idx) => (
-                  <React.Fragment key={`safest-frag-${idx}`}>
-                    {poly.isRecommended && (
-                      <Polyline
-                        positions={poly.positions}
-                        pathOptions={{ color: 'white', weight: poly.weight + 4, opacity: 0.5 }}
-                      />
-                    )}
-                    <Polyline
-                      positions={poly.positions}
-                      pathOptions={{
-                        color: poly.color,
-                        weight: poly.weight,
-                        opacity: poly.opacity
-                      }}
-                    >
-                      <Popup>
-                        Safest Route | Safety: {Math.round(poly.safetyScore)}/100 | AI chose this segment to minimize crime-zone exposure
-                      </Popup>
-                      {/* Add time label label to the path like Google Maps */}
-                      {idx === Math.floor(getRoutePolylines(safest, safest.segments).length / 2) && (
-                        <Tooltip permanent direction="center" className="route-label-tooltip">
-                          <div className="flex items-center gap-1">
-                            <span className="font-bold">{Math.round((safest.total_duration_seconds || 0) / 60)} min</span>
-                            {recommended === 'safest' && <span className="text-xs">🛡️</span>}
-                          </div>
-                        </Tooltip>
-                      )}
-                    </Polyline>
-                  </React.Fragment>
-                ))}
-
-                {/* Fastest Labels */}
-                {fastest && recommended === 'fastest' && getRoutePolylines(fastest, fastest.segments).length > 0 && (
-                  <Tooltip
-                    position={getRoutePolylines(fastest, fastest.segments)[Math.floor(getRoutePolylines(fastest, fastest.segments).length / 2)].positions[0]}
-                    permanent
-                    direction="top"
-                    className="route-label-tooltip fastest-active"
-                  >
-                    <div className="flex flex-col items-center">
-                      <span className="font-bold text-white">{Math.round((fastest.total_duration_seconds || 0) / 60)} min</span>
-                      <span className="text-[10px] text-blue-100">Fastest</span>
-                    </div>
-                  </Tooltip>
-                )}
 
                 {/* Fallback: Simple lines if no route geometry */}
                 {fastest && (!fastest.segments || fastest.segments.length === 0) && currentPos && destPos && (

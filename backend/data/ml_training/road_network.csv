@@ -1,0 +1,5 @@
+edge_id,start_lat,start_lng,end_lat,end_lng,road_type,speed_limit_kmh,length_m,num_lanes,has_traffic_light
+E001,11.0168,76.9558,11.0170,76.9560,arterial,50,250,4,1
+E002,11.0170,76.9560,11.0175,76.9565,arterial,50,550,4,0
+E003,11.0175,76.9565,11.0180,76.9570,residential,30,450,2,1
+E004,11.0180,76.9570,11.0185,76.9575,highway,80,1200,6,0

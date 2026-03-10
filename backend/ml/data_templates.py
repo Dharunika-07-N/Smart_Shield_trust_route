@@ -52,11 +52,10 @@ FB003,R003,RID003,2024-01-16T10:15:00,11.0175,76.9560,1,0,0,5,Fast and safe
 FB004,R004,RID001,2024-01-16T08:45:00,11.0250,76.9680,0,1,0,3,Morning rush hour
 """
 
-# 6. DELIVERY EPISODES (for Reinforcement Learning)
 rl_episodes_template = """
 episode_id,rider_id,start_lat,start_lng,end_lat,end_lng,state_sequence,action_sequence,reward_sequence,total_reward,success
-EP001,RID001,11.0168,76.9558,11.0200,76.9600,"[s1,s2,s3]","[a1,a2,a3]","[r1,r2,r3]",85.5,1
-EP002,RID002,11.0180,76.9570,11.0250,76.9650,"[s1,s2,s3,s4]","[a1,a2,a3,a4]","[r1,r2,r3,r4]",72.3,1
+EP001,RID001,11.0168,76.9558,11.0200,76.9600,"['s1','s2','s3']","['a1','a2','a3']","[10,20,30]",85.5,1
+EP002,RID002,11.0180,76.9570,11.0250,76.9650,"['s1','s2','s3','s4']","['a1','a2','a3','a4']","[15,20,25,30]",72.3,1
 """
 
 # 7. ROAD NETWORK DATA (for A* Algorithm - Optional)

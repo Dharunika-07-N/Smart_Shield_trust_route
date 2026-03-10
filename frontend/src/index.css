@@ -253,3 +253,49 @@ code {
   background: transparent !important;
   border: none !important;
 }
+
+/* Premium Route Styles */
+.route-fastest {
+  filter: drop-shadow(0 0 2px rgba(59, 130, 246, 0.4));
+}
+
+.route-safest {
+  filter: drop-shadow(0 0 4px rgba(16, 185, 129, 0.5));
+}
+
+.route-shortest {
+  filter: drop-shadow(0 0 2px rgba(139, 92, 246, 0.4));
+}
+
+.route-selected {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.route-active-glare {
+  filter: blur(1px);
+  stroke-linecap: round;
+}
+
+@keyframes route-pulse {
+  0% { stroke-opacity: 0.8; }
+  50% { stroke-opacity: 1.0; }
+  100% { stroke-opacity: 0.8; }
+}
+
+.route-selected {
+  animation: route-pulse 2s infinite ease-in-out;
+}
+
+/* Custom Marker Styling */
+.pulsing-marker {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}

@@ -1,6 +1,6 @@
 {
   "version": "demo_v1",
-  "timestamp": "2026-02-24T11:29:02.687447",
+  "timestamp": "2026-03-10T10:14:32.694589",
   "feature_names": [
     "crime_rate",
     "lighting",
@@ -20,86 +20,71 @@
   ],
   "training_history": [
     {
-      "timestamp": "2026-02-24T11:29:02.569268",
+      "timestamp": "2026-03-10T10:14:32.637248",
       "metrics": {
-        "accuracy": 0.86,
-        "precision_weighted": 0.8373214285714287,
-        "recall_weighted": 0.86,
-        "f1_weighted": 0.84352688172043,
-        "cohen_kappa": 0.6897163120567376,
+        "accuracy": 0.91,
+        "precision_weighted": 0.9153873239436621,
+        "recall_weighted": 0.91,
+        "f1_weighted": 0.9073333333333333,
+        "cohen_kappa": 0.7988826815642458,
         "confusion_matrix": [
           [
-            0,
+            27,
+            8,
+            0
+          ],
+          [
             1,
-            0,
-            0
-          ],
-          [
-            0,
-            25,
-            9,
-            0
-          ],
-          [
-            0,
-            2,
-            61,
+            63,
             0
           ],
           [
             0,
             0,
-            2,
-            0
+            1
           ]
         ],
         "classification_report": {
-          "1": {
-            "precision": 0.0,
-            "recall": 0.0,
-            "f1-score": 0.0,
-            "support": 1.0
-          },
           "2": {
-            "precision": 0.8928571428571429,
-            "recall": 0.7352941176470589,
-            "f1-score": 0.8064516129032258,
-            "support": 34.0
+            "precision": 0.9642857142857143,
+            "recall": 0.7714285714285715,
+            "f1-score": 0.8571428571428571,
+            "support": 35.0
           },
           "3": {
-            "precision": 0.8472222222222222,
-            "recall": 0.9682539682539683,
-            "f1-score": 0.9037037037037037,
-            "support": 63.0
+            "precision": 0.8873239436619719,
+            "recall": 0.984375,
+            "f1-score": 0.9333333333333333,
+            "support": 64.0
           },
           "4": {
-            "precision": 0.0,
-            "recall": 0.0,
-            "f1-score": 0.0,
-            "support": 2.0
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 1.0
           },
-          "accuracy": 0.86,
+          "accuracy": 0.91,
           "macro avg": {
-            "precision": 0.4350198412698413,
-            "recall": 0.4258870214752568,
-            "f1-score": 0.42753882915173236,
+            "precision": 0.9505365526492288,
+            "recall": 0.9186011904761905,
+            "f1-score": 0.9301587301587301,
             "support": 100.0
           },
           "weighted avg": {
-            "precision": 0.8373214285714287,
-            "recall": 0.86,
-            "f1-score": 0.84352688172043,
+            "precision": 0.9153873239436621,
+            "recall": 0.91,
+            "f1-score": 0.9073333333333333,
             "support": 100.0
           }
         },
-        "roc_auc_ovr": 0.9372433101004529,
+        "roc_auc_ovr": null,
         "cv_scores": [
-          0.8401007947276604,
-          0.8994855559952513,
-          0.8451638776106368
+          0.827200551189303,
+          0.8718386876281612,
+          0.8538938869331324
         ],
-        "cv_mean": 0.8615834094445162,
-        "cv_std": 0.026880454323231745,
+        "cv_mean": 0.8509777085835322,
+        "cv_std": 0.018339736063323214,
         "best_params": {
           "bootstrap": true,
           "ccp_alpha": 0.0,
@@ -125,35 +110,35 @@
       "feature_importance": [
         {
           "feature": "crime_rate",
-          "importance": 0.3392930571746654
+          "importance": 0.29085769702182573
         },
         {
           "feature": "lighting",
-          "importance": 0.17674280588501495
+          "importance": 0.1729705782322651
         },
         {
           "feature": "traffic_density",
-          "importance": 0.13922304175324635
+          "importance": 0.16052188184912605
         },
         {
           "feature": "patrol_frequency",
-          "importance": 0.1282297551294204
+          "importance": 0.15845642229132983
         },
         {
           "feature": "police_proximity",
-          "importance": 0.10057180235174762
+          "importance": 0.09347889804271885
         },
         {
           "feature": "hospital_proximity",
-          "importance": 0.07220090029210803
+          "importance": 0.06336455677328721
         },
         {
           "feature": "day_of_week",
-          "importance": 0.033106768850961976
+          "importance": 0.04469552040550475
         },
         {
           "feature": "is_weekend",
-          "importance": 0.010631868562835338
+          "importance": 0.015654445383942527
         },
         {
           "feature": "time_of_day",

@@ -52,7 +52,7 @@ class DeliveryTimePredictor:
         mae = mean_absolute_error(y_test, y_pred)
         r2 = r2_score(y_test, y_pred)
         
-        print(f"✅ Time Predictor Training Complete. MAE: {mae:.2f} min, R²: {r2:.4f}")
+        print(f"INFO: Time Predictor Training Complete. MAE: {mae:.2f} min, R2: {r2:.4f}")
         
         # Save model
         self.save_model()
@@ -66,12 +66,26 @@ class DeliveryTimePredictor:
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         """Predict delivery time for new routes"""
         if self.model is None:
-            self.load_model()
+            if not self.load_model():
+                # Fallback to simple distance-based estimation if model unavailable
+                if 'distance_km' in X.columns:
+                    return (X['distance_km'] * 3.5).values # baseline 3.5 min/km
+                return np.array([15.0] * len(X))
         
         # Ensure feature columns match
-        X = X[self.feature_columns]
+        if self.feature_columns:
+            for col in self.feature_columns:
+                if col not in X.columns:
+                    X[col] = 0
+            X = X[self.feature_columns]
         
-        return self.model.predict(X)
+        try:
+            return self.model.predict(X)
+        except Exception as e:
+            print(f"Prediction error: {e}")
+            if 'distance_km' in X.columns:
+                return (X['distance_km'] * 3.5).values
+            return np.array([15.0] * len(X))
     
     def get_feature_importance(self):
         """Get feature importance scores"""
@@ -91,12 +105,12 @@ class DeliveryTimePredictor:
             'feature_columns': self.feature_columns
         }
         joblib.dump(model_data, self.model_path)
-        print(f"✅ Model saved to {self.model_path}")
+        print(f"INFO: Model saved to {self.model_path}")
     
     def load_model(self):
         """Load trained model from disk"""
         if not os.path.exists(self.model_path):
-            print(f"⚠️ Model file not found: {self.model_path}. Returning dummy model.")
+            print(f"WARNING: Model file not found: {self.model_path}. Returning dummy model.")
             return False
             
         model_data = joblib.load(self.model_path)

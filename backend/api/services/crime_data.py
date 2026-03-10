@@ -373,13 +373,35 @@ class CrimeDataService:
             "theft": 0
         }
     
-    def get_heatmap_data(self, bbox: Dict[str, float], resolution: int = 50) -> List[Dict]:
-        """Generate crime heatmap data for a bounding box."""
+    def get_heatmap_data(self, bbox: Dict[str, float], resolution: int = 15) -> List[Dict]:
+        """Generate crime heatmap data for a bounding box with optimization."""
         min_lat = bbox.get("min_lat", 10.0)
         max_lat = bbox.get("max_lat", 13.0)
         min_lon = bbox.get("min_lon", 76.0)
         max_lon = bbox.get("max_lon", 80.0)
         
+        # Buffer for filtering districts/hotspots
+        buffer = 0.2 
+        
+        # Pre-filter districts that are relevant to this bbox
+        relevant_districts = {}
+        for district, coords in self.DISTRICT_COORDS.items():
+            if (min_lat - buffer <= coords[0] <= max_lat + buffer and 
+                min_lon - buffer <= coords[1] <= max_lon + buffer):
+                relevant_districts[district] = self.crime_data.get(district)
+        
+        # Pre-filter hotspots
+        relevant_hotspots = []
+        if hasattr(self, 'hotspots'):
+            for spot in self.hotspots:
+                if (min_lat - buffer <= spot['lat'] <= max_lat + buffer and 
+                    min_lon - buffer <= spot['lng'] <= max_lon + buffer):
+                    relevant_hotspots.append(spot)
+        
+        # If no relevant data, return empty or low-risk grid
+        if not relevant_districts and not relevant_hotspots:
+            return []
+
         lat_step = (max_lat - min_lat) / resolution
         lon_step = (max_lon - min_lon) / resolution
         
@@ -391,13 +413,55 @@ class CrimeDataService:
                 lon = min_lon + j * lon_step
                 
                 coord = Coordinate(latitude=lat, longitude=lon)
-                crime_score = self.get_crime_score(coord)
+                # Use a specialized fast scorer for heatmap
+                crime_score = self._get_fast_crime_score(coord, relevant_districts, relevant_hotspots)
                 
-                heatmap_points.append({
-                    "coordinates": coord,
-                    "crime_score": crime_score,
-                    "density": int(crime_score / 10)  # Convert to density scale
-                })
+                if crime_score > 5: # Only include significant points
+                    heatmap_points.append({
+                        "coordinates": coord,
+                        "crime_score": crime_score,
+                        "density": int(crime_score / 10)
+                    })
         
         return heatmap_points
+
+    def _get_fast_crime_score(self, coord, relevant_districts, relevant_hotspots) -> float:
+        """Faster crime score calculation for heatmap generation."""
+        max_crime_density = 0
+        
+        # Calculate for relevant districts only
+        for district, data in relevant_districts.items():
+            if not data: continue
+            dist_coords = data["coordinates"]
+            
+            # Use faster approximate distance if precision is less critical for heatmap
+            dist_km = geopy_distance(
+                (coord.latitude, coord.longitude),
+                dist_coords
+            ).km
+            
+            if dist_km <= 15.0:
+                weight = 1.0 / (1.0 + dist_km / 5.0)
+                crime_density = data.get("total_crimes", 0) * weight
+                crime_density += data.get("murders", 0) * 10 * weight
+                crime_density += data.get("sexual_harassment", 0) * 20 * weight
+                
+                max_crime_density = max(max_crime_density, crime_density)
+        
+        # Check relevant hotspots
+        for spot in relevant_hotspots:
+            spot_dist = geopy_distance(
+                (coord.latitude, coord.longitude),
+                (spot['lat'], spot['lng'])
+            ).km
+            
+            if spot_dist <= spot['radius']:
+                hotspot_density = (spot['risk_score'] / 100.0) * 50000
+                proximity_weight = 1.0 - (spot_dist / spot['radius']) * 0.5
+                max_crime_density = max(max_crime_density, hotspot_density * proximity_weight)
+        
+        if max_crime_density == 0:
+            return 0.0
+        
+        return float(min(100.0, (max_crime_density / 50000) * 100))
 

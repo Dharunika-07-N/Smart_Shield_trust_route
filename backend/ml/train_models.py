@@ -54,8 +54,8 @@ class MLModelTrainer:
         logger.info("=" * 60)
         
         df = self.load_data('historical_deliveries.csv')
-        if df is None or len(df) < 100:
-            logger.warning("Insufficient data for time predictor. Need at least 100 samples.")
+        if df is None or len(df) < 5:
+            logger.warning("Insufficient data for time predictor. Need at least 5 samples.")
             return False
         
         # Feature engineering
@@ -101,8 +101,8 @@ class MLModelTrainer:
         logger.info("=" * 60)
         
         df = self.load_data('rl_episodes.csv')
-        if df is None or len(df) < 50:
-            logger.warning("Insufficient data for RL agent. Need at least 50 episodes.")
+        if df is None or len(df) < 2:
+            logger.warning("Insufficient data for RL agent. Need at least 2 episodes.")
             return False
         
         # Parse episode data

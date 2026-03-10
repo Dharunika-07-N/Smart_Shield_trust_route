@@ -959,7 +959,7 @@ const ModernDashboard = () => {
                                                         {weather.icon}
                                                     </div>
                                                     <div>
-                                                        <div className="text-4xl font-black text-slate-800 leading-none">{weather.temperature}°C</div>
+                                                        <div className="text-4xl font-black text-slate-800 leading-none">{Number(weather.temperature).toFixed(2)}°C</div>
                                                         <div className="text-xs text-slate-500 font-medium">{weather.condition}</div>
                                                     </div>
                                                 </div>
@@ -967,17 +967,17 @@ const ModernDashboard = () => {
                                                     <div className="bg-white p-2 rounded-xl text-center border border-slate-100 shadow-sm">
                                                         <FiDroplet className="mx-auto text-blue-500 mb-1" />
                                                         <div className="text-[10px] text-slate-400 uppercase tracking-tighter">Humidity</div>
-                                                        <div className="text-xs font-bold text-slate-800">{weather.humidity}%</div>
+                                                        <div className="text-xs font-bold text-slate-800">{Number(weather.humidity).toFixed(2)}%</div>
                                                     </div>
                                                     <div className="bg-white p-2 rounded-xl text-center border border-slate-100 shadow-sm">
                                                         <FiWind className="mx-auto text-indigo-500 mb-1" />
                                                         <div className="text-[10px] text-slate-400 uppercase tracking-tighter">Wind</div>
-                                                        <div className="text-xs font-bold text-slate-800">{weather.wind_speed} km/h</div>
+                                                        <div className="text-xs font-bold text-slate-800">{Number(weather.wind_speed).toFixed(2)} km/h</div>
                                                     </div>
                                                     <div className="bg-white p-2 rounded-xl text-center border border-slate-100 shadow-sm">
                                                         <FiEye className="mx-auto text-purple-500 mb-1" />
                                                         <div className="text-[10px] text-slate-400 uppercase tracking-tighter">Visibility</div>
-                                                        <div className="text-xs font-bold text-slate-800">{weather.visibility}</div>
+                                                        <div className="text-xs font-bold text-slate-800">{Number(weather.visibility).toFixed(2)}</div>
                                                     </div>
                                                 </div>
                                             </>

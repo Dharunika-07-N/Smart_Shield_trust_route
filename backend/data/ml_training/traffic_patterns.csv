@@ -1,0 +1,7 @@
+location_id,latitude,longitude,hour,day_of_week,avg_speed_kmh,congestion_level,sample_size
+LOC001,11.0180,76.9570,8,0,15.2,high,150
+LOC001,11.0180,76.9570,8,1,18.5,medium,145
+LOC001,11.0180,76.9570,14,0,28.3,low,120
+LOC001,11.0180,76.9570,18,0,12.8,high,180
+LOC002,11.0200,76.9600,8,0,22.1,medium,95
+LOC002,11.0200,76.9600,14,0,35.7,low,88

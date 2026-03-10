@@ -528,22 +528,23 @@ class SafetyScorer:
         
         for coord in coordinates:
             score, factors = self.score_location(coord, time_of_day, rider_info)
+            
+            # Segment risk level
+            seg_risk = self._get_risk_level(score)
+            
             segment_scores.append({
                 "coordinates": coord,
                 "overall_score": score,
-                "factors": factors
+                "factors": factors,
+                "risk_level": seg_risk,
+                "recommendations": [] # Simplified for now
             })
             total_score += score
         
         avg_score = total_score / len(coordinates) if coordinates else 0
         
         # Risk level classification
-        if avg_score >= 75:
-            risk_level = "low"
-        elif avg_score >= 50:
-            risk_level = "medium"
-        else:
-            risk_level = "high"
+        risk_level = self._get_risk_level(avg_score)
         
         return {
             "route_safety_score": avg_score,
@@ -553,6 +554,15 @@ class SafetyScorer:
             "improvement_suggestions": self._get_improvement_suggestions(avg_score)
         }
     
+    def _get_risk_level(self, score: float) -> str:
+        """Classify risk level based on safety score."""
+        if score >= 75:
+            return "low"
+        elif score >= 50:
+            return "medium"
+        else:
+            return "high"
+
     def _get_improvement_suggestions(self, score: float) -> List[str]:
         """Get suggestions for improving route safety."""
         suggestions = []

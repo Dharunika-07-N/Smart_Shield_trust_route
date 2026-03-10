@@ -167,11 +167,15 @@ def seed_ai_training():
     try:
         print("Training Time Predictor...")
         tp = EnhancedTimePredictor()
-        df_time = pd.read_sql_query("SELECT * FROM deliveries WHERE actual_duration_seconds IS NOT NULL LIMIT 100", conn)
-        # Need to map columns if they differ from what EnhancedTimePredictor expects
-        # EnhancedTimePredictor expects: delivery_id, route_distance, traffic_level, timestamp, actual_time, ...
-        # Based on training.py query: actual_time, estimatd_time, route_distance...
-        
+        try:
+            df_time = pd.read_sql_query("SELECT * FROM deliveries WHERE delivered_at IS NOT NULL LIMIT 100", conn)
+            # Map columns to what EnhancedTimePredictor expects if needed
+            if not df_time.empty and 'estimated_duration' in df_time.columns:
+                 df_time['estimated_time'] = df_time['estimated_duration'] / 60.0
+                 df_time['actual_time'] = df_time['estimated_time'] * np.random.uniform(0.9, 1.1, len(df_time)) # Mock actuals
+        except Exception:
+            df_time = pd.DataFrame()
+            
         # For demo, let's just create a minimal DF if deliveries is empty or missing columns
         if df_time.empty:
              df_time = pd.DataFrame({

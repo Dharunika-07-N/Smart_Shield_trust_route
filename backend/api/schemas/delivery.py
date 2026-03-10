@@ -115,6 +115,8 @@ class OptimizedRoute(BaseModel):
     created_at: datetime = Field(default_factory=datetime.now)
     estimated_arrivals: Dict[str, datetime] = Field(..., description="Estimated arrival times")
     alternatives: Optional[List["OptimizedRoute"]] = Field(None, description="Alternative routes")
+    rl_recommended_id: Optional[str] = Field(None, description="RL Agent recommended route ID")
+    rl_state: Optional[str] = Field(None, description="RL Agent state representation")
 
     class Config:
         json_schema_extra = {

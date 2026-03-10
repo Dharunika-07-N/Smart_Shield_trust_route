@@ -1,0 +1,5 @@
+feedback_id,route_id,rider_id,timestamp,location_lat,location_lng,is_faster,has_traffic,has_safety_issue,rating,comment
+FB001,R001,RID001,2024-01-15T14:35:00,11.0185,76.9575,1,0,0,5,Great route
+FB002,R002,RID002,2024-01-15T18:25:00,11.0220,76.9630,0,1,0,3,Heavy traffic
+FB003,R003,RID003,2024-01-16T10:15:00,11.0175,76.9560,1,0,0,5,Fast and safe
+FB004,R004,RID001,2024-01-16T08:45:00,11.0250,76.9680,0,1,0,3,Morning rush hour

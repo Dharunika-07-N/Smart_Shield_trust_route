@@ -1,0 +1,25 @@
+{
+  "data_summary": {
+    "total_deliveries": 5,
+    "total_riders": 5,
+    "traffic_data_points": 6
+  },
+  "delivery_statistics": {
+    "avg_time_minutes": 20.0,
+    "avg_distance_km": 3.8200000000000003,
+    "success_rate": 1.0,
+    "peak_hour_deliveries": 2,
+    "weekend_deliveries": 0
+  },
+  "rider_statistics": {
+    "avg_experience_months": 24.0,
+    "avg_success_rate": 0.962,
+    "avg_rating": 4.659999999999999,
+    "total_deliveries": 6490
+  },
+  "traffic_statistics": {
+    "avg_speed_kmh": 22.100000000000005,
+    "high_congestion_periods": 2,
+    "peak_hour_avg_speed": 17.15
+  }
+}

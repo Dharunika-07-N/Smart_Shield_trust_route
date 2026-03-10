@@ -175,7 +175,11 @@ class MapsService:
         except Exception:
             return []
 
-    def get_directions(
+    async def get_all_directions(self, origin: any, destination: any, **kwargs) -> List[Dict]:
+        """Get all route variations (for RouteOptimizer compatibility)"""
+        return await self.get_directions(origin, destination, alternatives=True, **kwargs)
+
+    async def get_directions(
         self, 
         origin: any, 
         destination: any, 
@@ -198,15 +202,21 @@ class MapsService:
             try:
                 logger.info(f"Routing request: {orig} to {dest} via Google")
                 g_waypoints = [f"{wp[0]},{wp[1]}" for wp in waypoint_list] if waypoint_list else None
-                directions = self.gmaps.directions(
-                    origin=orig,
-                    destination=dest,
-                    waypoints=g_waypoints,
-                    mode="driving",
-                    alternatives=alternatives,
-                    departure_time=datetime.now(),
-                    traffic_model="best_guess",
-                    optimize_waypoints=True if waypoints else False
+                
+                # Google Maps client is sync, run in executor to avoid blocking
+                loop = asyncio.get_event_loop()
+                directions = await loop.run_in_executor(
+                    None,
+                    lambda: self.gmaps.directions(
+                        origin=orig,
+                        destination=dest,
+                        waypoints=g_waypoints,
+                        mode="driving",
+                        alternatives=alternatives,
+                        departure_time=datetime.now(),
+                        traffic_model="best_guess",
+                        optimize_waypoints=True if waypoints else False
+                    )
                 )
                 
                 if directions:
@@ -247,7 +257,16 @@ class MapsService:
             try:
                 logger.info("Routing request: via GraphHopper")
                 gh_kwargs = {k: v for k, v in kwargs.items() if k in ('vehicle', 'locale')}
-                gh_route = self.graphhopper.get_directions(orig, dest, waypoint_list, **gh_kwargs)
+                
+                if asyncio.iscoroutinefunction(self.graphhopper.get_directions):
+                    gh_route = await self.graphhopper.get_directions(orig, dest, waypoint_list, **gh_kwargs)
+                else:
+                    loop = asyncio.get_event_loop()
+                    gh_route = await loop.run_in_executor(
+                        None, 
+                        lambda: self.graphhopper.get_directions(orig, dest, waypoint_list, **gh_kwargs)
+                    )
+                    
                 if gh_route:
                     gh_route['provider'] = 'graphhopper'
                     return [gh_route]
@@ -258,26 +277,16 @@ class MapsService:
         if self.osrm:
             try:
                 logger.info("Routing request: via OSRM (FREE)")
-                import asyncio
-                import concurrent.futures
                 
                 osrm_routes = None
                 if asyncio.iscoroutinefunction(self.osrm.get_directions):
-                    def run_osrm():
-                        new_loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(new_loop)
-                        try:
-                            return new_loop.run_until_complete(
-                                self.osrm.get_directions(orig, dest, waypoint_list, alternatives=alternatives)
-                            )
-                        finally:
-                            new_loop.close()
-                    
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        future = executor.submit(run_osrm)
-                        osrm_routes = future.result(timeout=10)
+                    osrm_routes = await self.osrm.get_directions(orig, dest, waypoint_list, alternatives=alternatives)
                 else:
-                    osrm_routes = self.osrm.get_directions(orig, dest, waypoint_list, alternatives=alternatives)
+                    loop = asyncio.get_event_loop()
+                    osrm_routes = await loop.run_in_executor(
+                        None,
+                        lambda: self.osrm.get_directions(orig, dest, waypoint_list, alternatives=alternatives)
+                    )
                 
                 if osrm_routes:
                     for r in osrm_routes:
