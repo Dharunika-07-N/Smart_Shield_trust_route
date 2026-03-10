@@ -158,7 +158,7 @@ const AdminDashboard = () => {
   };
 
   const handleExportIncidentReports = () => {
-    window.open(`${api.defaults?.baseURL || ''}/api/v1/admin/export/reports`, '_blank');
+    window.open(`${api.defaults?.baseURL || ''}/admin/export/reports`, '_blank');
   };
 
   const handleSysConfig = () => {

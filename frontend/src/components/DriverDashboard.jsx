@@ -432,10 +432,12 @@ const DriverDashboard = () => {
                 <button
                     onClick={() => {
                         if (window.confirm("Report safety hazard in current area?")) {
-                            api.post('/api/v1/feedback/alert', {
-                                message: "Reported Safety Hazard",
-                                location: currentLocation,
-                                type: 'hazard'
+                            api.post('/feedback/alert', {
+                                rider_id: driverId || 'anonymous',
+                                service_type: 'hazard',
+                                location: currentLocation || { latitude: 0, longitude: 0 },
+                                is_faster: false,
+                                has_traffic_issues: true
                             });
                             alert("Safety Alert broadcast to nearby drivers.");
                         }
