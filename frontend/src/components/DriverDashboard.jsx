@@ -431,12 +431,14 @@ const DriverDashboard = () => {
                 </div>
                 <button
                     onClick={() => {
-                        const msg = window.prompt("Enter incident or hazard description:");
-                        if (msg) api.post('/api/v1/feedback/alert', {
-                            message: msg,
-                            location: currentLocation,
-                            type: 'hazard'
-                        });
+                        if (window.confirm("Report safety hazard in current area?")) {
+                            api.post('/api/v1/feedback/alert', {
+                                message: "Reported Safety Hazard",
+                                location: currentLocation,
+                                type: 'hazard'
+                            });
+                            alert("Safety Alert broadcast to nearby drivers.");
+                        }
                     }}
                     className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center gap-2"
                 >

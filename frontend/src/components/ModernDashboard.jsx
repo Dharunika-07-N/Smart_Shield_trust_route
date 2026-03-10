@@ -517,11 +517,8 @@ const ModernDashboard = () => {
     };
 
     const handleReportIssue = () => {
-        const type = window.prompt("Type of hazard? (1: Road Closure, 2: Suspicious Activity, 3: Other)");
-        if (type) {
-            alert("FEEDBACK: Intelligence node updated. Other riders in the sector will be alerted.");
-            setActiveTab('Feedback');
-        }
+        // Navigate directly to Feedback tab to provide a more robust safety concern reporting flow
+        setActiveTab('Feedback');
     };
 
     const handleEmergency = async () => {
@@ -1063,14 +1060,14 @@ const ModernDashboard = () => {
                                                 key={sev}
                                                 onClick={() => setSeverityFilter(sev)}
                                                 className={`px-4 py-2 rounded-lg text-xs font-bold transition-all border ${severityFilter === sev
-                                                        ? (sev === 'all' ? 'bg-slate-800 text-white border-slate-800' :
-                                                            sev === 'high' ? 'bg-red-600 text-white border-red-600' :
-                                                                sev === 'medium' ? 'bg-orange-500 text-white border-orange-500' :
-                                                                    'bg-blue-600 text-white border-blue-600')
-                                                        : (sev === 'all' ? 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100' :
-                                                            sev === 'high' ? 'bg-red-50 text-red-600 border-red-100 hover:bg-red-100' :
-                                                                sev === 'medium' ? 'bg-orange-50 text-orange-600 border-orange-100 hover:bg-orange-100' :
-                                                                    'bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100')
+                                                    ? (sev === 'all' ? 'bg-slate-800 text-white border-slate-800' :
+                                                        sev === 'high' ? 'bg-red-600 text-white border-red-600' :
+                                                            sev === 'medium' ? 'bg-orange-500 text-white border-orange-500' :
+                                                                'bg-blue-600 text-white border-blue-600')
+                                                    : (sev === 'all' ? 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100' :
+                                                        sev === 'high' ? 'bg-red-50 text-red-600 border-red-100 hover:bg-red-100' :
+                                                            sev === 'medium' ? 'bg-orange-50 text-orange-600 border-orange-100 hover:bg-orange-100' :
+                                                                'bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100')
                                                     }`}
                                             >
                                                 {sev === 'all' ? 'All Alerts' : sev.charAt(0).toUpperCase() + sev.slice(1)}
@@ -1132,8 +1129,8 @@ const ModernDashboard = () => {
                                                             <div>
                                                                 <div className="flex flex-wrap items-center gap-2 mb-2">
                                                                     <span className={`text-[10px] font-black uppercase tracking-tighter px-2 py-0.5 rounded-full border shadow-sm ${severity === 'high' ? 'bg-red-600 text-white border-red-700' :
-                                                                            severity === 'medium' ? 'bg-orange-500 text-white border-orange-600' :
-                                                                                'bg-blue-600 text-white border-blue-700'
+                                                                        severity === 'medium' ? 'bg-orange-500 text-white border-orange-600' :
+                                                                            'bg-blue-600 text-white border-blue-700'
                                                                         }`}>
                                                                         {severity} severity
                                                                     </span>

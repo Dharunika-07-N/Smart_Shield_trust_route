@@ -521,9 +521,8 @@ const DispatcherDashboard = () => {
                                             </button>
                                             <button
                                                 onClick={() => {
-                                                    const msg = window.prompt(`Message to ${dr.full_name || dr.username}:`);
-                                                    if (msg) {
-                                                        alert(`Message sent via Secure Hub: "${msg}"`);
+                                                    if (window.confirm(`Ping ${dr.full_name || dr.username} for status update via secure channel?`)) {
+                                                        alert(`Status query sent to ${dr.username}. Waiting for node acknowledgement...`);
                                                         setActivities(prev => [{
                                                             id: Date.now(),
                                                             driver: dr.username,

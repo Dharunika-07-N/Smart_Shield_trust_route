@@ -145,14 +145,15 @@ const AdminDashboard = () => {
   }, [activeTab]);
 
   const handleBroadcast = async () => {
-    const msg = window.prompt("Enter message to broadcast to all nodes:");
-    if (!msg) return;
-    try {
-      await api.post('/admin/broadcast', { message: msg, target: 'all' });
-      setLastBroadcast({ message: msg, time: new Date().toLocaleTimeString() });
-      alert("Broadcast sent successfully!");
-    } catch (e) {
-      alert("Broadcast failed: " + e.message);
+    if (window.confirm("Broadcast emergency safety update to all active nodes?")) {
+      const msg = "System Alert: Maintain high vigilance in current sector. Tactical routing active.";
+      try {
+        await api.post('/admin/broadcast', { message: msg, target: 'all' });
+        setLastBroadcast({ message: msg, time: new Date().toLocaleTimeString() });
+        alert("Broadcast sent successfully!");
+      } catch (e) {
+        alert("Broadcast failed: " + e.message);
+      }
     }
   };
 
@@ -752,12 +753,11 @@ const AdminDashboard = () => {
                             <button
                               onClick={async () => {
                                 if (alert.status === 'resolved') return;
-                                const notes = window.prompt("Enter resolution notes:");
-                                if (notes) {
+                                if (window.confirm("Mark this SOS alert as resolved? All responders will be updated.")) {
                                   await api.post('/safety/panic-button/resolve', {
                                     alert_id: alert.id,
                                     rider_id: alert.rider_id,
-                                    resolution_notes: notes
+                                    resolution_notes: "SOS Resolved via Admin Control"
                                   });
                                   // Refresh
                                   const updated = await api.get('/safety/alerts');
