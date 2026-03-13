@@ -26,7 +26,7 @@ class MapsService:
         self.gmaps_key = settings.GOOGLE_MAPS_API_KEY
         self.gmaps_working = True
         self.gmaps_failures = 0
-        if self.gmaps_key and not self.gmaps_key.startswith('YOUR_'):
+        if self.gmaps_key and not self.gmaps_key.startswith('YOUR_') and not self.gmaps_key.startswith('your_') and len(self.gmaps_key) > 20:
             try:
                 self.gmaps = googlemaps.Client(key=self.gmaps_key)
                 logger.info("Google Maps Client initialized")
@@ -37,11 +37,11 @@ class MapsService:
         else:
             self.gmaps = None
             self.gmaps_working = False
-            logger.warning("Google Maps API key missing or invalid")
+            logger.warning("Google Maps API key missing or placeholder")
 
         # Initialize PositionStack (High Accuracy Geocoding)
         self.ps_api_key = settings.POSITIONSTACK_API_KEY
-        if self.ps_api_key and not self.ps_api_key.startswith('your_'):
+        if self.ps_api_key and not self.ps_api_key.startswith('your_') and not self.ps_api_key.startswith('YOUR_') and len(self.ps_api_key) > 10:
             self.positionstack = PositionStackService(api_key=self.ps_api_key)
             logger.info("PositionStack Geocoding Service initialized")
         else:
@@ -50,12 +50,12 @@ class MapsService:
 
         # Initialize GraphHopper
         self.gh_api_key = settings.GRAPHHOPPER_API_KEY
-        if self.gh_api_key and not self.gh_api_key.startswith('YOUR_'):
+        if self.gh_api_key and not self.gh_api_key.startswith('YOUR_') and not self.gh_api_key.startswith('your_') and len(self.gh_api_key) > 20:
             self.graphhopper = GraphHopperService(api_key=self.gh_api_key)
             logger.info("GraphHopper Service initialized")
         else:
             self.graphhopper = None
-            logger.warning("GraphHopper API key missing")
+            logger.warning("GraphHopper API key missing or placeholder")
 
         # Initialize OSRM (FREE!)
         try:
