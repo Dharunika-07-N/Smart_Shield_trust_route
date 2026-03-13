@@ -193,15 +193,22 @@ async def optimize_route(
     try:
         logger.info(f"Optimizing route for {len(request.stops)} stops (Origin: {request.starting_point})")
         
-        # Optimize route using the optimizer service
-        optimized_data = await route_optimizer.optimize_route(
-            starting_point=request.starting_point,
-            stops=request.stops,
-            optimize_for=request.optimize_for,
-            rider_info=request.rider_info,
-            vehicle_type=request.vehicle_type,
-            departure_time=request.departure_time
-        )
+        # Optimize route using the optimizer service with a global timeout
+        try:
+            optimized_data = await asyncio.wait_for(
+                route_optimizer.optimize_route(
+                    starting_point=request.starting_point,
+                    stops=request.stops,
+                    optimize_for=request.optimize_for,
+                    rider_info=request.rider_info,
+                    vehicle_type=request.vehicle_type,
+                    departure_time=request.departure_time
+                ),
+                timeout=25.0  # 25-second hard limit
+            )
+        except asyncio.TimeoutError:
+            logger.error("Route optimization timed out after 25 seconds")
+            raise HTTPException(status_code=504, detail="Route optimization timed out. Please try again.")
         
         # Save to database - use jsonable_encoder to handle datetime/pydantic objects
         db_service = DatabaseService(db)
@@ -232,6 +239,8 @@ async def optimize_route(
     except ValueError as e:
         logger.error(f"Validation error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception(f"Optimization error: {e}")
         raise HTTPException(status_code=500, detail=f"Route optimization failed: {str(e)}")

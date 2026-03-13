@@ -804,17 +804,16 @@ class RouteOptimizer:
             safety_data = self.safety_scorer.score_route(
                 segment_coords, time_of_day, rider_info
             )
-            safety_score = safety_data["route_safety_score"]
+            # safety_scorer now returns plain float; clip to [0,100] as a safeguard
+            safety_score = float(np.clip(safety_data["route_safety_score"], 0.0, 100.0))
             
             # Apply weather penalty to duration
             weather_penalty = self.weather_service.calculate_weather_penalty(weather_data)
-            duration = duration * weather_penalty
+            duration = float(duration) * float(weather_penalty)
             
             # Phase 4: Predictive Delivery Time Model
             if HAS_RENOVATION_ML and self.time_predictor.model:
                 try:
-                    # Prepare features for ML model
-                    # [distance, traffic_level, hour, weather_hazard, etc.]
                     feature_row = pd.DataFrame([{
                         'distance': distance / 1000.0,
                         'traffic_level': 2 if traffic_level == 'high' else 1 if traffic_level == 'medium' else 0,
@@ -826,16 +825,17 @@ class RouteOptimizer:
                              if col not in feature_row.columns:
                                  feature_row[col] = 0
                     
-                    predicted_min = self.time_predictor.predict(feature_row)[0]
+                    predicted_min = float(self.time_predictor.predict(feature_row)[0])
                     # Blend OSRM duration with ML prediction (70/30)
                     duration = (duration * 0.7) + (predicted_min * 60 * 0.3)
                     logger.debug(f"Applied ML time prediction: {predicted_min:.2f} min (Original: {duration/60:.2f} min)")
                 except Exception as e:
                     logger.warning(f"Predictive time model failed: {e}")
 
-            # Calculate fuel consumption
-
-            fuel = distance / 1000 * settings.FUEL_CONSUMPTION_PER_KM
+            # Calculate fuel consumption — cast explicitly to avoid np.float64
+            fuel = float(distance / 1000 * settings.FUEL_CONSUMPTION_PER_KM)
+            distance = float(distance)
+            duration = float(duration)
             
             # Get traffic level for this segment
             traffic_level = "low"
@@ -872,13 +872,14 @@ class RouteOptimizer:
             
             current_point = next_point
         
-        avg_safety = total_safety / len(sequence) if sequence else 0
+        avg_safety = float(total_safety / len(sequence)) if sequence else 0.0
+        avg_safety = float(np.clip(avg_safety, 0.0, 100.0))
         
         return segments, {
-            "distance": total_distance,
-            "duration": total_duration,
+            "distance": float(total_distance),
+            "duration": float(total_duration),
             "avg_safety": avg_safety,
-            "fuel": total_fuel
+            "fuel": float(total_fuel)
         }
     
     def _calculate_arrivals(
@@ -1189,12 +1190,12 @@ class RouteOptimizer:
         safety_data = self.safety_scorer.score_route(
             segment_coords, time_of_day, rider_info
         )
-        safety_score = safety_data["route_safety_score"]
+        # Cast to plain float and clamp — safety_scorer already does this, but being explicit here
+        safety_score = float(np.clip(safety_data["route_safety_score"], 0.0, 100.0))
 
         # RENOVATION: ML Model Integration
         if HAS_RENOVATION_ML:
             try:
-                # Prepare context for feature extraction
                 route_context = {
                     'delivery_time': departure_time.isoformat() if departure_time else datetime.utcnow().isoformat(),
                     'total_distance': distance / 1000,
@@ -1207,33 +1208,29 @@ class RouteOptimizer:
                     }]
                 }
                 
-                # Extract features
                 features_df = self.feature_engineer.extract_features(route_context)
                 
-                # Predict Time (minutes to seconds)
-                ml_time_min = self.time_predictor.predict(features_df)[0]
+                # Predict Time — cast to plain float
+                ml_time_min = float(self.time_predictor.predict(features_df)[0])
                 duration = float(ml_time_min * 60)
                 
-                # Predict Safety Score (Random Forest)
-                ml_safety_score = self.safety_classifier.predict_safety_score(features_df)[0]
-                safety_score = float(ml_safety_score)
+                # Predict Safety Score — cast to plain float and clamp
+                ml_safety_score = float(self.safety_classifier.predict_safety_score(features_df)[0])
+                safety_score = float(np.clip(ml_safety_score, 0.0, 100.0))
                 
                 logger.info(f"ML Metrics - Time: {ml_time_min:.1f}m, Safety: {safety_score:.1f}")
             except Exception as e:
                 logger.warning(f"ML prediction failed, using rule-based fallback: {e}")
 
-        # Adjustments
-        weather_penalty = self.weather_service.calculate_weather_penalty(weather_data)
-        duration = duration * weather_penalty
-        
-        fuel = distance / 1000 * settings.FUEL_CONSUMPTION_PER_KM
+        # Adjustments — ensure all are plain float throughout
+        weather_penalty = float(self.weather_service.calculate_weather_penalty(weather_data))
+        duration = float(duration) * weather_penalty
+        distance = float(distance)
+        fuel = float(distance / 1000 * settings.FUEL_CONSUMPTION_PER_KM)
         
         # Traffic level (simplified check)
         traffic_level = "low"
         if directions.get('has_traffic_data'):
-             # If duration in traffic is significantly higher than base duration
-             # We can't easily get base duration from here without another call, 
-             # so we rely on what traffic service would say or infer from speed
              avg_speed_kmh = (distance / 1000) / (duration / 3600) if duration > 0 else 30
              if avg_speed_kmh < 15:
                  traffic_level = "high"
@@ -1241,7 +1238,7 @@ class RouteOptimizer:
                  traffic_level = "medium"
         
         segment = {
-            "from_stop": "START", # Placeholder, should be fixed by caller if needed
+            "from_stop": "START",
             "to_stop": "END",
             "distance_meters": distance,
             "duration_seconds": duration,

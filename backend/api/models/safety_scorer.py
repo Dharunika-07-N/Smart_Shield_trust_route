@@ -416,66 +416,62 @@ class SafetyScorer:
         if self.scaler:
             features_for_model = self.scaler.transform(features_for_model)
         
-        # Get model prediction
-        base_score = self.model.predict(features_for_model)[0]
+        # Get model prediction — cast to plain float to avoid np.float64 Pydantic errors
+        base_score = float(self.model.predict(features_for_model)[0])
+        
         # Apply gender-specific adjustments if needed
         if rider_info and rider_info.get("gender") == "female":
-            # Determine indices based on feature count
             feat_cnt = getattr(self, "feature_count", 7)
             if feat_cnt == 12:
-                # 12-feature model: index 6 is lighting, index 1 is crime_severity
-                if features[6] < 50:  # Low lighting
+                if float(features[6]) < 50:
                     base_score -= 10
-                if features[1] > 5:   # High crime (0-10 scale)
+                if float(features[1]) > 5:
                     base_score -= 10
             else:
-                # 7-feature model: index 1 is lighting, index 2 is patrol
-                if features[1] < 50:  # Low lighting
+                if float(features[1]) < 50:
                     base_score -= 10
-                if features[2] < 50:  # Low patrol
+                if float(features[2]) < 50:
                     base_score -= 10
-        
-        base_score = np.clip(base_score, 0, 100)
         
         # Get crime data for detailed description
         crime_data = self.crime_service.get_crime_data_for_location(coord)
-        crime_score = self.crime_service.get_crime_score(coord)
+        crime_score = float(self.crime_service.get_crime_score(coord))
         
-        # Create factors breakdown
+        # Create factors breakdown — all scores explicitly cast to float for Pydantic
         factors = [
             {
                 "factor": "crime_overall",
-                "score": max(0, 100 - crime_score),
-                "weight": self.weights["crime"],
+                "score": float(max(0.0, 100.0 - crime_score)),
+                "weight": float(self.weights["crime"]),
                 "description": f"Overall Crime Risk: {crime_data.get('district', 'Unknown')}"
             },
             {
                 "factor": "lighting",
-                "score": features[1],
-                "weight": self.weights["lighting"],
-                "description": f"Lighting conditions: {features[1]:.1f}/100"
+                "score": float(np.clip(features[1], 0, 100)),
+                "weight": float(self.weights["lighting"]),
+                "description": f"Lighting conditions: {float(features[1]):.1f}/100"
             },
             {
                 "factor": "patrol_presence",
-                "score": features[2],
-                "weight": self.weights["patrol_presence"],
-                "description": f"Patrol density: {features[2]:.1f}/100"
+                "score": float(np.clip(features[2], 0, 100)),
+                "weight": float(self.weights["patrol_presence"]),
+                "description": f"Patrol density: {float(features[2]):.1f}/100"
             },
             {
                 "factor": "traffic",
-                "score": max(0, 100 - features[3]),
-                "weight": self.weights["traffic"],
-                "description": f"Traffic conditions: {features[3]:.1f}/100"
+                "score": float(max(0.0, 100.0 - float(features[3]))),
+                "weight": float(self.weights["traffic"]),
+                "description": f"Traffic conditions: {float(features[3]):.1f}/100"
             },
             {
                 "factor": "police_proximity",
-                "score": features[5],
+                "score": float(np.clip(features[5], 0, 100)),
                 "weight": 0.15,
                 "description": "Proximity to Police Station"
             },
             {
                 "factor": "hospital_proximity",
-                "score": features[6],
+                "score": float(np.clip(features[6], 0, 100)),
                 "weight": 0.15,
                 "description": "Proximity to 24/7 Medical Services"
             }
@@ -483,32 +479,34 @@ class SafetyScorer:
         
         # Add specific high-risk warnings based on raw counts
         if crime_data.get('theft', 0) > 100:
-             factors.append({
+            factors.append({
                 "factor": "theft_risk",
-                "score": 40, # Low safety score specifically for theft
+                "score": 40.0,
                 "weight": 0.1,
                 "description": "High Theft Zone"
             })
             
         if crime_data.get('sexual_harassment', 0) > 20:
-             factors.append({
+            factors.append({
                 "factor": "harassment_risk",
-                "score": 20, # Very low safety score
+                "score": 20.0,
                 "weight": 0.2,
                 "description": "High Harassment Risk Area"
             })
         
-        # Add weather factor if available
+        # Add weather factor if available and adjust score BEFORE final clip
         if weather_data:
-            weather_hazard = weather_data.get("hazard_score", 0)
+            weather_hazard = float(weather_data.get("hazard_score", 0))
             factors.append({
                 "factor": "weather",
-                "score": max(0, 100 - weather_hazard),
-                "weight": 0.15,  # Additional weight for weather
+                "score": float(max(0.0, 100.0 - weather_hazard)),
+                "weight": 0.15,
                 "description": f"Weather hazard: {', '.join(weather_data.get('hazard_conditions', []))}"
             })
-            # Adjust base score based on weather
             base_score -= weather_hazard * 0.2
+        
+        # Final clip AFTER all adjustments to guarantee [0, 100] range
+        base_score = float(np.clip(base_score, 0.0, 100.0))
         
         return base_score, factors
     
@@ -524,24 +522,26 @@ class SafetyScorer:
             Dictionary with route safety metrics
         """
         segment_scores = []
-        total_score = 0
+        total_score = 0.0
         
         for coord in coordinates:
             score, factors = self.score_location(coord, time_of_day, rider_info)
+            # score is already a plain float after score_location's final clip
             
-            # Segment risk level
+            # Segment risk level — guaranteed valid string
             seg_risk = self._get_risk_level(score)
             
             segment_scores.append({
                 "coordinates": coord,
-                "overall_score": score,
-                "factors": factors,
-                "risk_level": seg_risk,
-                "recommendations": [] # Simplified for now
+                "overall_score": score,          # plain float
+                "factors": factors,               # all factor scores already float
+                "risk_level": seg_risk,           # "low" | "medium" | "high"
+                "recommendations": []
             })
             total_score += score
         
-        avg_score = total_score / len(coordinates) if coordinates else 0
+        avg_score = float(total_score / len(coordinates)) if coordinates else 0.0
+        avg_score = float(np.clip(avg_score, 0.0, 100.0))
         
         # Risk level classification
         risk_level = self._get_risk_level(avg_score)
