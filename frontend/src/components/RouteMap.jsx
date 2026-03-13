@@ -402,24 +402,27 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
 
       setAlternatives(alts);
 
-      // Simple recommendation logic
-      let best = 'fastest';
-      // If we have data, logic: prefer safe if safety < 65 on fastest or time diff < 20%
+      // Simple recommendation logic: Pick first available successful route as initial default
+      let best = fastJson?.success ? 'fastest' : (safeJson?.success ? 'safest' : (shortJson?.success ? 'shortest' : 'fastest'));
+      
       const fastData = fastJson?.data;
       const safeData = safeJson?.data;
       const shortData = shortJson?.data;
-
-      if (fastData && safeData) {
-        const fastestSecs = fastData.total_duration_seconds || 0;
-        const safestSecs = safeData.total_duration_seconds || 0;
-        const fastestSafety = fastData.average_safety_score || 0;
-        const chooseSafe = fastestSafety < 65 || (safestSecs && fastestSecs && (safestSecs - fastestSecs) / fastestSecs < 0.2);
-        if (chooseSafe) best = 'safest';
-      } else if (safeData) {
-        best = 'safest';
-      }
-      // Could accept Shortest if specifically much shorter, but for now stick to 2 main defaults unless user clicks
-      setRecommended(best);
+ 
+       // Only perform complex comparison if we have both fastest and safest data
+       if (fastData && safeData) {
+         const fastestSecs = fastData.total_duration_seconds || 0;
+         const safestSecs = safeData.total_duration_seconds || 0;
+         const fastestSafety = fastData.average_safety_score || 0;
+         const chooseSafe = fastestSafety < 65 || (safestSecs && fastestSecs && (safestSecs - fastestSecs) / fastestSecs < 0.2);
+         if (chooseSafe) best = 'safest';
+       } else if (safeData && !fastData) {
+         best = 'safest';
+       } else if (shortData && !fastData && !safeData) {
+         best = 'shortest';
+       }
+       
+       setRecommended(best);
 
       // Fetch safety overlay for recommended route
       const recData = best === 'safest' ? safeData : (best === 'shortest' ? shortData : fastData);
@@ -590,6 +593,143 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
       shortest: '#8b5cf6', // Purple
     };
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
     const isSelected = (recommended === 'fastest' && routeType === 'fastest') ||
       (recommended === 'safest'   && routeType === 'safest')   ||
       (recommended === 'shortest' && routeType === 'shortest') ||
@@ -598,9 +738,9 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
 
     const routeColor = typeColors[routeType] || (isSelected ? '#3b82f6' : '#94a3b8');
     
-    // Add distinct patterns for accessibility
+    // Add distinct patterns and glow for better visibility
     const dashArray = 
-      routeType === 'shortest' ? '1, 10' : 
+      routeType === 'shortest' ? '3, 15' : 
       routeType === 'fastest' ? null : 
       null; // Safest is solid but thicker
 
@@ -618,13 +758,13 @@ const RouteMap = ({ variant = 'default', route, markers, center, zoom, onMarkerC
         polylines.push({
           positions: coords,
           color: routeColor,
-          weight: isSelected ? 10 : 5,
-          opacity: isSelected ? 1.0 : 0.4,
+          weight: isSelected ? 12 : 6,
+          opacity: isSelected ? 1.0 : 0.45,
           dashArray: isSelected ? null : dashArray,
           safetyScore,
           isRecommended: isSelected,
           routeType,
-          className: `route-${routeType || 'alt'} ${isSelected ? 'route-selected' : ''}`
+          className: `route-${routeType || 'alt'} ${isSelected ? 'route-selected selected-glow' : ''}`
         });
       }
     });

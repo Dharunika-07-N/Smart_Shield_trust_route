@@ -366,21 +366,25 @@ const ModernDashboard = () => {
 
     const fetchFleetData = async () => {
         try {
-            // Using getRidersStatus as it provides more detail (active delivery etc)
-            // It was recently opened for non-admins too
-            const data = await api.getRidersStatus();
-            if (Array.isArray(data)) {
-                // Filter out current user if needed, or show all
-                setFleetRiders(data.map(r => ({
-                    ...r,
-                    // Store initial simulated position if real location is static
-                    simLat: r.last_location?.latitude || (11.0168 + (Math.random() - 0.5) * 0.04),
-                    simLng: r.last_location?.longitude || (76.9558 + (Math.random() - 0.5) * 0.04),
-                    drift: {
-                        lat: (Math.random() - 0.5) * 0.0005,
-                        lng: (Math.random() - 0.5) * 0.0005
-                    }
-                })));
+            // Only fetch fleet data if the user has appropriate permissions
+            if (user?.role === 'admin' || user?.role === 'dispatcher') {
+                const data = await api.getRidersStatus();
+                if (Array.isArray(data)) {
+                    // Filter out current user if needed, or show all
+                    setFleetRiders(data.map(r => ({
+                        ...r,
+                        // Store initial simulated position if real location is static
+                        simLat: r.last_location?.latitude || (11.0168 + (Math.random() - 0.5) * 0.04),
+                        simLng: r.last_location?.longitude || (76.9558 + (Math.random() - 0.5) * 0.04),
+                        drift: {
+                            lat: (Math.random() - 0.5) * 0.0005,
+                            lng: (Math.random() - 0.5) * 0.0005
+                        }
+                    })));
+                }
+            } else {
+                console.log("Skipping fleet status fetch: restricted to admin/dispatcher roles.");
+                setFleetRiders([]); 
             }
         } catch (err) {
             console.error("Failed to fetch fleet for simulation", err);

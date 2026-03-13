@@ -48,3 +48,18 @@
     transform: rotate(360deg);
   }
 }
+
+/* Route highlighting */
+.selected-glow {
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.8));
+  z-index: 1000 !important;
+}
+
+.route-selected {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pulsing-marker {
+  z-index: 2000 !important;
+}
