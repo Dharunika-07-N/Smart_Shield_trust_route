@@ -100,16 +100,6 @@ const LandingPage = () => {
                 </div>
             </section>
 
-            {/* CTA */}
-            <section className="py-20 px-8 bg-slate-50">
-                <div className="max-w-4xl mx-auto bg-gradient-to-br from-indigo-600 to-blue-700 rounded-[3rem] p-12 md:p-20 text-center shadow-2xl shadow-indigo-900/20 relative overflow-hidden">
-                    <FiShield className="absolute -right-10 -bottom-10 text-white/10 w-64 h-64 rotate-12" />
-                    <h2 className="text-3xl md:text-5xl font-black text-white mb-8 relative z-10 tracking-tight">Start Protecting Your Journey Today.</h2>
-                    <Link to="/login" className="inline-flex items-center gap-3 px-10 py-5 bg-white text-indigo-600 rounded-2xl font-black text-lg hover:scale-[1.05] transition-all relative z-10 shadow-xl">
-                        Deploy SmartShield <FiArrowRight />
-                    </Link>
-                </div>
-            </section>
 
             {/* Footer */}
             <footer className="py-12 border-t border-slate-100 px-8 md:px-20 flex flex-col md:flex-row items-center justify-between gap-8 bg-white">
