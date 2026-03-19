@@ -435,6 +435,7 @@ class DeliveryFeedback(Base):
     route = relationship("DeliveryRoute", back_populates="feedback")
 
 
+
 class AlertPreferences(Base):
     """Alert notification preferences for riders."""
     __tablename__ = "alert_preferences"
@@ -471,6 +472,7 @@ class AlertPreferences(Base):
     
     # Metadata
     submitted_at = Column(DateTime, default=datetime.utcnow)
+
 
 
 class HistoricalDelivery(Base):
