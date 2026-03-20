@@ -1,0 +1,169 @@
+{
+  "version": "demo_v2",
+  "timestamp": "2026-03-20T17:21:36.721639",
+  "feature_names": [
+    "lighting",
+    "patrol_frequency",
+    "traffic_density",
+    "police_proximity",
+    "hospital_proximity",
+    "time_of_day",
+    "day_of_week",
+    "is_weekend",
+    "population_density",
+    "commercial_area",
+    "residential_area",
+    "street_width",
+    "cctv_coverage",
+    "emergency_response_time"
+  ],
+  "training_history": [
+    {
+      "timestamp": "2026-03-20T17:21:36.120275",
+      "metrics": {
+        "accuracy": 0.81,
+        "precision_weighted": 0.7998529411764705,
+        "recall_weighted": 0.81,
+        "f1_weighted": 0.8044155844155845,
+        "cohen_kappa": 0.5770258236865539,
+        "confusion_matrix": [
+          [
+            24,
+            10,
+            0
+          ],
+          [
+            8,
+            57,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ]
+        ],
+        "classification_report": {
+          "2": {
+            "precision": 0.75,
+            "recall": 0.7058823529411765,
+            "f1-score": 0.7272727272727273,
+            "support": 34.0
+          },
+          "3": {
+            "precision": 0.8382352941176471,
+            "recall": 0.8769230769230769,
+            "f1-score": 0.8571428571428571,
+            "support": 65.0
+          },
+          "4": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 1.0
+          },
+          "accuracy": 0.81,
+          "macro avg": {
+            "precision": 0.5294117647058824,
+            "recall": 0.5276018099547511,
+            "f1-score": 0.5281385281385281,
+            "support": 100.0
+          },
+          "weighted avg": {
+            "precision": 0.7998529411764705,
+            "recall": 0.81,
+            "f1-score": 0.8044155844155845,
+            "support": 100.0
+          }
+        },
+        "roc_auc_ovr": null,
+        "cv_scores": [
+          0.7988843660485452,
+          0.8183673469387756,
+          0.8173171022795083
+        ],
+        "cv_mean": 0.8115229384222763,
+        "cv_std": 0.008947099611814996,
+        "best_params": {
+          "bootstrap": true,
+          "ccp_alpha": 0.0,
+          "class_weight": "balanced",
+          "criterion": "gini",
+          "max_depth": 20,
+          "max_features": "sqrt",
+          "max_leaf_nodes": null,
+          "max_samples": null,
+          "min_impurity_decrease": 0.0,
+          "min_samples_leaf": 2,
+          "min_samples_split": 5,
+          "min_weight_fraction_leaf": 0.0,
+          "monotonic_cst": null,
+          "n_estimators": 200,
+          "n_jobs": -1,
+          "oob_score": false,
+          "random_state": 42,
+          "verbose": 0,
+          "warm_start": false
+        }
+      },
+      "feature_importance": [
+        {
+          "feature": "lighting",
+          "importance": 0.3109465705121738
+        },
+        {
+          "feature": "traffic_density",
+          "importance": 0.20920189207325934
+        },
+        {
+          "feature": "patrol_frequency",
+          "importance": 0.15232585503755272
+        },
+        {
+          "feature": "police_proximity",
+          "importance": 0.13065307739569004
+        },
+        {
+          "feature": "hospital_proximity",
+          "importance": 0.12938047605565045
+        },
+        {
+          "feature": "day_of_week",
+          "importance": 0.05285289769609713
+        },
+        {
+          "feature": "is_weekend",
+          "importance": 0.014639231229576631
+        },
+        {
+          "feature": "time_of_day",
+          "importance": 0.0
+        },
+        {
+          "feature": "population_density",
+          "importance": 0.0
+        },
+        {
+          "feature": "commercial_area",
+          "importance": 0.0
+        },
+        {
+          "feature": "residential_area",
+          "importance": 0.0
+        },
+        {
+          "feature": "street_width",
+          "importance": 0.0
+        },
+        {
+          "feature": "cctv_coverage",
+          "importance": 0.0
+        },
+        {
+          "feature": "emergency_response_time",
+          "importance": 0.0
+        }
+      ]
+    }
+  ]
+}
