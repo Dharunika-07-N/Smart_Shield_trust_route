@@ -44,7 +44,7 @@ class EnhancedSafetyClassifier:
         self.model = None
         self.scaler = RobustScaler()  # Better for outliers than StandardScaler
         self.feature_names = [
-            'crime_rate', 'lighting', 'patrol_frequency', 
+            'lighting', 'patrol_frequency', 
             'traffic_density', 'police_proximity', 'hospital_proximity',
             # NEW FEATURES:
             'time_of_day', 'day_of_week', 'is_weekend',
@@ -95,7 +95,6 @@ class EnhancedSafetyClassifier:
         )
         
         df['risk_score'] = (
-            df.get('crime_rate', 0) * 0.6 + 
             (1 / (df.get('police_proximity', 0.1) + 0.1)) * 0.4
         )
         
@@ -132,14 +131,13 @@ class EnhancedSafetyClassifier:
         Convert features to safety classes (0-4)
         This is for synthetic data generation or labeling
         """
-        # Weighted safety score calculation with defaults
+        # Weighted safety score calculation with defaults (Removing Crime)
         safety_score = (
-            (1 - features.get('crime_rate', 0.5)) * 0.30 +
-            features.get('lighting', 0.5) * 0.15 +
+            features.get('lighting', 0.5) * 0.25 +
             features.get('patrol_frequency', 0.5) * 0.20 +
-            features.get('safety_infrastructure', 0.5) * 0.15 +
-            features.get('emergency_accessibility', 0.5) * 0.10 +
-            (1 - features.get('risk_score', 0.5)) * 0.10
+            features.get('safety_infrastructure', 0.5) * 0.20 +
+            features.get('emergency_accessibility', 0.5) * 0.15 +
+            (1 - features.get('risk_score', 0.5)) * 0.20
         )
         
         # Convert to classes
