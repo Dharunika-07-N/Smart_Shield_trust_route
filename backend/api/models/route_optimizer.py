@@ -43,8 +43,8 @@ except ImportError:
 # Renovation ML Models
 try:
     from ml.feature_engineer import FeatureEngineer
-    from ml.time_predictor import DeliveryTimePredictor
-    from ml.safety_classifier import SafetyClassifier
+    from ml.time_predictor_enhanced import EnhancedTimePredictor as DeliveryTimePredictor
+    from ml.safety_classifier_enhanced import EnhancedSafetyClassifier as SafetyClassifier
     from ml.rl_agent import SARSARouteAgent
     HAS_RENOVATION_ML = True
 except ImportError:
@@ -622,15 +622,52 @@ class RouteOptimizer:
         return sorted_stops
 
     def _optimize_genetic(
-
         self,
         cost_matrix: List[List[float]],
         num_stops: int
     ) -> List[int]:
-        """Genetic algorithm optimization (simplified)."""
-        # For simplicity, use nearest neighbor with variations
-        # In production, implement full GA with population, crossover, mutation
-        return self._optimize_nearest_neighbor(cost_matrix)
+        if num_stops < 4:
+            return self._optimize_nearest_neighbor(cost_matrix)
+            
+        population_size = 50
+        generations = 50
+        mutation_rate = 0.1
+        
+        def calculate_fitness(route):
+            total_cost = 0
+            for i in range(len(route) - 1):
+                total_cost += cost_matrix[route[i]][route[i+1]]
+            return 1 / (total_cost + 1e-6)
+
+        # Initial Population: Mix of nearest neighbor + random scrambles
+        population = [self._optimize_nearest_neighbor(cost_matrix)]
+        base_route = list(range(num_stops))
+        for _ in range(population_size - 1):
+            random_route = base_route.copy()
+            np.random.shuffle(random_route)
+            population.append(random_route)
+            
+        for generation in range(generations):
+            # Sort by fitness
+            population = sorted(population, key=lambda r: calculate_fitness(r), reverse=True)
+            new_population = population[:10] # Elitism
+            
+            while len(new_population) < population_size:
+                # Crossover (Simple Order Crossover)
+                parent1, parent2 = population[np.random.randint(0, 20)], population[np.random.randint(0, 20)]
+                cut = np.random.randint(0, num_stops - 1)
+                child = parent1[:cut] + [x for x in parent2 if x not in parent1[:cut]]
+                
+                # Mutation
+                if np.random.rand() < mutation_rate:
+                    idx1, idx2 = np.random.randint(0, num_stops), np.random.randint(0, num_stops)
+                    child[idx1], child[idx2] = child[idx2], child[idx1]
+                
+                new_population.append(child)
+            population = new_population
+
+        best_route = sorted(population, key=lambda r: calculate_fitness(r), reverse=True)[0]
+        return best_route
     
     async def _build_route_segments(
         self,
@@ -728,22 +765,30 @@ class RouteOptimizer:
                 distance = self.maps_service.calculate_straight_distance(current_point, next_point)
                 duration = distance / 8.33 # default 30km/h
             
-            # Get traffic-aware override if service is available
-            traffic_level = "low"
-            try:
-                if hasattr(self.traffic_service, 'get_traffic_level'):
-                    if asyncio.iscoroutinefunction(self.traffic_service.get_traffic_level):
-                        t_level, _, t_duration = await self.traffic_service.get_traffic_level(current_point, next_point)
-                    else:
-                        t_level, _, t_duration = self.traffic_service.get_traffic_level(current_point, next_point)
+            # NEW: ML-powered Duration Prediction using our 50k ride history
+            ml_predicted_duration = duration # fallback
+            if HAS_RENOVATION_ML and self.time_predictor:
+                try:
+                    # Prepare simple features for inference
+                    current_time_obj = departure_time or datetime.now()
+                    feature_df = pd.DataFrame([{
+                        'route_distance': distance / 1000.0, # km
+                        'traffic_level': 0.5 if traffic_level == 'medium' else (0.8 if traffic_level == 'high' else 0.2),
+                        'timestamp': current_time_obj.isoformat()
+                    }])
+                    X_infer, _, _ = self.time_predictor.prepare_data(feature_df)
+                    preds = self.time_predictor.predict(X_infer)
+                    ml_predicted_duration = float(preds[0]) * 60 # Convert min to seconds
                     
-                    traffic_level = t_level
-                    # Only override if we don't have directions duration or if traffic says it's higher
-                    if duration == 0 or t_duration > duration:
-                        duration = t_duration
-            except Exception:
-                pass
-            
+                    # Log if there's a significant discrepancy
+                    diff = abs(ml_predicted_duration - duration)
+                    if diff > 300: # 5 mins
+                        logger.info(f"AI Prediction discrepancy: ML {ml_predicted_duration/60:.1f}m vs API {duration/60:.1f}m")
+                        # Use ML if we trust it more, or a weighted average
+                        duration = (duration * 0.4) + (ml_predicted_duration * 0.6)
+                except Exception as ml_err:
+                    logger.warning(f"ML prediction failed for segment: {ml_err}")
+
             # Get weather data for route points
             weather_points = [current_point, next_point]
             if route_coords:

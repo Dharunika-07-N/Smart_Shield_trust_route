@@ -11,7 +11,6 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from config.config import settings
 from api.schemas.delivery import Coordinate
-from api.services.crime_data import CrimeDataService
 from loguru import logger
 import json
 from geopy.distance import distance
@@ -21,11 +20,10 @@ from geopy.distance import distance
 class SafetyScorer:
     """AI-powered safety scoring for routes."""
     
-    def __init__(self, crime_service: Optional[CrimeDataService] = None):
+    def __init__(self):
         self.model = None
         self.scaler = StandardScaler()
         self.weights = settings.SAFETY_WEIGHTS
-        self.crime_service = crime_service or CrimeDataService()
         self.police_stations = self._load_police_stations()
         self.hospitals = self._load_hospitals()
         
@@ -116,8 +114,8 @@ class SafetyScorer:
                     self.feature_count = self.model.n_features_in_
                     logger.info(f"Loaded existing safety scoring model with {self.feature_count} features")
                 else:
-                    self.feature_count = 8
-                    logger.info("Loaded models without explicit feature count attribute, assuming 8")
+                    self.feature_count = 7
+                    logger.info("Loaded models without explicit feature count attribute, assuming 7")
                     
             except Exception as e:
                 logger.warning(f"Could not load model or scaler: {e}, creating new one")
@@ -127,79 +125,35 @@ class SafetyScorer:
             self._train_initial_model()
     
     def _train_initial_model(self):
-        """Train initial model with enhanced data including real crime statistics."""
-        # Generate training data based on real crime statistics and heuristics
-        n_samples = 2000
+        """Train initial model focused on hazards and infrastructure (No Crime)."""
+        n_samples = 1000
         np.random.seed(42)
         
-        # Features: [crime_rate, lighting_score, patrol_density, traffic_density, hour_of_day, police_proximity, hospital_proximity]
+        # Features: [lighting_score, patrol_density, traffic_density, hour_of_day, police_proximity, hospital_proximity, weather_hazard]
         X = []
         y = []
         
-        # 1. Use real district centers as key training points
-        districts = self.crime_service.crime_data
-        for district, data in districts.items():
-            coords = data["coordinates"]
-            # Create a few samples around each district center
-            for _ in range(20):
-                # Add some jitter to coordinates
-                jitter_lat = coords[0] + np.random.uniform(-0.1, 0.1)
-                jitter_lng = coords[1] + np.random.uniform(-0.1, 0.1)
-                
-                # Get real crime score for this jittered location
-                crime_score = self.crime_service.get_crime_score(Coordinate(latitude=jitter_lat, longitude=jitter_lng))
-                
-                # Generate other features synthetically for now
-                hour = np.random.randint(0, 24)
-                lighting = 80 if 6 <= hour <= 18 else np.random.uniform(20, 60)
-                traffic = np.random.uniform(10, 90)
-                patrol = np.random.uniform(10, 80)
-                
-                # Proximity to police/hospitals
-                police_prox = self._calculate_proximity(Coordinate(latitude=jitter_lat, longitude=jitter_lng), self.police_stations)
-                hosp_prox = self._calculate_proximity(Coordinate(latitude=jitter_lat, longitude=jitter_lng), self.hospitals)
-                
-                weather_hazard = 0.0
-                features = [crime_score, lighting, patrol, traffic, hour, police_prox, hosp_prox, weather_hazard]
-                X.append(features)
-                
-                # Target safety score (heuristic for initial training)
-                # Lower crime, higher lighting/patrol/proximity = higher safety
-                target = (
-                    (100 - crime_score) * 0.4 +
-                    lighting * 0.2 +
-                    patrol * 0.15 +
-                    (100 - traffic * 0.2) * 0.1 + # Traffic has small negative impact on safety
-                    police_prox * 0.1 +
-                    hosp_prox * 0.05
-                )
-                y.append(target)
-        
-        # 2. Add some purely random samples to cover other areas
-        for _ in range(n_samples - len(X)):
-            # Random coordinates in Tamil Nadu range
-            lat = np.random.uniform(8.0, 13.5)
-            lng = np.random.uniform(76.2, 80.3)
-            
-            crime_score = self.crime_service.get_crime_score(Coordinate(latitude=lat, longitude=lng))
+        for _ in range(n_samples):
+            # Simulated data for base model
             hour = np.random.randint(0, 24)
-            lighting = np.random.uniform(20, 90)
-            traffic = np.random.uniform(0, 100)
-            patrol = np.random.uniform(0, 100)
+            lighting = 80 if 6 <= hour <= 18 else np.random.uniform(20, 60)
+            traffic = np.random.uniform(10, 90)
+            patrol = np.random.uniform(10, 80)
             police_prox = np.random.uniform(0, 100)
             hosp_prox = np.random.uniform(0, 100)
-            weather_hazard = np.random.uniform(0, 5) # Slight random weather hazard
-            features = [crime_score, lighting, patrol, traffic, hour, police_prox, hosp_prox, weather_hazard]
+            weather_hazard = np.random.uniform(0, 5)
+            
+            features = [lighting, patrol, traffic, hour, police_prox, hosp_prox, weather_hazard]
             X.append(features)
             
+            # Target safety score (hazard-focused)
             target = (
-                (100 - crime_score) * 0.4 +
-                lighting * 0.2 +
-                patrol * 0.15 +
-                (100 - traffic * 0.2) * 0.1 +
-                police_prox * 0.1 +
-                hosp_prox * 0.05 -
-                weather_hazard * 2.0
+                lighting * 0.3 +
+                patrol * 0.2 +
+                (100 - traffic * 0.2) * 0.2 +
+                police_prox * 0.15 +
+                hosp_prox * 0.1 -
+                weather_hazard * 3.0
             )
             y.append(target)
         
@@ -257,34 +211,37 @@ class SafetyScorer:
         weather_data: Optional[Dict] = None,
         delivery_info: Optional[Dict] = None
     ) -> np.ndarray:
-        """Extract features for a location using real crime data."""
-        # Get real crime data from Tamil Nadu crime dataset
-        crime_score = self.crime_service.get_crime_score(coord)
-        crime_data = self.crime_service.get_crime_data_for_location(coord)
-        
-        # Convert crime score to crime rate (0-10 scale)
-        crime_rate = crime_score / 10.0
-        
-        # Lighting score (varies by location and time)
+        """Extract hazard-based features for a location (No Crime)."""
         hour_map = {"day": 12, "evening": 18, "night": 22}
         hour = hour_map.get(time_of_day, 12)
         
-        # Adjust lighting based on time of day
+        # Adjust lighting based on time of day (Deterministic)
         if hour < 6 or hour > 20:
-            lighting_score = 30 + np.random.rand() * 20  # Low at night
+            lighting_score = 35.0  # Low at night
         elif hour < 8 or hour > 18:
-            lighting_score = 50 + np.random.rand() * 30  # Medium at dawn/dusk
+            lighting_score = 65.0  # Medium at dawn/dusk
         else:
-            lighting_score = 70 + np.random.rand() * 30  # High during day
+            lighting_score = 90.0  # High during day
         
-        # Patrol density (higher in high-crime areas)
-        if crime_score > 50:
-            patrol_density = 60 + np.random.rand() * 30  # More patrols in high-crime areas
-        else:
-            patrol_density = 40 + np.random.rand() * 40
+        # Patrol density (Infrastructure Proxy)
+        patrol_density = 60.0  # Median patrol proxy
         
-        # Traffic density (mock for now, could use real traffic data)
-        traffic_density = 30 + np.random.rand() * 50
+        # Traffic density (Heuristic based on rush hours + Real data if available)
+        is_rush_hour = (7 <= hour <= 9) or (17 <= hour <= 19)
+        traffic_density = 80.0 if is_rush_hour else 40.0
+        
+        # Try real traffic data if service is available
+        try:
+            from api.services.traffic import TrafficService
+            traffic_service = TrafficService()
+            # Note: This is a synchronous call - in high performance this should be async
+            # or pre-fetched in the optimizer
+            t_level, _, _ = traffic_service.get_traffic_level(coord, coord)
+            if t_level == 'high': traffic_density = 90.0
+            elif t_level == 'medium': traffic_density = 60.0
+            elif t_level == 'low': traffic_density = 30.0
+        except Exception:
+            pass # Use heuristic fallback
         
         # Weather hazard impact (if provided)
         weather_hazard = 0
@@ -318,14 +275,13 @@ class SafetyScorer:
             ])
 
         return np.array([
-            crime_rate,
             lighting_score,
             patrol_density,
             traffic_density,
             hour,
-            police_proximity,  # Feature 5 (0-100)
-            hospital_proximity, # Feature 6 (0-100)
-            weather_hazard    # Extra feature, not in main model X
+            police_proximity,  # Feature 4 (0-100)
+            hospital_proximity, # Feature 5 (0-100)
+            weather_hazard    # Feature 6
         ])
 
     def _calculate_hospital_proximity(self, coord: Coordinate) -> float:
@@ -420,97 +376,57 @@ class SafetyScorer:
         base_score = self.model.predict(features_for_model)[0]
         # Apply gender-specific adjustments if needed
         if rider_info and rider_info.get("gender") == "female":
-            # Determine indices based on feature count
-            feat_cnt = getattr(self, "feature_count", 7)
-            if feat_cnt == 12:
-                # 12-feature model: index 6 is lighting, index 1 is crime_severity
-                if features[6] < 50:  # Low lighting
+                # 7-feature model: index 0 is lighting, index 1 is patrol
+                if features[0] < 50:  # Low lighting
                     base_score -= 10
-                if features[1] > 5:   # High crime (0-10 scale)
-                    base_score -= 10
-            else:
-                # 7-feature model: index 1 is lighting, index 2 is patrol
-                if features[1] < 50:  # Low lighting
-                    base_score -= 10
-                if features[2] < 50:  # Low patrol
+                if features[1] < 50:  # Low patrol
                     base_score -= 10
         
         base_score = np.clip(base_score, 0, 100)
         
-        # Get crime data for detailed description
-        crime_data = self.crime_service.get_crime_data_for_location(coord)
-        crime_score = self.crime_service.get_crime_score(coord)
+        # Create factors breakdown (Hazard Focused)
+        from config.config import settings
+        w = settings.SAFETY_WEIGHTS
         
-        # Create factors breakdown
         factors = [
             {
-                "factor": "crime_overall",
-                "score": max(0, 100 - crime_score),
-                "weight": self.weights["crime"],
-                "description": f"Overall Crime Risk: {crime_data.get('district', 'Unknown')}"
-            },
-            {
                 "factor": "lighting",
-                "score": features[1],
-                "weight": self.weights["lighting"],
-                "description": f"Lighting conditions: {features[1]:.1f}/100"
+                "score": features[0],
+                "weight": w.get("lighting", 0.30),
+                "description": f"Lighting conditions: {features[0]:.1f}/100"
             },
             {
                 "factor": "patrol_presence",
-                "score": features[2],
-                "weight": self.weights["patrol_presence"],
-                "description": f"Patrol density: {features[2]:.1f}/100"
+                "score": features[1],
+                "weight": w.get("patrol_presence", 0.20),
+                "description": f"Safety patrol presence: {features[1]:.1f}/100"
             },
             {
                 "factor": "traffic",
-                "score": max(0, 100 - features[3]),
-                "weight": self.weights["traffic"],
-                "description": f"Traffic conditions: {features[3]:.1f}/100"
+                "score": max(0, 100 - features[2]),
+                "weight": w.get("traffic_safety", 0.10),
+                "description": f"Traffic safety: {features[2]:.1f}/100"
             },
             {
-                "factor": "police_proximity",
-                "score": features[5],
-                "weight": 0.15,
-                "description": "Proximity to Police Station"
-            },
-            {
-                "factor": "hospital_proximity",
-                "score": features[6],
-                "weight": 0.15,
-                "description": "Proximity to 24/7 Medical Services"
+                "factor": "infrastructure_proximity",
+                "score": (features[4] + features[5]) / 2, # Combined emergency proximity
+                "weight": w.get("infrastructure_proximity", 0.35),
+                "description": f"Infrastructure (Police & Hospitals): {(features[4] + features[5]) / 2:.1f}/100"
             }
         ]
         
-        # Add specific high-risk warnings based on raw counts
-        if crime_data.get('theft', 0) > 100:
-             factors.append({
-                "factor": "theft_risk",
-                "score": 40, # Low safety score specifically for theft
-                "weight": 0.1,
-                "description": "High Theft Zone"
-            })
-            
-        if crime_data.get('sexual_harassment', 0) > 20:
-             factors.append({
-                "factor": "harassment_risk",
-                "score": 20, # Very low safety score
-                "weight": 0.2,
-                "description": "High Harassment Risk Area"
-            })
-        
-        # Add weather factor if available
+        # Add weather factor if available (adjusts base score)
         if weather_data:
             weather_hazard = weather_data.get("hazard_score", 0)
             factors.append({
                 "factor": "weather",
                 "score": max(0, 100 - weather_hazard),
-                "weight": 0.15,  # Additional weight for weather
-                "description": f"Weather hazard: {', '.join(weather_data.get('hazard_conditions', []))}"
+                "weight": 0.05, # Adaptive weight
+                "description": f"Weather conditions: {', '.join(weather_data.get('hazard_conditions', []))}"
             })
-            # Adjust base score based on weather
-            base_score -= weather_hazard * 0.2
+            base_score -= (weather_hazard * 0.1)
         
-        return base_score, factors
+        return np.clip(base_score, 0, 100), factors
     
     def score_route(
         self,
