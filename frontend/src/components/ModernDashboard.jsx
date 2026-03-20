@@ -1261,10 +1261,10 @@ const ModernDashboard = () => {
                                         <h4 className="font-bold text-slate-700 border-b border-slate-100 pb-2 mb-4">Alert Types</h4>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                             {Object.entries({
-                                                suspicious_activity: 'Suspicious Activity',
+                                                road_obstruction: 'Road Obstructions',
                                                 road_hazard: 'Road Hazards',
                                                 poor_lighting: 'Poor Lighting',
-                                                high_crime_area: 'High Crime Areas',
+                                                poor_visibility_area: 'Low Visibility Areas',
                                                 traffic_congestion: 'Traffic Congestion',
                                                 accident: 'Accidents',
                                                 construction: 'Road Construction',
