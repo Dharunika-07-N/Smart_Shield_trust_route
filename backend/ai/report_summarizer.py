@@ -48,7 +48,7 @@ class ReportSummarizer:
         else:
             try:
                 genai.configure(api_key=gemini_key)
-                self.model = genai.GenerativeModel('gemini-1.5-flash')
+                self.model = genai.GenerativeModel('gemini-1.5-flash-8b')
             except Exception as e:
                 logger.error(f"Failed to initialize Gemini: {e}")
                 self.is_mock = True
