@@ -58,10 +58,10 @@ class Settings(BaseSettings):
     
     # Safety Scoring
     SAFETY_WEIGHTS: dict = {
-        "crime": 0.35,
-        "lighting": 0.25,
-        "patrol_presence": 0.25,
-        "traffic": 0.10,
+        "infrastructure_proximity": 0.35,  # Distance to police/hospital
+        "lighting": 0.30,
+        "patrol_presence": 0.20,
+        "traffic_safety": 0.10,
         "user_feedback": 0.05
     }
     
