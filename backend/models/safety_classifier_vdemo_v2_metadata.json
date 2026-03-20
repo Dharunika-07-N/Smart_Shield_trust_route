@@ -1,6 +1,6 @@
 {
   "version": "demo_v2",
-  "timestamp": "2026-03-20T17:21:36.721639",
+  "timestamp": "2026-03-20T17:36:52.408032",
   "feature_names": [
     "lighting",
     "patrol_frequency",
@@ -19,42 +19,57 @@
   ],
   "training_history": [
     {
-      "timestamp": "2026-03-20T17:21:36.120275",
+      "timestamp": "2026-03-20T17:36:52.170463",
       "metrics": {
         "accuracy": 0.81,
-        "precision_weighted": 0.7998529411764705,
+        "precision_weighted": 0.7934595605423095,
         "recall_weighted": 0.81,
-        "f1_weighted": 0.8044155844155845,
-        "cohen_kappa": 0.5770258236865539,
+        "f1_weighted": 0.7975972850678734,
+        "cohen_kappa": 0.5908699397071491,
         "confusion_matrix": [
           [
-            24,
-            10,
+            0,
+            1,
+            0,
             0
           ],
           [
-            8,
-            57,
+            0,
+            25,
+            12,
             0
           ],
           [
+            0,
+            5,
+            56,
+            0
+          ],
+          [
+            0,
             0,
             1,
             0
           ]
         ],
         "classification_report": {
+          "1": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 1.0
+          },
           "2": {
-            "precision": 0.75,
-            "recall": 0.7058823529411765,
-            "f1-score": 0.7272727272727273,
-            "support": 34.0
+            "precision": 0.8064516129032258,
+            "recall": 0.6756756756756757,
+            "f1-score": 0.7352941176470589,
+            "support": 37.0
           },
           "3": {
-            "precision": 0.8382352941176471,
-            "recall": 0.8769230769230769,
-            "f1-score": 0.8571428571428571,
-            "support": 65.0
+            "precision": 0.8115942028985508,
+            "recall": 0.9180327868852459,
+            "f1-score": 0.8615384615384616,
+            "support": 61.0
           },
           "4": {
             "precision": 0.0,
@@ -64,26 +79,26 @@
           },
           "accuracy": 0.81,
           "macro avg": {
-            "precision": 0.5294117647058824,
-            "recall": 0.5276018099547511,
-            "f1-score": 0.5281385281385281,
+            "precision": 0.40451145395044413,
+            "recall": 0.39842711564023037,
+            "f1-score": 0.3992081447963801,
             "support": 100.0
           },
           "weighted avg": {
-            "precision": 0.7998529411764705,
+            "precision": 0.7934595605423095,
             "recall": 0.81,
-            "f1-score": 0.8044155844155845,
+            "f1-score": 0.7975972850678734,
             "support": 100.0
           }
         },
-        "roc_auc_ovr": null,
+        "roc_auc_ovr": 0.8583721833721834,
         "cv_scores": [
-          0.7988843660485452,
-          0.8183673469387756,
-          0.8173171022795083
+          0.7993980118778444,
+          0.758579803701996,
+          0.7546263459779254
         ],
-        "cv_mean": 0.8115229384222763,
-        "cv_std": 0.008947099611814996,
+        "cv_mean": 0.7708680538525886,
+        "cv_std": 0.020238187265433753,
         "best_params": {
           "bootstrap": true,
           "ccp_alpha": 0.0,
@@ -108,32 +123,32 @@
       },
       "feature_importance": [
         {
-          "feature": "lighting",
-          "importance": 0.3109465705121738
+          "feature": "police_proximity",
+          "importance": 0.22274421270537068
         },
         {
-          "feature": "traffic_density",
-          "importance": 0.20920189207325934
+          "feature": "lighting",
+          "importance": 0.21430209987285234
         },
         {
           "feature": "patrol_frequency",
-          "importance": 0.15232585503755272
+          "importance": 0.19606331767858334
         },
         {
-          "feature": "police_proximity",
-          "importance": 0.13065307739569004
+          "feature": "traffic_density",
+          "importance": 0.16537203066949532
         },
         {
           "feature": "hospital_proximity",
-          "importance": 0.12938047605565045
+          "importance": 0.10804653292844574
         },
         {
           "feature": "day_of_week",
-          "importance": 0.05285289769609713
+          "importance": 0.06744577755322545
         },
         {
           "feature": "is_weekend",
-          "importance": 0.014639231229576631
+          "importance": 0.02602602859202719
         },
         {
           "feature": "time_of_day",
