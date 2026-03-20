@@ -23,7 +23,7 @@ The Dispatcher role is the bridge between real-time field operations and system 
 | :--- | :--- | :--- |
 | **Drone/Truck Icons** | Represent active drivers. Location updates via WebSocket or 5s polling. | **Fully Functional** |
 | **Node Selection** | Clicking a driver icon opens a sidebar with telemetry (Speed, Fuel, Safety Score). | **Functional** |
-| **Heatmap Toggle** | Overlays safety zones (Crime/Traffic/Weather) onto the fleet view. | **Functional** |
+| **Heatmap Toggle** | Overlays safety zones (Infrastructure/Traffic/Weather) onto the fleet view. | **Functional** |
 
 ### 3. Delivery Queue
 | Element | Logic / Action | Status |

@@ -11,7 +11,7 @@ Smart Shield Trust Route is an intelligent delivery routing system that optimize
 - **AI Route Optimization Engine** - Combines graph algorithms + ML to plan efficient delivery sequences
 - **Interactive Animated Map** - Snapchat-style location tracking with real-time route visualization
 - **Safety Overlay** - Color-coded route segments based on safety scores with heatmap visualization
-- **Crime Data Integration** - Tamil Nadu 2022 crime statistics for route safety scoring
+- **Hazard & Infrastructure Awareness** - Real-time assessment of lighting, traffic, and emergency service proximity for route safety scoring
 - **Traffic-Aware Routing** - Real-time traffic data from Google Maps for accurate ETAs
 - **Weather Integration** - Real-time weather conditions affecting route safety and duration
 - **Multi-Delivery Handling** - Dynamic route updates for multiple stops
@@ -23,10 +23,10 @@ Smart Shield Trust Route is an intelligent delivery routing system that optimize
 Smart Shield Trust Route integrates several specialized AI/ML models to provide industry-leading safety and efficiency:
 
 ### 1. Safety Scoring Model (Random Forest)
-Our safety engine uses a **Random Forest Regressor** trained on real Tamil Nadu crime data, historical delivery success patterns, and crowdsourced rider feedback. It evaluates locations based on 12 key features including:
-- Crime density and severity in the immediate vicinity
-- Distance to the nearest verified Safe Zone (Police stations, 24h hospitals)
-- Real-time lighting conditions and patrol presence
+Our safety engine uses a **Random Forest Regressor** trained on environmental hazards, infrastructure availability, and crowdsourced rider feedback. It evaluates locations based on key features including:
+- Real-time lighting conditions and visibility
+- Proximity to emergency services (Police stations, 24h hospitals)
+- Road quality and traffic congestion levels
 - Historical safety ratings from other riders
 
 ### 2. Multi-Objective Route Optimization
@@ -37,9 +37,9 @@ The routing engine uses high-performance graph algorithms (A* with custom heuris
 
 ### 3. Real-Time Feedback Loop
 The system implements an online learning loop where every completed delivery and rider feedback entry is processed to:
-- Dynamically update location safety scores
-- Retrain models periodically to adapt to changing urban crime/traffic patterns
-- Identify emerging "red zones" before they appear in official statistics
+- Dynamically update location safety scores based on rider perception
+- Retrain models periodically to adapt to changing urban infrastructure/traffic patterns
+- Identify emerging hazards before they are officially reported
 
 ## 🏗️ System Architecture
 
@@ -85,7 +85,6 @@ The system implements an online learning loop where every completed delivery and
 - **Google Maps API** - Geocoding, traffic-aware directions, route geometry
 - **OpenWeatherMap API** - Real-time weather data and hazard scoring
 - **OpenStreetMap / Nominatim** - Map data and geocoding
-- **Tamil Nadu Crime Data** - District-wise crime statistics (OpenCity.in)
 
 ## 📁 Project Structure
 
@@ -103,7 +102,7 @@ Smart_shield/
 │   │   │   └── route_optimizer.py
 │   │   ├── services/
 │   │   │   ├── maps.py          # Maps API integration (traffic-aware)
-│   │   │   ├── crime_data.py    # Tamil Nadu crime data service
+│   │   │   ├── safety_service.py # Core safety and hazard service
 │   │   │   ├── weather.py       # Weather API integration
 │   │   │   └── database.py      # Database operations
 │   │   ├── schemas/             # Pydantic models
@@ -114,9 +113,9 @@ Smart_shield/
 │   │   ├── models.py
 │   │   └── database.py
 │   ├── data/
-│   │   └── crime/               # Place Tamil Nadu crime CSV files here
+│   │   └── hazards/             # Place emergency infrastructure JSON here
 │   ├── scripts/
-│   │   ├── setup_crime_data.py  # Helper script for crime data setup
+│   │   ├── seed_safety_data.py  # Helper script for safety data seeding
 │   │   └── README.md
 │   └── requirements.txt
 ├── frontend/
@@ -157,15 +156,8 @@ cd backend
 pip install -r requirements.txt
 ```
 
-3. Set up crime data (optional but recommended):
-```bash
-# Run the setup script to create data directory and sample CSV
-python scripts/setup_crime_data.py
-
-# Or manually download Tamil Nadu crime data:
-# Visit: https://www.data.opencity.in/dataset/tamil-nadu-crime-data-2022
-# Download CSV files and place in backend/data/crime/
-```
+3. Set up safety data (Heuristics + Real-time):
+The system initializes with deterministic safety heuristics based on lighting, traffic, and infrastructure. Real-time data is pulled from Google Maps and OpenWeatherMap.
 
 4. Set up environment variables:
 ```bash
@@ -307,10 +299,10 @@ ENVIRONMENT=development
    - Get your free API key
    - Copy to `WEATHER_API_KEY`
 
-3. **Crime Data** (No API key needed):
-   - Download from [OpenCity.in](https://www.data.opencity.in/dataset/tamil-nadu-crime-data-2022)
-   - Place CSV files in `backend/data/crime/`
-   - Or use the built-in default data for development
+3. **Safety Data** (Infrastructure & Hazards):
+   - Emergency service proximity (Hospitals, Police)
+   - Real-time weather and lighting data
+   - Historical hazard reports from the community
 
 ## 🤝 Contributing
 
@@ -326,12 +318,10 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 📊 Data Sources
 
-### Crime Data
-- **Tamil Nadu Crime Data 2022** - [OpenCity.in Dataset](https://www.data.opencity.in/dataset/tamil-nadu-crime-data-2022)
-  - District-wise crime statistics
-  - Includes murders, sexual harassment, road accidents, suicides
-  - Public Domain license
-  - Used for route safety scoring
+### Infrastructure & Safety Data
+- **Emergency Infrastructure** - Proximity based on Google Maps / OSM
+- **Lighting & Visibility** - Calculated based on time-of-day and weather
+- **Road Safety** - Derived from traffic density and road quality metrics
 
 ### Traffic Data
 - **Google Maps Directions API** - Traffic-aware routing
@@ -354,7 +344,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - Google Maps Platform for traffic-aware routing
 - OpenStreetMap / Nominatim for map data and geocoding
-- OpenCity.in for Tamil Nadu crime data
 - OpenWeatherMap for weather data
 - Coimbatore Institute of Technology for traffic research
 
