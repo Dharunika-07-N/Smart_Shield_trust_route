@@ -53,7 +53,7 @@ def compare_routes():
         print("\n🧠 AI LOGIC EXPLANATION:")
         print(f"- The 'Safest' route adds {max(0, (safest.get('total_duration_seconds', 0) - fastest.get('total_duration_seconds', 0))/60):.1f} extra minutes.")
         print(f"- It improves the safety profile by {safest.get('average_safety_score', 0) - fastest.get('average_safety_score', 0):.1f} points.")
-        print("- This diversion avoids the high-crime districts identified in the TN Crime Dataset.")
+        print("- This diversion avoids low-visibility and high-traffic areas identified by AI.")
         
     except Exception as e:
         print(f"❌ Error: {e}")

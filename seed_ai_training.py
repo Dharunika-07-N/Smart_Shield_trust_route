@@ -15,7 +15,7 @@ from ml.time_predictor_enhanced import EnhancedTimePredictor
 from ml.rl_agent_enhanced import EnhancedSARSAAgent
 
 def seed_ai_training():
-    print("🧠 Starting AI Training Data Seeding...")
+    print("[AI] Starting AI Training Data Seeding...")
     db_path = 'backend/smartshield.db'
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -30,7 +30,7 @@ def seed_ai_training():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         route_id TEXT,
         segment_order INTEGER,
-        crime_rate REAL,
+        visibility_score REAL,
         lighting REAL,
         patrol_frequency REAL,
         traffic_density REAL,
@@ -74,18 +74,18 @@ def seed_ai_training():
     """)
 
     # 2. Generate Synthetic Safety Data (route_segments)
-    print("🛡️ Generating Safety Training Data...")
+    print("[SEC] Generating Safety Training Data...")
     safety_data = []
     for i in range(500):
-        crime = np.random.beta(2, 5) # Skewed towards low crime
+        visibility = np.random.beta(5, 2) 
         lighting = np.random.beta(5, 2)
         patrol = np.random.beta(3, 3)
         traffic = np.random.uniform(0, 1)
         police = np.random.uniform(0, 1)
         hospital = np.random.uniform(0, 1)
         
-        # Calculate a pseudo-safety score
-        score = (1-crime) * 0.4 + lighting * 0.2 + patrol * 0.2 + (1-traffic) * 0.1 + police * 0.1
+        # Calculate a pseudo-safety score (Higher visibility/lighting = safer)
+        score = visibility * 0.3 + lighting * 0.3 + patrol * 0.2 + (1-traffic) * 0.1 + police * 0.1
         s_class = 0
         if score > 0.8: s_class = 4
         elif score > 0.6: s_class = 3
@@ -93,19 +93,19 @@ def seed_ai_training():
         elif score > 0.2: s_class = 1
         
         safety_data.append((
-            f"R-{i}", i % 10, crime, lighting, patrol, traffic, police, hospital,
+            f"R-{i}", i % 10, visibility, lighting, patrol, traffic, police, hospital,
             (datetime.now() - timedelta(days=np.random.randint(0, 30))).isoformat(),
             score * 100, s_class
         ))
     
     cursor.executemany("""
     INSERT INTO route_segments 
-    (route_id, segment_order, crime_rate, lighting, patrol_frequency, traffic_density, police_proximity, hospital_proximity, timestamp, safety_score, safety_class)
+    (route_id, segment_order, visibility_score, lighting, patrol_frequency, traffic_density, police_proximity, hospital_proximity, timestamp, safety_score, safety_class)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, safety_data)
 
     # 3. Generate Synthetic RL Data (delivery_outcomes)
-    print("🤖 Generating RL Training Data...")
+    print("[RL] Generating RL Training Data...")
     rl_data = []
     actions = ['fastest', 'safest', 'balanced', 'shortest']
     for i in range(300):
@@ -133,20 +133,21 @@ def seed_ai_training():
     """, rl_data)
 
     conn.commit()
-    print(f"✅ Database seeded with {len(safety_data)} safety rows and {len(rl_data)} RL rows.")
+    print(f"[OK] Database seeded with {len(safety_data)} safety rows and {len(rl_data)} RL rows.")
 
     # 4. Trigger Training for Models
-    print("\n🚀 Training Models (this might take a few seconds)...")
+    print("\n[RUN] Training Models (this might take a few seconds)...")
     
     # Safety
     try:
         print("Training Safety Classifier...")
         sc = EnhancedSafetyClassifier()
         df_safety = pd.read_sql_query("SELECT * FROM route_segments", conn)
+        # Rename column for preparation if needed
         X, y = sc.prepare_data(df_safety)
         sc_metrics = sc.train(X, y, tune_hyperparameters=False)
-        sc.save_model(version="demo_v1")
-        print(f"   Success! F1: {sc_metrics['f1_weighted']:.2f}")
+        sc.save_model(version="demo_v2")
+        print(f"   Success! F1: {sc_metrics.get('f1_weighted', 0):.2f}")
     except Exception as e:
         print(f"   Safety training failed: {e}")
         sc_metrics = {}
@@ -157,43 +158,32 @@ def seed_ai_training():
         rl = EnhancedSARSAAgent()
         df_rl = pd.read_sql_query("SELECT * FROM delivery_outcomes", conn)
         rl_metrics = rl.train_from_history(df_rl)
-        rl.save_model(version="demo_v1")
+        rl.save_model(version="demo_v2")
         print(f"   Success! Avg Reward: {rl_metrics.get('avg_episode_reward', 0):.2f}")
     except Exception as e:
         print(f"   RL training failed: {e}")
         rl_metrics = {}
 
-    # Time Predictor (using existing deliveries table if possible)
+    # Time Predictor
     try:
         print("Training Time Predictor...")
         tp = EnhancedTimePredictor()
-        try:
-            df_time = pd.read_sql_query("SELECT * FROM deliveries WHERE delivered_at IS NOT NULL LIMIT 100", conn)
-            # Map columns to what EnhancedTimePredictor expects if needed
-            if not df_time.empty and 'estimated_duration' in df_time.columns:
-                 df_time['estimated_time'] = df_time['estimated_duration'] / 60.0
-                 df_time['actual_time'] = df_time['estimated_time'] * np.random.uniform(0.9, 1.1, len(df_time)) # Mock actuals
-        except Exception:
-            df_time = pd.DataFrame()
-            
-        # For demo, let's just create a minimal DF if deliveries is empty or missing columns
-        if df_time.empty:
-             df_time = pd.DataFrame({
-                 'delivery_id': [f"D-{i}" for i in range(100)],
-                 'route_distance': np.random.uniform(1, 15, 100),
-                 'traffic_level': np.random.uniform(0, 1, 100),
-                 'timestamp': [datetime.now().isoformat() for _ in range(100)],
-                 'actual_time': np.random.uniform(10, 60, 100),
-                 'estimated_time': np.random.uniform(10, 60, 100),
-                 'weather_condition': ['clear']*100,
-                 'num_stops': [2]*100,
-                 'vehicle_type': ['motorcycle']*100,
-                 'success': [1]*100
-             })
+        df_time = pd.DataFrame({
+             'delivery_id': [f"D-{i}" for i in range(200)],
+             'route_distance': np.random.uniform(1, 15, 200),
+             'traffic_level': np.random.uniform(0, 1, 200),
+             'timestamp': [datetime.now().isoformat() for _ in range(200)],
+             'actual_time': np.random.uniform(10, 60, 200),
+             'estimated_time': np.random.uniform(10, 60, 200),
+             'weather_condition': ['clear']*200,
+             'num_stops': [2]*200,
+             'vehicle_type': ['motorcycle']*200,
+             'success': [1]*200
+        })
         
         X, y, feats = tp.prepare_data(df_time, 'actual_time')
         tp_metrics = tp.train(X, y, tune_hyperparameters=False)
-        tp.save_model(version="demo_v1")
+        tp.save_model(version="demo_v2")
         print(f"   Success! R2 Score: {tp_metrics.get('r2', 0):.2f}")
     except Exception as e:
         print(f"   Time training failed: {e}")
@@ -209,11 +199,12 @@ def seed_ai_training():
         "safety,time,rl",
         str({"safety": sc_metrics, "time": tp_metrics, "rl": rl_metrics}),
         "",
-        "demo_v1"
+        "demo_v2"
     ))
     conn.commit()
     conn.close()
-    print("\n✨ All done! Admin dashboard should now show AI training details.")
+    print("\n[DONE] All done! Admin dashboard should now show AI training details.")
 
 if __name__ == "__main__":
     seed_ai_training()
+

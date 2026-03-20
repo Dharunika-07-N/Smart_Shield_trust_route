@@ -51,7 +51,7 @@ def run_demo():
                 if segment.get('weather'):
                     print(f"  - Weather: {segment['weather'].get('condition', 'Clear')}")
             
-            print("\n✅ Demo Complete. The system successfully cross-referenced TN Crime Data + ML Models.")
+            print("\n✅ Demo Complete. The system successfully cross-referenced Safety Metrics + ML Models.")
         else:
             print(f"❌ Error: {response.status_code} - {response.text}")
             
