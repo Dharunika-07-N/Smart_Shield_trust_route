@@ -375,7 +375,6 @@ class RouteSegment(Base):
     distance = Column(Float)  # km
     duration = Column(Float)  # minutes
     safety_score = Column(Float)  # 0-100
-    crime_score = Column(Float)
     accident_history = Column(Float)
     lighting_score = Column(Float)
     road_quality = Column(Float)
@@ -389,29 +388,7 @@ class RouteSegment(Base):
     route = relationship("DeliveryRoute", back_populates="segments")
 
 
-class CrimeData(Base):
-    __tablename__ = "crime_data"
-    
-    id = Column(Integer, primary_key=True)
-    district = Column(String, index=True)
-    location = Column(JSON, nullable=True) # {latitude, longitude}
-    
-    # Crime statistics
-    murder_count = Column(Integer, default=0)
-    sexual_harassment_count = Column(Integer, default=0)
-    road_accident_count = Column(Integer, default=0)
-    theft_count = Column(Integer, default=0)
-    
-    # Aggregated risk score
-    crime_risk_score = Column(Float)  # 0-100
-    
-    # Temporal data
-    year = Column(Integer)
-    month = Column(Integer, nullable=True)
-    
-    # Geographic coverage
-    radius_km = Column(Float, default=5.0)  # Area of influence
-
+# CrimeData removed
 
 class DeliveryFeedback(Base):
     __tablename__ = "delivery_feedback"
@@ -444,10 +421,10 @@ class AlertPreferences(Base):
     user_id = Column(String, ForeignKey("users.id"), unique=True, index=True)
     
     # Alert type preferences (enabled/disabled)
-    suspicious_activity = Column(Boolean, default=True)
+    road_obstruction = Column(Boolean, default=True)
     road_hazard = Column(Boolean, default=True)
     poor_lighting = Column(Boolean, default=True)
-    high_crime_area = Column(Boolean, default=True)
+    poor_visibility_area = Column(Boolean, default=True)
     traffic_congestion = Column(Boolean, default=True)
     accident = Column(Boolean, default=True)
     construction = Column(Boolean, default=True)
