@@ -13,9 +13,13 @@ sys.path.append(os.path.abspath('backend'))
 from ml.safety_classifier_enhanced import EnhancedSafetyClassifier
 from ml.time_predictor_enhanced import EnhancedTimePredictor
 from ml.rl_agent_enhanced import EnhancedSARSAAgent
+from database.database import Base, engine
 
 def seed_ai_training():
     print("[AI] Starting AI Training Data Seeding...")
+    # Initialize all tables in the schema
+    Base.metadata.create_all(bind=engine)
+    
     db_path = 'backend/smartshield.db'
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()

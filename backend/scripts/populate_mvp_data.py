@@ -14,6 +14,8 @@ from database.database import SessionLocal, engine, Base
 from database.models import SafeZone, User, CrowdsourcedAlert
 
 def populate_mvp_data():
+    # Ensure all tables exist in the DB
+    Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
         print("[RUN] Starting MVP Data Population...")
