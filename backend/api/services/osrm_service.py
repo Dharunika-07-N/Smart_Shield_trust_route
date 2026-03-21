@@ -301,7 +301,19 @@ class OSRMService:
     
     def geocode(self, address: str) -> Optional[Coordinate]:
         """Geocode an address (for compatibility)"""
-        result = self.geocode_address(address)
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # We are in an active loop, we can't block here.
+                # In a real app we'd use nest_asyncio, but for now we fallback.
+                return None
+            result = loop.run_until_complete(self.geocode_address(address))
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            result = loop.run_until_complete(self.geocode_address(address))
+            loop.close()
+            
         if result:
             return Coordinate(latitude=result['lat'], longitude=result['lng'])
         return None

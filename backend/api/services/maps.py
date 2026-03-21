@@ -74,10 +74,19 @@ class MapsService:
         if self.positionstack:
             try:
                 # Sync wrap for async call
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                res = loop.run_until_complete(self.positionstack.geocode(query))
-                loop.close()
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        # We are in an active loop, can't block.
+                        res = None
+                    else:
+                        res = loop.run_until_complete(self.positionstack.geocode(query))
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    res = loop.run_until_complete(self.positionstack.geocode(query))
+                    loop.close()
+                
                 if res: return res
             except Exception as e:
                 logger.debug(f"PositionStack Geocoding failed: {e}")

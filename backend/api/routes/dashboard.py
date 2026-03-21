@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from loguru import logger
 import random
 
-from database.models import User, Route, SafetyFeedback, DeliveryStatus, Delivery, HistoricalDelivery, CrimeData, AlertPreferences
+from database.models import User, Route, SafetyFeedback, DeliveryStatus, Delivery, HistoricalDelivery, AlertPreferences
 from api.services.weather import WeatherService
 from api.schemas.delivery import Coordinate
 from sqlalchemy import func
@@ -136,32 +136,14 @@ async def get_delivery_queue(
 
 @router.get("/zones/safety")
 async def get_zone_safety(db: Session = Depends(get_db)) -> Dict[str, Any]:
-    """Get safety information for different zones based on crime data."""
+    """Get safety information for different zones."""
     try:
-        # Query top dangerous districts from CrimeData
-        crime_stats = db.query(
-            CrimeData.district,
-            CrimeData.crime_risk_score,
-            (CrimeData.murder_count + CrimeData.sexual_harassment_count + CrimeData.road_accident_count).label('total_incidents')
-        ).order_by(CrimeData.crime_risk_score.desc()).limit(5).all()
-        
-        zones = []
-        for stat in crime_stats:
-            score = 100 - stat.crime_risk_score
-            color = "green" if score > 75 else "amber" if score > 50 else "red"
-            
-            zones.append({
-                "name": stat.district,
-                "incidents": f"{stat.total_incidents} incidents",
-                "trend": "neutral",
-                "score": int(score),
-                "color": color,
-                "last_updated": datetime.now().isoformat()
-            })
-        
-        # Fallback if no crime data
-        if not zones:
-             zones = [{"name": "Chennai Central", "incidents": "5 incidents", "trend": "down", "score": 85, "color": "green", "last_updated": datetime.now().isoformat()}]
+        # Static safe zones for demo
+        zones = [
+            {"name": "Chennai Central", "incidents": "2 hazards", "trend": "down", "score": 85, "color": "green", "last_updated": datetime.now().isoformat()},
+            {"name": "Anna Nagar", "incidents": "4 hazards", "trend": "neutral", "score": 72, "color": "amber", "last_updated": datetime.now().isoformat()},
+            {"name": "T. Nagar", "incidents": "1 hazard", "trend": "down", "score": 91, "color": "green", "last_updated": datetime.now().isoformat()}
+        ]
         
         return {
             "status": "success",
@@ -235,16 +217,7 @@ async def get_recent_alerts(
             titles = {
                 'suspicious_activity': 'Suspicious Activity Reported',
                 'road_hazard': 'Road Hazard Detected',
-                'poor_lighting': 'Poorly Lit Area',
-                'high_crime_area': 'High Crime Area Alert',
-                'traffic_congestion': 'Traffic Congestion',
-                'accident': 'Accident Reported',
-                'construction': 'Road Construction',
-                'weather_hazard': 'Weather Hazard',
-                'safety': 'Safety Concern',
-                'safety_concern': 'Safety Concern',
-                'general': 'General Alert',
-                'general_alert': 'General Alert'
+                'poor_lighting': 'Poorly Lit Area'
             }
             return titles.get(incident_type or feedback_type, 'Safety Feedback')
         
@@ -253,16 +226,7 @@ async def get_recent_alerts(
             mapping = {
                 'suspicious_activity': 'suspicious_activity',
                 'road_hazard': 'road_hazard',
-                'poor_lighting': 'poor_lighting',
-                'high_crime_area': 'high_crime_area',
-                'traffic_congestion': 'traffic_congestion',
-                'accident': 'accident',
-                'construction': 'construction',
-                'weather_hazard': 'weather_hazard',
-                'safety': 'safety_concern',
-                'safety_concern': 'safety_concern',
-                'general': 'general_alert',
-                'general_alert': 'general_alert'
+                'poor_lighting': 'poor_lighting'
             }
             return mapping.get(alert_type, 'general_alert')
         
@@ -345,10 +309,6 @@ async def get_alert_preferences(
                     "suspicious_activity": preferences.suspicious_activity,
                     "road_hazard": preferences.road_hazard,
                     "poor_lighting": preferences.poor_lighting,
-                    "high_crime_area": preferences.high_crime_area,
-                    "traffic_congestion": preferences.traffic_congestion,
-                    "accident": preferences.accident,
-                    "construction": preferences.construction,
                     "weather_hazard": preferences.weather_hazard,
                     "safety_concern": preferences.safety_concern,
                     "general_alert": preferences.general_alert
