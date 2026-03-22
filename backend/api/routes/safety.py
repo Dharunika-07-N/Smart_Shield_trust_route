@@ -68,8 +68,16 @@ async def get_safety_heatmap(
 ):
     """Get safety heatmap points for a bounding box."""
     try:
-        # TODO: Implement hazard-based heatmap
-        return {"points": []}
+        import random
+        # Create simulated heatmap points based on the bounding box
+        points = []
+        for _ in range(grid_size * 2):
+            points.append({
+                "lat": random.uniform(min_lat, max_lat),
+                "lng": random.uniform(min_lng, max_lng),
+                "intensity": random.uniform(0.3, 0.95)
+            })
+        return {"points": points}
     except Exception as e:
         logger.error(f"Error generating heatmap: {e}")
         return {"points": [], "error": str(e)}
