@@ -260,6 +260,37 @@ const AIReportSummary = () => {
                 </div>
             </div>
 
+            <div className="report-metrics-banner">
+                <div className="metric-card gold">
+                    <Zap className="metric-icon" size={24} />
+                    <div className="metric-data">
+                        <span className="metric-value">8.5s</span>
+                        <span className="metric-label">SOS Response</span>
+                    </div>
+                </div>
+                <div className="metric-card blue">
+                    <TrendingUp className="metric-icon" size={24} />
+                    <div className="metric-data">
+                        <span className="metric-value">+18.2%</span>
+                        <span className="metric-label">Route Efficiency</span>
+                    </div>
+                </div>
+                <div className="metric-card green">
+                    <CheckCircle className="metric-icon" size={24} />
+                    <div className="metric-data">
+                        <span className="metric-value">98.5%</span>
+                        <span className="metric-label">SOS Success</span>
+                    </div>
+                </div>
+                <div className="metric-card purple">
+                    <Users className="metric-icon" size={24} />
+                    <div className="metric-data">
+                        <span className="metric-value">1,240</span>
+                        <span className="metric-label">Active Users</span>
+                    </div>
+                </div>
+            </div>
+
             <div className="report-body">
                 {loading && (
                     <div className="loading-state">
