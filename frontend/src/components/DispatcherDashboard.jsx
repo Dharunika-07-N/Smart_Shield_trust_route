@@ -85,8 +85,8 @@ const DispatcherDashboard = () => {
             const summary = await api.get('/admin/summary');
             setFleetStats({
                 totalFleet: summary.activeDrivers || 0,
-                activeTasks: summary.activeAlerts + (summary.totalTasks - (summary.totalTasks - summary.activeAlerts)), // Just a representative number
-                safetyIndex: `${summary.safetyScore}%`,
+                activeTasks: (summary.activeAlerts || 0) + (summary.totalTasks - (summary.totalTasks - (summary.activeAlerts || 0))), // Just a representative number
+                safetyIndex: `${summary.safetyScore || 95}%`,
                 networkLoad: `${Math.floor(Math.random() * 20) + 5}%` // Mock load
             });
 
@@ -96,11 +96,33 @@ const DispatcherDashboard = () => {
             } else if (activeTab === 'Drivers') {
                 const data = await api.get('/users/online');
                 setOnlineDrivers(Array.isArray(data) ? data : []);
+            } else if (activeTab === 'Alerts') {
+                const alerts = await api.get('/safety/alerts');
+                setPanicAlerts(Array.isArray(alerts) ? alerts : []);
             }
         } catch (e) {
             console.error("Failed to fetch dispatcher data", e);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const [panicAlerts, setPanicAlerts] = useState([]);
+
+    const handleResolveAlert = async (alertId, riderId) => {
+        if (!window.confirm("Confirm resolution of this SOS alert? Ensure the rider is safe.")) return;
+        
+        try {
+            await api.resolvePanicButton({
+                alert_id: alertId,
+                rider_id: riderId,
+                resolution_notes: "Resolved by Dispatcher"
+            });
+            alert("Alert resolved successfully.");
+            fetchData();
+        } catch (err) {
+            console.error("Failed to resolve alert", err);
+            alert("Resolution failed: " + err.message);
         }
     };
 
@@ -214,6 +236,7 @@ const DispatcherDashboard = () => {
     const menuItems = [
         { id: 'Overview', icon: FiActivity, label: 'Ops Overview' },
         { id: 'Fleet', icon: FiMap, label: 'Live Fleet Map' },
+        { id: 'Alerts', icon: FiAlertTriangle, label: 'Safety Alerts' },
         { id: 'Queue', icon: FiPackage, label: 'Delivery Queue' },
         { id: 'Drivers', icon: FiUsers, label: 'Active Drivers' },
         { id: 'Performance', icon: FiBarChart2, label: 'Analytics' }
@@ -409,6 +432,68 @@ const DispatcherDashboard = () => {
                     {activeTab === 'Performance' && (
                         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 h-full shadow-sm">
                             <Analytics />
+                        </div>
+                    )}
+
+                    {activeTab === 'Alerts' && (
+                        <div className="space-y-6">
+                            <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
+                                <FiAlertTriangle className="text-rose-600" />
+                                Active SOS & Emergency Signals
+                            </h2>
+                            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                                {panicAlerts.length === 0 ? (
+                                    <div className="py-20 text-center text-slate-400">
+                                        <FiCheckCircle size={48} className="mx-auto mb-4 text-emerald-500/20" />
+                                        <p className="font-bold">No active emergency signals</p>
+                                    </div>
+                                ) : (
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="bg-rose-50 border-b border-rose-100 uppercase text-[10px] font-black tracking-widest text-rose-400">
+                                                <th className="text-left px-6 py-4">Rider / Status</th>
+                                                <th className="text-left px-4 py-4">Location</th>
+                                                <th className="text-left px-4 py-4">Time</th>
+                                                <th className="text-right px-6 py-4">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50">
+                                            {panicAlerts.filter(a => a.status !== 'resolved').map(alert => (
+                                                <tr key={alert.id} className="bg-rose-50/20 animate-pulse">
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 bg-rose-600 text-white rounded-lg flex items-center justify-center font-bold">
+                                                                !
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-black text-rose-600">{alert.rider_id}</p>
+                                                                <p className="text-[10px] text-rose-400 font-bold uppercase">Panic Triggered</p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-4">
+                                                        <p className="text-xs font-bold text-slate-700">
+                                                            {alert.location?.latitude?.toFixed(4)}, {alert.location?.longitude?.toFixed(4)}
+                                                        </p>
+                                                        <p className="text-[10px] text-slate-400">Sector {Math.floor(alert.location?.latitude % 10)}</p>
+                                                    </td>
+                                                    <td className="px-4 py-4 text-slate-500 text-xs">
+                                                        {new Date(alert.created_at).toLocaleTimeString()}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <button 
+                                                            onClick={() => handleResolveAlert(alert.id, alert.rider_id)}
+                                                            className="px-4 py-2 bg-emerald-600 text-white text-[10px] font-black uppercase rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-500/10"
+                                                        >
+                                                            Resolve
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
                         </div>
                     )}
 

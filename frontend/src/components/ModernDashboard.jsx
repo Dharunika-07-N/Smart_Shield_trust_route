@@ -4,7 +4,7 @@ import {
     FiShield, FiMap, FiPackage, FiZap, FiAlertTriangle, FiBarChart2,
     FiSettings, FiMessageSquare, FiSearch, FiBell, FiUser, FiChevronRight,
     FiNavigation, FiClock, FiWind, FiDroplet, FiEye, FiActivity, FiLayers,
-    FiPlus, FiMinus, FiTarget, FiPhone, FiMapPin, FiLogOut
+    FiPlus, FiMinus, FiTarget, FiPhone, FiMapPin, FiLogOut, FiRefreshCw, FiCheckCircle
 } from 'react-icons/fi';
 import RouteMap from './RouteMap';
 import L from 'leaflet';
@@ -886,6 +886,11 @@ const ModernDashboard = () => {
                                                 <FiAlertTriangle className="text-2xl mb-2 group-hover:scale-110 transition-transform" />
                                                 <span className="text-[10px] font-black uppercase tracking-tight text-slate-800">Report Issue</span>
                                                 <span className="text-[8px] text-slate-500">Safety concern</span>
+                                            </button>
+                                            <button onClick={handleEmergency} className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition-all group shadow-lg ${sosActive ? 'bg-rose-600 border-rose-500 text-white animate-pulse' : 'bg-rose-50 border-rose-100 text-rose-600 hover:bg-rose-100'}`}>
+                                                <FiAlertTriangle className="text-2xl mb-2 group-hover:scale-110 transition-transform" />
+                                                <span className={`text-[10px] font-black uppercase tracking-tight ${sosActive ? 'text-white' : 'text-rose-700'}`}>{sosActive ? 'SOS ACTIVE' : 'PANIC (SOS)'}</span>
+                                                <span className={`text-[8px] ${sosActive ? 'text-rose-100' : 'text-rose-500'}`}>{sosActive ? 'Alerting Nodes...' : 'Immediate Alert'}</span>
                                             </button>
 
                                         </div>
