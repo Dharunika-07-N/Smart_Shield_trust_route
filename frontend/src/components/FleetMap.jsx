@@ -130,37 +130,96 @@ const FleetMap = () => {
 
                     <SafetyHeatmap show={showHeatmap} />
 
-                    {simulatedFleet.map((driver) => (
-                        <Marker
-                            key={driver.id}
-                            position={driver.position}
-                            icon={driverIcon(driver.status)}
-                        >
-                            <Popup className="custom-popup">
-                                <div className="p-2 min-w-[150px]">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <div className="w-6 h-6 bg-indigo-100 text-indigo-600 rounded flex items-center justify-center text-[10px] font-bold">
-                                            {driver.full_name?.substring(0, 2)}
+                    {(() => {
+                        // Simple grid-based clustering logic
+                        const clustered = [];
+                        const visited = new Set();
+                        const clusterRadius = 0.005; // ~500m
+
+                        simulatedFleet.forEach((driver, idx) => {
+                            if (visited.has(idx)) return;
+                            
+                            const cluster = [driver];
+                            visited.add(idx);
+
+                            simulatedFleet.forEach((other, oIdx) => {
+                                if (visited.has(oIdx)) return;
+                                const dist = Math.sqrt(
+                                    Math.pow(driver.position[0] - other.position[0], 2) + 
+                                    Math.pow(driver.position[1] - other.position[1], 2)
+                                );
+                                if (dist < clusterRadius) {
+                                    cluster.push(other);
+                                    visited.add(oIdx);
+                                }
+                            });
+
+                            if (cluster.length > 1) {
+                                clustered.push({
+                                    id: `cluster-${idx}`,
+                                    position: cluster[0].position,
+                                    count: cluster.length,
+                                    isCluster: true,
+                                    drivers: cluster
+                                });
+                            } else {
+                                clustered.push({ ...driver, isCluster: false });
+                            }
+                        });
+
+                        return clustered.map((item) => {
+                            if (item.isCluster) {
+                                return (
+                                    <Marker 
+                                        key={item.id} 
+                                        position={item.position}
+                                        icon={L.divIcon({
+                                            className: 'custom-cluster-icon',
+                                            html: `<div class="bg-indigo-600/90 text-white rounded-full w-10 h-10 flex items-center justify-center border-4 border-white shadow-lg font-black text-sm">
+                                                ${item.count}
+                                            </div>`,
+                                            iconSize: [40, 40]
+                                        })}
+                                    >
+                                        <Popup>
+                                            <div className="p-2">
+                                                <h4 className="font-bold text-slate-800 mb-2">Cluster: {item.count} Personnel</h4>
+                                                <div className="space-y-1">
+                                                    {item.drivers.map(d => (
+                                                        <div key={d.id} className="text-[10px] text-slate-600">• {d.full_name} ({d.role})</div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </Popup>
+                                    </Marker>
+                                );
+                            }
+                            return (
+                                <Marker
+                                    key={item.id}
+                                    position={item.position}
+                                    icon={driverIcon(item.status)}
+                                >
+                                    <Popup className="custom-popup">
+                                        <div className="p-2 min-w-[150px]">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <div className="w-6 h-6 bg-indigo-100 text-indigo-600 rounded flex items-center justify-center text-[10px] font-bold">
+                                                    {item.full_name?.substring(0, 2)}
+                                                </div>
+                                                <span className="font-bold text-sm text-slate-800">{item.full_name}</span>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <div className="flex justify-between text-[10px]">
+                                                    <span className="text-slate-400">Status</span>
+                                                    <span className="font-bold text-emerald-600 uppercase">Available</span>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <span className="font-bold text-sm text-slate-800">{driver.full_name}</span>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <div className="flex justify-between text-[10px]">
-                                            <span className="text-slate-400">Status</span>
-                                            <span className="font-bold text-emerald-600 uppercase">Available</span>
-                                        </div>
-                                        <div className="flex justify-between text-[10px]">
-                                            <span className="text-slate-400">Signal</span>
-                                            <span className="font-bold text-slate-700">98% Strong</span>
-                                        </div>
-                                    </div>
-                                    <button className="w-full mt-3 py-1.5 bg-indigo-600 text-white rounded text-[10px] font-bold hover:bg-indigo-700 transition-colors">
-                                        Assign Duty
-                                    </button>
-                                </div>
-                            </Popup>
-                        </Marker>
-                    ))}
+                                    </Popup>
+                                </Marker>
+                            );
+                        });
+                    })()}
                 </MapContainer>
             </div>
 
