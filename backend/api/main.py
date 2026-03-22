@@ -126,25 +126,63 @@ async def startup_event():
     asyncio.create_task(periodic_cache_cleanup())
     logger.info("📦 Location cache cleanup task started (runs every 60s)")
 
-    # Seed a default developer user if it doesn't exist
+    # Seed default developer users for all roles
     db = SessionLocal()
     try:
-        default_username = "dharunikaktm@gmail.com"
-        user = db.query(User).filter(User.username == default_username).first()
-        if not user:
-            logger.info(f"Seeding default user: {default_username}")
-            new_user = User(
-                username=default_username,
-                email=default_username,
-                hashed_password=get_password_hash("password123"),
-                role="rider",
-                full_name="Dharunika K",
-                status="active"
-            )
-            db.add(new_user)
-            db.commit()
+        users_to_seed = [
+            {
+                "username": "admin@smartshield.com",
+                "email": "admin@smartshield.com",
+                "hashed_password": get_password_hash("Admin@123"),
+                "role": "admin",
+                "full_name": "System Administrator",
+                "status": "active"
+            },
+            {
+                "username": "dispatcher@smartshield.com",
+                "email": "dispatcher@smartshield.com",
+                "hashed_password": get_password_hash("Dispatch@123"),
+                "role": "dispatcher",
+                "full_name": "Emergency Dispatcher",
+                "status": "active"
+            },
+            {
+                "username": "rider@smartshield.com",
+                "email": "rider@smartshield.com",
+                "hashed_password": get_password_hash("Rider@123"),
+                "role": "rider",
+                "full_name": "Smart Rider",
+                "status": "active"
+            },
+            {
+                "username": "dharunika07@gmail.com",
+                "email": "dharunika07@gmail.com",
+                "hashed_password": get_password_hash("password123"),
+                "role": "customer",
+                "full_name": "Dharunika 07",
+                "status": "active"
+            },
+            {
+                "username": "dharunikaktm@gmail.com",
+                "email": "dharunikaktm@gmail.com",
+                "hashed_password": get_password_hash("password123"),
+                "role": "rider",
+                "full_name": "Dharunika K",
+                "status": "active"
+            }
+        ]
+
+        for user_data in users_to_seed:
+            user = db.query(User).filter(User.username == user_data["username"]).first()
+            if not user:
+                logger.info(f"Seeding default user: {user_data['username']} ({user_data['role']})")
+                new_user = User(**user_data)
+                db.add(new_user)
+        
+        db.commit()
     except Exception as e:
         logger.error(f"Error seeding database: {e}")
+        db.rollback()
     finally:
         db.close()
 

@@ -410,6 +410,7 @@ class DeliveryFeedback(Base):
     feedback_text = Column(String, nullable=True)
     
     route = relationship("DeliveryRoute", back_populates="feedback")
+    submitted_at = Column(DateTime, default=datetime.utcnow)
 
 
 
@@ -447,8 +448,6 @@ class AlertPreferences(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    # Metadata
-    submitted_at = Column(DateTime, default=datetime.utcnow)
 
 
 

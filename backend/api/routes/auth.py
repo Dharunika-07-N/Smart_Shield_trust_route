@@ -177,7 +177,9 @@ def login(request: Request, response: Response, user_in: UserLogin, db: Session 
         "token_type": "bearer",
         "user_id": user.id,
         "username": user.username,
-        "role": user.role
+        "role": user.role,
+        "full_name": user.full_name,
+        "email": user.email
     }
 
 @router.post("/refresh", response_model=Token)
